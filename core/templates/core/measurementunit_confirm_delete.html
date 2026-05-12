@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Eliminación</h5>
+            </div>
+            <div class="card-body">
+                <p>¿Está seguro que desea eliminar la Unidad de Medida <strong>"{{ measurementunit.name }}"</strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="fa-solid fa-circle-info me-2"></i> <strong>Aviso:</strong> Si esta unidad está siendo usada por algún Tipo de Grasa, no podrá ser eliminada para mantener la integridad de la base de datos.
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'measurementunit_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-danger"><i class="fa-solid fa-trash me-1"></i> Eliminar Definitivamente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "budget/base_budget.html" %}
+
+{% block budget_content %}
+<div class="row justify-content-center animate__animated animate__fadeIn">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 rounded-3 overflow-hidden">
+            <div class="card-header bg-white border-0 pt-4 pb-0 text-center">
+                <div class="display-1 text-danger mb-3">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+                <h2 class="fw-bold">{{ title|default:"Confirmar Eliminación" }}</h2>
+            </div>
+            <div class="card-body p-4 text-center">
+                <p class="lead mb-4">
+                    ¿Está seguro que desea eliminar <strong>{{ object }}</strong>?
+                </p>
+                
+                <div class="alert alert-warning border-0">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                    <strong>Atención:</strong> Esta acción es irreversible y podría afectar datos relacionados (distribuciones, ejecuciones, etc).
+                </div>
+                
+                <form method="post" class="mt-4">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg rounded-pill shadow-sm">
+                            <i class="fa-solid fa-trash me-2"></i> Confirmar Eliminación
+                        </button>
+                        <a href="{% url cancel_url %}" class="btn btn-link text-muted mt-2">
+                            Cancelar y volver
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h2><i class="fa-solid fa-boxes-stacked me-2"></i> Casamatas (Stock Actual)</h2>
+    <div class="d-flex gap-2 flex-wrap justify-content-end">
+        <a href="{% url 'export_grease_batches_csv' %}" class="btn btn-success"><i class="fa-solid fa-file-csv me-2"></i>Excel (CSV)</a>
+        <a href="{% url 'export_grease_batches_pdf' %}" class="btn btn-danger"><i class="fa-solid fa-file-pdf me-2"></i>Imprimir (PDF)</a>
+        
+        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or user.unit %}
+        <a href="{% url 'consume_grease' %}" class="btn btn-warning"><i class="fa-solid fa-minus me-1"></i> Registrar Consumo</a>
+        <a href="{% url 'batch_create' %}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Ingresar Casamata</a>
+        {% endif %}
+        <a href="{% url 'batch_archived_list' %}" class="btn btn-outline-secondary"><i class="fa-solid fa-box-archive me-1"></i> Historial (Archivadas)</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Número de Lote</th>
+                    <th>Tipo de Grasa</th>
+                    <th>Vencimiento</th>
+                    <th>Estado</th>
+                    <th>Disponibilidad</th>
+                    <th>Valor Unit. / Total</th>
+                    <th>Ubicación</th>
+                    <th class="text-end">Auditoría</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in batches %}
+                <tr class="{% if batch.available_quantity <= 0 %}table-secondary text-muted{% elif batch.status == 'EXPIRED' %}table-danger{% elif batch.status == 'NEAR_EXPIRATION' %}table-warning{% elif batch.status == 'PENDING_RETEST' %}table-info{% endif %}">
+                    <td><strong>{{ batch.batch_number }}</strong></td>
+                    <td>{{ batch.grease_type.nomenclatura }}</td>
+                    <td data-sort="{{ batch.expiration_date|date:'Y-m-d' }}">{{ batch.expiration_date|date:"d M Y" }}</td>
+                    <td>
+                        {% if batch.available_quantity <= 0 %}
+                            <span class="badge bg-secondary"><i class="fa-solid fa-box-open"></i> Sin Stock</span>
+                        {% elif batch.status == 'SERVICEABLE' %}
+                            <span class="badge bg-success"><i class="fa-solid fa-check"></i> Retesteable</span>
+                        {% elif batch.status == 'NEAR_EXPIRATION' %}
+                            <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation"></i> Próx. a vencer</span>
+                        {% elif batch.status == 'EXPIRED' %}
+                            <span class="badge bg-danger"><i class="fa-solid fa-ban"></i> Vencido</span>
+                        {% elif batch.status == 'PENDING_RETEST' %}
+                            <span class="badge bg-info text-dark"><i class="fa-solid fa-flask-vial"></i> Retesteando...</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ batch.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex flex-column">
+                            <span class="fw-bold" style="font-size: 1.05em;">
+                                {{ batch.available_quantity|smart_number }} <small class="text-muted fw-normal">{{ batch.grease_type.unidad }} disp.</small>
+                            </span>
+                            <span class="text-muted" style="font-size: 0.85em;">
+                                de {{ batch.initial_quantity|smart_number }} {{ batch.grease_type.unidad }} iniciales
+                                {% if batch.container_size and batch.container_count %}
+                                    <br>({{ batch.container_count }} × {{ batch.container_size|smart_number }} {{ batch.grease_type.unidad }})
+                                {% endif %}
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if batch.unit_price %}
+                            <small class="text-muted">${{ batch.unit_price|floatformat:2 }} c/u</small><br>
+                            <strong>${{ batch.get_total_value|floatformat:2 }}</strong>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ batch.storage_location }}</td>
+                    <td class="text-end text-nowrap">
+                        <a href="{% url 'batch_detail' batch.id %}" class="btn btn-sm btn-outline-info"><i class="fa-solid fa-list-ul"></i> Movimientos</a>
+                        {% if batch.available_quantity <= 0 %}
+                        <form action="{% url 'batch_archive' batch.id %}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas archivar esta casamata? Se moverá al historial de consumidos.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-secondary ms-1" title="Archivar al Historial">
+                                <i class="fa-solid fa-box-archive"></i> Archivar
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+                        <a href="{% url 'batch_update' batch.id %}" class="btn btn-sm btn-outline-primary ms-1" title="Editar"><i class="fa-solid fa-pen"></i></a>
+                        <a href="{% url 'batch_delete' batch.id %}" class="btn btn-sm btn-outline-danger ms-1" title="Eliminar"><i class="fa-solid fa-trash"></i></a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">No hay casamatas registradas en stock.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ title }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="mt-4 d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary" onclick="window.history.back();">Cancelar</button>
+                        <button type="submit" class="btn btn-success"><i class="fa-solid fa-save me-1"></i> Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const containerSizeInput = document.getElementById('id_container_size');
+        const containerCountInput = document.getElementById('id_container_count');
+        const initialQuantityInput = document.getElementById('id_initial_quantity');
+
+        if (containerSizeInput && containerCountInput && initialQuantityInput) {
+            function updateQuantity() {
+                const size = parseFloat(containerSizeInput.value) || 0;
+                const count = parseInt(containerCountInput.value) || 0;
+                if (size > 0 && count > 0) {
+                    initialQuantityInput.value = (size * count).toFixed(2);
+                }
+            }
+
+            containerSizeInput.addEventListener('input', updateQuantity);
+            containerCountInput.addEventListener('input', updateQuantity);
+        }
+    });
+</script>
+{% endblock %}

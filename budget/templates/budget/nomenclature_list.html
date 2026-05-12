@@ -1,0 +1,85 @@
+{% extends "budget/base_budget.html" %}
+
+{% block budget_content %}
+<div class="row animate__animated animate__fadeIn">
+    <div class="col-12 d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{% url 'budget:nomenclature_dashboard' %}">Configuración</a></li>
+                    <li class="breadcrumb-item active">{{ config.name }}</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold mb-0">{{ config.name }}</h2>
+        </div>
+        <a href="{% url 'budget:nomenclature_create' config.id %}" class="btn btn-success rounded-pill px-4 shadow-sm">
+            <i class="fa-solid fa-plus me-2"></i> Agregar Nuevo
+        </a>
+    </div>
+
+    <div class="col-12">
+        <div class="card card-stats border-0 shadow-sm p-4">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="bg-light">
+                        <tr class="small text-uppercase text-muted">
+                            <th style="width: 150px;">Código</th>
+                            <th>Descripción / Nombre</th>
+                            <th class="text-end" style="width: 150px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark border fw-bold">{{ item.code|default:item.id }}</span></td>
+                            <td>{{ item.name }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'budget:nomenclature_update' config.id item.pk %}" class="btn btn-sm btn-outline-primary rounded-circle me-1" title="Editar">
+                                    <i class="fa-solid fa-pen"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-circle" 
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal{{ item.pk }}">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-folder-open h1 d-block mb-3 opacity-25"></i>
+                                No se encontraron registros en este catálogo.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% for item in items %}
+<!-- Delete Modal for {{ item }} -->
+<div class="modal fade" id="deleteModal{{ item.pk }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold">Confirmar Eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-start">
+                ¿Está seguro que desea eliminar a <strong>{{ item }}</strong>? 
+                <br><small class="text-danger">Esta acción no se puede deshacer si existen créditos o gastos asociados.</small>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <form action="{% url 'budget:nomenclature_delete' config.id item.pk %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger rounded-pill px-4">Eliminar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

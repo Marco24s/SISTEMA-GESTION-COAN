@@ -1,0 +1,65 @@
+{% extends "budget/base_budget.html" %}
+{% load budget_tags %}
+
+{% block budget_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold"><i class="fa-solid fa-tag-slash text-warning me-2"></i>Desasignar Tipo de Crédito</h2>
+            <a href="{% url 'budget:credit_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left"></i> Cancelar
+            </a>
+        </div>
+
+        <div class="card card-stats p-4">
+            <div class="alert alert-warning border-0 mb-4">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                Está a punto de <strong>remover la clasificación de tipo</strong> del siguiente crédito. Esta acción quedará registrada en el historial de auditoría.
+            </div>
+
+            <dl class="row mb-4">
+                <dt class="col-sm-4 text-muted small text-uppercase">Crédito</dt>
+                <dd class="col-sm-8 fw-bold font-monospace">{{ credit }}</dd>
+
+                <dt class="col-sm-4 text-muted small text-uppercase">Tipo Actual</dt>
+                <dd class="col-sm-8">
+                    <span class="badge {{ credit.credit_type.code|credit_type_badge_color }} rounded-pill">{{ credit.credit_type }}</span>
+                </dd>
+
+                <dt class="col-sm-4 text-muted small text-uppercase">Resultado</dt>
+                <dd class="col-sm-8 text-muted">
+                    <span class="badge bg-secondary rounded-pill opacity-50">Sin Tipo</span>
+                </dd>
+            </dl>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label for="current_amount" class="form-label fw-bold">Monto actual del crédito</label>
+                        <input type="text" name="current_amount" id="current_amount" class="form-control currency-input" value="{{ current_amount|default:credit.total_amount }}" placeholder="0,00">
+                        <div class="form-text">Ingrese el monto de referencia del crédito antes de la desasignación.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="unassign_amount" class="form-label fw-bold">Monto a desasignar</label>
+                        <input type="text" name="unassign_amount" id="unassign_amount" class="form-control currency-input" value="{{ unassign_amount }}" placeholder="0,00">
+                        <div class="form-text">Ingrese cuánto del crédito está desasignando en esta acción.</div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="notes" class="form-label fw-bold">Motivo de la Desasignación <small class="text-muted fw-normal">(opcional pero recomendado)</small></label>
+                    <textarea name="notes" id="notes" class="form-control" rows="3" placeholder="Ej: Error al cargar el tipo, se corregirá más adelante...">{{ notes }}</textarea>
+                </div>
+
+                <div class="d-flex gap-2 justify-content-end">
+                    <a href="{% url 'budget:credit_list' %}" class="btn btn-light rounded-pill px-4">Cancelar</a>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold text-dark">
+                        <i class="fa-solid fa-link-slash me-2"></i>Confirmar Desasignación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

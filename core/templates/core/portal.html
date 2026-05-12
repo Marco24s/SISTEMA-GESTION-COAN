@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Integrado - Aviación Naval</title>
+    
+     <!-- Bootstrap CSS (LOCAL) -->
+    <link href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
+    <!-- FontAwesome (LOCAL) -->
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    
+    <!-- Google Fonts -->
+    <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.9) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .portal-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1rem;
+        }
+
+        .system-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+            height: 100%;
+        }
+
+        .system-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+            z-index: -1;
+        }
+
+        .system-card.active-system:hover {
+            transform: translateY(-10px);
+        }
+
+        .system-card.disabled-system:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .icon-box {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .active-system .icon-box {
+            color: white;
+        }
+
+        .active-system:hover .icon-box {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        /* SGMG Theme (Blue) */
+        .sgmg-theme.active-system:hover {
+            box-shadow: 0 25px 50px rgba(13, 110, 253, 0.2);
+            border-color: rgba(13, 110, 253, 0.3);
+        }
+        .sgmg-theme .icon-box {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            box-shadow: 0 10px 20px rgba(13, 110, 253, 0.3);
+        }
+        .sgmg-theme .btn-portal {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
+        }
+        .sgmg-theme .btn-portal:hover {
+            background-color: #0a58ca;
+            border-color: #0a58ca;
+            box-shadow: 0 5px 15px rgba(13, 110, 253, 0.3);
+        }
+
+        /* SIGERA Theme (Orange/Amber) */
+        .sigera-theme.active-system:hover {
+            box-shadow: 0 25px 50px rgba(253, 126, 20, 0.2);
+            border-color: rgba(253, 126, 20, 0.3);
+        }
+        .sigera-theme .icon-box {
+            background: linear-gradient(135deg, #fd7e14 0%, #e8590c 100%);
+            box-shadow: 0 10px 20px rgba(253, 126, 20, 0.3);
+        }
+        .sigera-theme .btn-portal {
+            background-color: #fd7e14;
+            border-color: #fd7e14;
+            color: white;
+        }
+        .sigera-theme .btn-portal:hover {
+            background-color: #e8590c;
+            border-color: #e8590c;
+            box-shadow: 0 5px 15px rgba(253, 126, 20, 0.3);
+        }
+
+        /* SGP Theme (Green) */
+        .sgp-theme.active-system:hover {
+            box-shadow: 0 25px 50px rgba(25, 135, 84, 0.2);
+            border-color: rgba(25, 135, 84, 0.3);
+        }
+        .sgp-theme .icon-box {
+            background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+            box-shadow: 0 10px 20px rgba(25, 135, 84, 0.3);
+        }
+        .sgp-theme .btn-portal {
+            background-color: #198754;
+            border-color: #198754;
+            color: white;
+        }
+        .sgp-theme .btn-portal:hover {
+            background-color: #146c43;
+            border-color: #146c43;
+            box-shadow: 0 5px 15px rgba(25, 135, 84, 0.3);
+        }
+
+        .disabled-system .icon-box {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+            box-shadow: 0 10px 20px rgba(108, 117, 125, 0.2);
+        }
+
+        .badge-soon {
+            position: absolute;
+            top: 20px;
+            right: -30px;
+            background: #ffc107;
+            color: #000;
+            padding: 5px 40px;
+            transform: rotate(45deg);
+            font-size: 0.8rem;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .btn-portal {
+            border-radius: 50px;
+            padding: 10px 30px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="#">
+                <i class="fa-solid fa-anchor text-primary me-2"></i>
+                COAN - Portal Integrado
+            </a>
+            <div class="d-flex align-items-center ms-auto">
+                <span class="text-muted me-3">
+                    <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}
+                </span>
+                <form method="post" action="{% url 'logout' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3">
+                        <i class="fa-solid fa-right-from-bracket me-1"></i> Salir
+                    </button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    <div class="portal-container mt-5">
+        <div class="container">
+            <div class="text-center mb-5 animate__animated animate__fadeInDown">
+                <h1 class="display-5 fw-bold text-dark mb-2">Sistemas de Gestión</h1>
+                <p class="lead text-muted">Seleccione el sistema al que desea ingresar</p>
+            </div>
+
+            <div class="row justify-content-center g-4">
+                
+                <!-- SGMG Card -->
+                <div class="col-md-5 col-lg-4">
+                    <div class="card system-card active-system sgmg-theme p-4 h-100">
+                        <div class="card-body d-flex flex-column align-items-center text-center">
+                            <div class="icon-box">
+                                <i class="fa-solid fa-oil-can"></i>
+                            </div>
+                            <h3 class="card-title fw-bold mb-3">SGMG</h3>
+                            <p class="card-text text-muted mb-4 flex-grow-1">
+                                Sistema de Gestión de Materias Grasas Aeronáuticas. Control de stock, vencimientos y abastecimiento.
+                            </p>
+                            <a href="{% url 'home' %}" class="btn btn-primary btn-portal w-100 mt-auto">
+                                Ingresar al Sistema <i class="fa-solid fa-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SIGERA Card -->
+                <div class="col-md-5 col-lg-4">
+                    <div class="card system-card active-system sigera-theme p-4 h-100 position-relative">
+                        <div class="card-body d-flex flex-column align-items-center text-center">
+                            <div class="icon-box">
+                                <i class="fa-solid fa-shirt"></i>
+                            </div>
+                            <h3 class="card-title fw-bold mb-3">SIGERA</h3>
+                            <p class="card-text text-muted mb-4 flex-grow-1">
+                                Sistema de Gestión de Ropa Aeronaval. Control integral de vestuario y equipamiento.
+                            </p>
+                            <a href="{% url 'sigera:home' %}" class="btn btn-primary btn-portal w-100 mt-auto">
+                                Ingresar al Sistema <i class="fa-solid fa-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SGP Card -->
+                <div class="col-md-5 col-lg-4">
+                    <div class="card system-card active-system sgp-theme p-4 h-100 position-relative">
+                        <div class="card-body d-flex flex-column align-items-center text-center">
+                            <div class="icon-box">
+                                <i class="fa-solid fa-money-bill-trend-up"></i>
+                            </div>
+                            <h3 class="card-title fw-bold mb-3">SGP</h3>
+                            <p class="card-text text-muted mb-4 flex-grow-1">
+                                Sistema de Gestión Presupuestaria. Control total de créditos, distribución y ejecución de gastos por etapas.
+                            </p>
+                            <a href="{% url 'budget:dashboard' %}" class="btn btn-primary btn-portal w-100 mt-auto">
+                                Ingresar al Sistema <i class="fa-solid fa-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle (LOCAL) -->
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

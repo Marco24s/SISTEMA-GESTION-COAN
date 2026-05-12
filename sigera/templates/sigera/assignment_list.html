@@ -1,0 +1,324 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row align-items-center mb-4 mt-2">
+    <div class="col-md-6">
+        <h2 class="fw-bold mb-0" style="color: #462880;"><i class="fa-solid fa-hand-holding-hand me-2"></i>Historial de Entregas</h2>
+        <p class="text-muted">Registro de altas y devoluciones de cargo.</p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <a href="{% url 'sigera:home' %}" class="btn btn-outline-secondary rounded-pill px-4 me-2">
+            <i class="fa-solid fa-arrow-left me-2"></i>Volver al Panel
+        </a>
+        {% if is_admin %}
+        <a href="{% url 'sigera:assignment_create' %}" class="btn btn-warning rounded-pill px-4 text-dark">
+            <i class="fa-solid fa-plus me-2"></i>Registrar Entrega
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+
+
+<!-- TABS DE NAVEGACION -->
+<ul class="nav nav-tabs mb-4 border-bottom" id="provisionTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold border-0 border-bottom border-3" id="historial-tab" data-bs-toggle="tab" data-bs-target="#historial-tab-pane" type="button" role="tab" aria-controls="historial-tab-pane" aria-selected="true" style="color: #6f42c1; border-color: #6f42c1 !important;">
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>Historial General
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold border-0 border-bottom border-3 text-success" id="primera-tab" data-bs-toggle="tab" data-bs-target="#primera-tab-pane" type="button" role="tab" aria-controls="primera-tab-pane" aria-selected="false" style="border-color: transparent;">
+            <i class="fa-solid fa-seedling me-2"></i>Primera Provisión
+            {% if personnel_first_provision %}<span class="badge bg-success ms-1">{{ personnel_first_provision.count }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold border-0 border-bottom border-3 text-warning" id="renovaciones-tab" data-bs-toggle="tab" data-bs-target="#renovaciones-tab-pane" type="button" role="tab" aria-controls="renovaciones-tab-pane" aria-selected="false" style="border-color: transparent;">
+            <i class="fa-solid fa-arrows-rotate me-2"></i>Renovaciones
+            {% if renewals_list %}<span class="badge bg-warning text-dark ms-1">{{ renewals_list|length }}</span>{% endif %}
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="provisionTabsContent">
+    <!-- TAB 1: HISTORIAL GENERAL -->
+    <div class="tab-pane fade show active" id="historial-tab-pane" role="tabpanel" aria-labelledby="historial-tab" tabindex="0">
+        <div class="card shadow-sm border-0 mb-5" style="border-radius: 15px; overflow: hidden;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Registro General</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0">
+                        <thead style="background-color: #f8f9fa;">
+                            <tr>
+                                <th scope="col" class="py-3 px-4 text-muted" style="width: 40%;">Personal (Grado y Nombre)</th>
+                                <th scope="col" class="py-3 text-muted text-center">Unidad</th>
+                                <th scope="col" class="py-3 text-muted text-center">Resumen del Cargo</th>
+                                <th scope="col" class="py-3 text-muted text-end px-4">Ver Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-top-0">
+                            {% regroup assignment_list by personnel as grouped_assignments %}
+                            {% for person_group in grouped_assignments %}
+                                <!-- FILA DEL ACORDEON (PERSONAL) -->
+                                <tr data-bs-toggle="collapse" data-bs-target="#collapse-person-{{ person_group.grouper.id }}" style="cursor: pointer;" class="table-light border-bottom">
+                                    <td class="px-4 py-3">
+                                        <div class="fw-bold" style="color: #462880; font-size: 1.1rem;">
+                                            <i class="fa-solid fa-user-shield me-2 opacity-75"></i>
+                                            {{ person_group.grouper.last_name }}, {{ person_group.grouper.first_name }}
+                                        </div>
+                                        <small class="text-muted"><i class="fa-solid fa-id-badge me-1"></i>{{ person_group.grouper.get_rank_display }} | Matrícula: {{ person_group.grouper.dni }}</small>
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        {% if person_group.grouper.assigned_unit %}
+                                            <span class="badge border bg-white text-dark shadow-sm">{{ person_group.grouper.assigned_unit.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted fst-italic">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        <span class="badge bg-primary rounded-pill px-3 py-2"><i class="fa-solid fa-box-open me-1"></i> {{ person_group.list|length }} Registro(s)</span>
+                                    </td>
+                                    <td class="py-3 text-end px-4">
+                                        <button class="btn btn-sm btn-outline-primary rounded-circle shadow-sm">
+                                            <i class="fa-solid fa-chevron-down"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                
+                                <!-- CONTENIDO DESPLEGABLE (SUB-TABLA DE ENTREGAS DE ESA PERSONA) -->
+                                <tr class="p-0 m-0 border-0 bg-white">
+                                    <td colspan="4" class="p-0 m-0 border-0">
+                                        <div class="collapse" id="collapse-person-{{ person_group.grouper.id }}">
+                                            <div class="p-4" style="background-color: #fbfbfb; border-bottom: 2px solid #dee2e6;">
+                                                <h6 class="fw-bold text-muted mb-3"><i class="fa-solid fa-clipboard-list me-2"></i>Ficha Detallada de Cargo</h6>
+                                                <table class="table table-sm table-bordered bg-white shadow-sm mb-0">
+                                                    <thead class="table-light text-muted">
+                                                        <tr>
+                                                            <th class="ps-3 py-2">F. Emisión</th>
+                                                            <th class="py-2">Prenda Otorgada</th>
+                                                            <th class="py-2 text-center">Cant.</th>
+                                                            <th class="py-2 text-center">Estado de Cargo</th>
+                                                            <th class="py-2 text-center">Operaciones</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for item in person_group.list %}
+                                                            <tr>
+                                                                <td class="ps-3 py-2 align-middle fw-bold">{{ item.assigned_date|date:"d/m/Y" }}</td>
+                                                                <td class="py-2 align-middle">
+                                                                    <div class="fw-bold text-dark">{{ item.batch.clothing_size.clothing_type.name }}</div>
+                                                                    <span class="badge bg-light text-dark border mt-1">Talle: {{ item.batch.clothing_size.size }}</span>
+                                                                </td>
+                                                                <td class="py-2 align-middle text-center fw-bold">{{ item.quantity }}</td>
+                                                                <td class="py-2 align-middle text-center">
+                                                                    {% if item.returned %}
+                                                                        <span class="badge rounded-pill bg-secondary px-2 py-1"><i class="fa-solid fa-check me-1"></i>Devuelto</span>
+                                                                        <div class="small text-muted mt-1">{{ item.return_date|date:"d/m/Y" }}</div>
+                                                                    {% else %}
+                                                                        <span class="badge rounded-pill bg-success px-2 py-1"><i class="fa-solid fa-user-check me-1"></i>Provisto</span>
+                                                                        {% if item.expiration_date %}
+                                                                            <div class="mt-1">
+                                                                            {% if item.is_expired %}
+                                                                                <small class="text-danger fw-bold"><i class="fa-solid fa-circle-exclamation"></i> Vencido</small>
+                                                                            {% else %}
+                                                                                <small class="text-muted"><i class="fa-solid fa-hourglass-half"></i> Expira: {{ item.expiration_date|date:'m/Y' }}</small>
+                                                                            {% endif %}
+                                                                            </div>
+                                                                        {% endif %}
+                                                                    {% endif %}
+                                                                </td>
+                                                                <td class="py-2 align-middle text-center">
+                                                                    {% if not item.returned %}
+                                                                        {% if item.batch.clothing_size.clothing_type.must_be_returned %}
+                                                                            {% if is_admin %}
+                                                                            <form method="post" action="{% url 'sigera:assignment_return' item.pk %}" onsubmit="return confirm('¿Confirma que el material fue devuelto? Esto restablecerá {{ item.quantity }} unidades al pañol.');">
+                                                                                {% csrf_token %}
+                                                                                <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm py-0" title="Devolver unitario">
+                                                                                    <i class="fa-solid fa-rotate-left"></i> Devolver
+                                                                                </button>
+                                                                            </form>
+                                                                            {% else %}
+                                                                                <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Pendiente</span>
+                                                                            {% endif %}
+                                                                        {% else %}
+                                                                            <span class="badge bg-light text-muted border"><i class="fa-solid fa-ban me-1"></i>No retorna</span>
+                                                                        {% endif %}
+                                                                    {% else %}
+                                                                        <span class="text-muted small"><i class="fa-solid fa-lock"></i> Cerrado</span>
+                                                                    {% endif %}
+                                                                </td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-clipboard-list fa-3x mb-3" style="color: #e0cffc;"></i>
+                                        <h5>No hay registros de entregas</h5>
+                                        <p>No se han registrado entregas de material en el sistema.</p>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- TAB 2: PRIMERA PROVISION -->
+    <div class="tab-pane fade" id="primera-tab-pane" role="tabpanel" aria-labelledby="primera-tab" tabindex="0">
+        <div class="card shadow-sm border-0 mb-5" style="border-radius: 15px; overflow: hidden; border-top: 4px solid #198754 !important;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold text-success">Personal Sin Dotación</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0">
+                        <thead style="background-color: #f8f9fa;">
+                            <tr>
+                                <th scope="col" class="py-3 px-4 text-muted">Ape. y Nombres</th>
+                                <th scope="col" class="py-3 text-muted text-center">Jerarquía/Rango</th>
+                                <th scope="col" class="py-3 text-muted text-center">Matrícula</th>
+                                <th scope="col" class="py-3 text-muted">Unidad</th>
+                                <th scope="col" class="py-3 text-muted text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-top-0">
+                            {% for person in personnel_first_provision %}
+                                <tr>
+                                    <td class="px-4 py-3 fw-bold">{{ person.last_name }}, {{ person.first_name }}</td>
+                                    <td class="py-3 text-center">
+                                        <span class="badge border bg-light text-dark">{{ person.get_rank_display }}</span>
+                                    </td>
+                                    <td class="py-3 font-monospace text-center">{{ person.dni }}</td>
+                                    <td class="py-3 text-muted">
+                                        {% if person.assigned_unit %}
+                                            <i class="fa-solid fa-building-flag me-1 text-success opacity-50"></i> {{ person.assigned_unit.name }}
+                                        {% else %}
+                                            <span class="text-muted fst-italic">Sin unidad</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        {% if is_admin %}
+                                        <a href="{% url 'sigera:assignment_create' %}?person={{ person.id }}" class="btn btn-sm btn-success shadow-sm rounded-pill px-3">
+                                            <i class="fa-solid fa-truck-fast me-1"></i> Proveer
+                                        </a>
+                                        {% else %}
+                                        <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Pendiente</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-check-double fa-3x mb-3 text-success opacity-50"></i>
+                                        <h5>Todo Al Día</h5>
+                                        <p>No hay personal registrado sin al menos una provisión.</p>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- TAB 3: RENOVACIONES -->
+    <div class="tab-pane fade" id="renovaciones-tab-pane" role="tabpanel" aria-labelledby="renovaciones-tab" tabindex="0">
+        <div class="card shadow-sm border-0 mb-5" style="border-radius: 15px; overflow: hidden; border-top: 4px solid #ffc107 !important;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold text-warning" style="text-shadow: 0 0 1px rgba(0,0,0,0.2);">Dotación Próxima a Vencer o Vencida</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0">
+                        <thead style="background-color: #f8f9fa;">
+                            <tr>
+                                <th scope="col" class="py-3 px-4 text-muted">Personal</th>
+                                <th scope="col" class="py-3 text-muted">Prenda Asignada</th>
+                                <th scope="col" class="py-3 text-muted text-center">Fecha Entrega</th>
+                                <th scope="col" class="py-3 text-muted text-center">Estado de Renovación</th>
+                                <th scope="col" class="py-3 text-muted text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="border-top-0">
+                            {% for item in renewals_list %}
+                                <tr {% if item.is_expired %}class="table-danger"{% endif %}>
+                                    <td class="px-4 py-3">
+                                        <div class="fw-bold">{{ item.personnel.last_name }}, {{ item.personnel.first_name }}</div>
+                                        <small class="text-muted">{{ item.personnel.get_rank_display }}</small>
+                                    </td>
+                                    <td class="py-3">
+                                        <div>{{ item.batch.clothing_size.clothing_type.name }}</div>
+                                        <span class="badge bg-light text-dark border">Talle: {{ item.batch.clothing_size.size }}</span>
+                                    </td>
+                                    <td class="py-3 text-center">{{ item.assigned_date|date:"d/m/Y" }}</td>
+                                    <td class="py-3 text-center">
+                                        {% if item.is_expired %}
+                                            <span class="badge bg-danger px-3 py-2 rounded-pill shadow-sm"><i class="fa-solid fa-circle-exclamation me-1"></i> Vencido ({{ item.expiration_date|date:'d/m/Y' }})</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark px-3 py-2 rounded-pill shadow-sm border border-warning"><i class="fa-solid fa-hourglass-end me-1"></i> Vence pronto ({{ item.expiration_date|date:'d/m/Y' }})</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        {% if is_admin %}
+                                        <a href="{% url 'sigera:assignment_create' %}?person={{ item.personnel.id }}" class="btn btn-sm btn-warning shadow-sm rounded-pill px-3">
+                                            <i class="fa-solid fa-arrows-rotate me-1"></i> Renovar
+                                        </a>
+                                        {% else %}
+                                        <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Requiere</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-shield-halved fa-3x mb-3 text-warning opacity-50"></i>
+                                        <h5>No Hay Renovaciones Urgentes</h5>
+                                        <p>Todas las dotaciones entregadas se encuentran en su periodo óptimo de uso.</p>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script para que Bootstrap maneje las tabs y los colores de las líneas activas
+    document.addEventListener('DOMContentLoaded', function () {
+        var tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]')
+        tabEls.forEach(function (tabEl) {
+            tabEl.addEventListener('show.bs.tab', function (event) {
+                // Reset border colors on all
+                tabEls.forEach(function(el) {
+                    el.style.setProperty('border-color', 'transparent', 'important');
+                });
+                
+                // Set color for active tab
+                if (event.target.id === 'historial-tab') {
+                    event.target.style.setProperty('border-color', '#6f42c1', 'important');
+                } else if (event.target.id === 'primera-tab') {
+                    event.target.style.setProperty('border-color', '#198754', 'important'); // success green
+                } else if (event.target.id === 'renovaciones-tab') {
+                    event.target.style.setProperty('border-color', '#ffc107', 'important'); // warning yellow
+                }
+            })
+        })
+    });
+</script>
+{% endblock %}

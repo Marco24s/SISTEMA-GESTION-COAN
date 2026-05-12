@@ -1,0 +1,187 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block budget_content %}
+<div class="row align-items-center mb-4">
+    <div class="col">
+        <h2 class="fw-bold"><i class="fa-solid fa-chart-pie text-success me-2"></i>Clasificación: {{ classification.name }}</h2>
+        <p class="text-muted mb-0">{{ classification.notes|default:"Esta vista muestra los totales agregados de todos los créditos bajo este grupo." }}</p>
+    </div>
+    <div class="col-auto">
+        <a href="{% url 'budget:classification_list' %}" class="btn btn-outline-secondary rounded-pill px-4 me-2">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver a Clasificaciones
+        </a>
+        <a href="{% url 'budget:classification_assign' classification.pk %}" class="btn btn-primary rounded-pill px-4">
+            <i class="fa-solid fa-list-check me-1"></i> Editar Asignaciones
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card card-stats p-3 border-start border-4 border-primary h-100 shadow-sm">
+            <div class="text-muted small text-uppercase mb-1">Monto Total Distribuido</div>
+            <div class="h4 mb-0 fw-bold text-primary">${{ stats.total_allocated|floatformat:2 }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-stats p-3 border-start border-4 border-warning h-100 shadow-sm">
+            <div class="text-muted small text-uppercase mb-1">Total Comprometido</div>
+            <div class="h4 mb-0 fw-bold text-warning">${{ stats.total_spent|floatformat:2 }}</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-stats p-3 border-start border-4 border-success h-100 shadow-sm">
+            <div class="text-muted small text-uppercase mb-1">Total Pagado</div>
+            <div class="h4 mb-0 fw-bold text-success">${{ stats.total_paid|floatformat:2 }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-stats p-4">
+    <h5 class="fw-bold mb-4">Créditos Distribuidos Agrupados ({{ allocation_details|length }})</h5>
+    
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="bg-light">
+                <tr class="small text-uppercase text-muted">
+                    <th style="width: 40px;">
+                        <input class="form-check-input" type="checkbox" id="select-all-class">
+                    </th>
+                    <th>Unidad</th>
+                    <th class="text-center">Periodo</th>
+                    <th>Nomenclatura (AA.PP.)</th>
+                    <th class="text-end">Monto Distribuido</th>
+                    <th class="text-end">Comprometido</th>
+                    <th class="text-end">Devengado</th>
+                    <th class="text-end">Pagado</th>
+                    <th class="text-center">Ejecución (%)</th>
+                </tr>
+            </thead>
+            <tbody class="border-top-0">
+                {% for item in allocation_details %}
+                <tr class="class-row" 
+                    data-allocated="{{ item.allocation.allocated_amount|unlocalize }}"
+                    data-spent="{{ item.spent|unlocalize }}"
+                    data-accrued="{{ item.accrued|unlocalize }}"
+                    data-paid="{{ item.paid|unlocalize }}">
+                    <td>
+                        <input class="form-check-input class-checkbox" type="checkbox">
+                    </td>
+                    <td class="fw-bold text-dark">{{ item.allocation.unit.name }}</td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary bg-opacity-10 text-dark rounded-pill px-3">{{ item.allocation.get_quarters_display }}</span>
+                    </td>
+                    <td class="small">
+                        <a href="{% url 'budget:credit_detail' item.allocation.credit.pk %}" class="text-decoration-none">
+                            {{ item.allocation.credit }}
+                        </a>
+                    </td>
+                    <td class="text-end text-primary fw-bold">${{ item.allocation.allocated_amount|localize }}</td>
+                    <td class="text-end text-warning">${{ item.spent|localize }}</td>
+                    <td class="text-end text-info">${{ item.accrued|localize }}</td>
+                    <td class="text-end text-success">${{ item.paid|localize }}</td>
+                    <td class="text-center align-middle">
+                        {% if item.allocation.allocated_amount > 0 %}
+                            {% widthratio item.spent item.allocation.allocated_amount 100 as execution_percent %}
+                            <div class="progress" style="height: 6px;" title="{{ execution_percent }}% Comprometido">
+                                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ execution_percent }}%"></div>
+                            </div>
+                        {% else %}
+                            <span class="text-muted small">0%</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        No hay distribuciones asignadas a esta clasificación. Usa el botón "Editar Asignaciones".
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-success bg-opacity-10 d-none" id="class-summary-row">
+                <tr class="fw-bold">
+                    <td colspan="4" class="text-end py-2 small">SUMA SELECCIONADA:</td>
+                    <td class="text-end py-2 text-primary" id="sum-allocated">$0,00</td>
+                    <td class="text-end py-2 text-warning" id="sum-spent">$0,00</td>
+                    <td class="text-end py-2 text-info" id="sum-accrued">$0,00</td>
+                    <td class="text-end py-2 text-success" id="sum-paid">$0,00</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formatCurrency = (value) => {
+        return new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            minimumFractionDigits: 2
+        }).format(value);
+    };
+
+    const selectAll = document.getElementById('select-all-class');
+    const checkboxes = document.querySelectorAll('.class-checkbox');
+    const summaryRow = document.getElementById('class-summary-row');
+    const sumAllocated = document.getElementById('sum-allocated');
+    const sumSpent = document.getElementById('sum-spent');
+    const sumAccrued = document.getElementById('sum-accrued');
+    const sumPaid = document.getElementById('sum-paid');
+
+    const updateTotals = () => {
+        const checked = document.querySelectorAll('.class-checkbox:checked');
+        let totalAllocated = 0;
+        let totalSpent = 0;
+        let totalAccrued = 0;
+        let totalPaid = 0;
+
+        checked.forEach(cb => {
+            const row = cb.closest('.class-row');
+            totalAllocated += parseFloat(row.dataset.allocated || 0);
+            totalSpent += parseFloat(row.dataset.spent || 0);
+            totalAccrued += parseFloat(row.dataset.accrued || 0);
+            totalPaid += parseFloat(row.dataset.paid || 0);
+            row.classList.add('table-primary', 'bg-opacity-10');
+        });
+
+        // Clear highlight from unchecked
+        document.querySelectorAll('.class-checkbox:not(:checked)').forEach(cb => {
+            cb.closest('.class-row').classList.remove('table-primary', 'bg-opacity-10');
+        });
+
+        if (checked.length > 0) {
+            summaryRow.classList.remove('d-none');
+            sumAllocated.textContent = formatCurrency(totalAllocated);
+            sumSpent.textContent = formatCurrency(totalSpent);
+            sumAccrued.textContent = formatCurrency(totalAccrued);
+            sumPaid.textContent = formatCurrency(totalPaid);
+        } else {
+            summaryRow.classList.add('d-none');
+        }
+
+        // Update select all state
+        if (selectAll) {
+            selectAll.checked = (checked.length === checkboxes.length && checkboxes.length > 0);
+            selectAll.indeterminate = (checked.length > 0 && checked.length < checkboxes.length);
+        }
+    };
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateTotals();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateTotals);
+    });
+});
+</script>
+{% endblock %}

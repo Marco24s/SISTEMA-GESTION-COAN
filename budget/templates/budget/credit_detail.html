@@ -1,0 +1,423 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block budget_content %}
+<div class="mb-4 animate__animated animate__fadeIn">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'budget:dashboard' %}">Inicio</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'budget:credit_list' %}">Créditos</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Detalles del Crédito</li>
+        </ol>
+    </nav>
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 class="fw-bold mb-0">
+            <i class="fa-solid fa-file-invoice text-primary me-2"></i>
+            Crédito: {{ credit }}
+        </h2>
+        <a href="{% url 'budget:credit_list' %}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fa-solid fa-arrow-left me-2"></i>Volver a la Lista
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Resumen de Crédito -->
+    <div class="col-lg-8">
+        <div class="card card-stats p-4 mb-4">
+            <h5 class="fw-bold mb-4 border-bottom pb-2">Información de Nomenclador</h5>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">Ejercicio Económico</label>
+                    <span class="fw-bold">{{ credit.fiscal_year.year }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">Fuente de Financiamiento (FF)</label>
+                    <span class="fw-bold">{{ credit.ff|default:"N/A" }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">Programa</label>
+                    <span class="fw-bold">{{ credit.programa|default:"No especificado" }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">Subprograma</label>
+                    <span class="small text-dark fw-bold">{{ credit.subprog|default:"N/A" }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">INCISO (Nivel 1)</label>
+                    <span class="small text-dark fw-bold">{{ credit.inc|default:"N/A" }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">PPAL (Nivel 2)</label>
+                    <span class="small text-dark fw-bold">{{ credit.ppp_inc|default:"N/A" }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">PARCIAL (Nivel 3)</label>
+                    <span class="small text-dark fw-bold">{{ credit.pp_inc|default:"N/A" }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">SUBPC (Nivel 4)</label>
+                    <span class="small text-dark fw-bold">{{ credit.pre_inc|default:"N/A" }}</span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted small d-block">MONEDA (Nivel 5)</label>
+                    <span class="small text-dark fw-bold">{{ credit.incisos_agrupado|default:"N/A" }}</span>
+                </div>
+                {% if credit.notes %}
+                <div class="col-12">
+                    <label class="text-muted small d-block">Observaciones</label>
+                    <p class="text-muted small mb-0 italic">{{ credit.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card card-stats p-4 mt-4 border-start border-4 border-success bg-success bg-opacity-10">
+            <h5 class="fw-bold mb-4 d-flex align-items-center">
+                <i class="fa-solid fa-calendar-days text-success me-2"></i>
+                Programación Trimestral (Crédito Original)
+            </h5>
+            <div class="row text-center g-2 mb-4">
+                <div class="col-6 col-md-3 border-end">
+                    <div class="bg-white rounded-3 p-2 shadow-sm h-100">
+                        <label class="text-muted small d-block mb-1">1er Trimestre</label>
+                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q1_amount|localize }}</div>
+                        <div class="mt-1 pt-1 border-top border-light">
+                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
+                            <span class="fw-bold {% if q_rems.0 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.0|localize }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 border-end">
+                    <div class="bg-white rounded-3 p-2 shadow-sm h-100">
+                        <label class="text-muted small d-block mb-1">2do Trimestre</label>
+                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q2_amount|localize }}</div>
+                        <div class="mt-1 pt-1 border-top border-light">
+                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
+                            <span class="fw-bold {% if q_rems.1 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.1|localize }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 border-end">
+                    <div class="bg-white rounded-3 p-2 shadow-sm h-100">
+                        <label class="text-muted small d-block mb-1">3er Trimestre</label>
+                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q3_amount|localize }}</div>
+                        <div class="mt-1 pt-1 border-top border-light">
+                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
+                            <span class="fw-bold {% if q_rems.2 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.2|localize }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-white rounded-3 p-2 shadow-sm h-100">
+                        <label class="text-muted small d-block mb-1">4to Trimestre</label>
+                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q4_amount|localize }}</div>
+                        <div class="mt-1 pt-1 border-top border-light">
+                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
+                            <span class="fw-bold {% if q_rems.3 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.3|localize }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Barra de Distribución Acumulada -->
+            <div class="px-2">
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Progreso de Distribución Trimestral</span>
+                    <span>Total Distribuido: ${{ total_allocated|localize }}</span>
+                </div>
+                <div class="progress shadow-sm" style="height: 12px; background: rgba(0,0,0,0.05); border-radius: 6px;">
+                    <!-- Segmento T1 -->
+                    <div class="d-flex" style="width: {{ q_segs.0|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-success h-100" style="width: {{ q_fills.0|stringformat:'f' }}%;" title="T1: {{ q_fills.0|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T2 -->
+                    <div class="d-flex" style="width: {{ q_segs.1|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-success h-100" style="width: {{ q_fills.1|stringformat:'f' }}%;" title="T2: {{ q_fills.1|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T3 -->
+                    <div class="d-flex" style="width: {{ q_segs.2|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-success h-100" style="width: {{ q_fills.2|stringformat:'f' }}%;" title="T3: {{ q_fills.2|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T4 -->
+                    <div class="d-flex" style="width: {{ q_segs.3|stringformat:'f' }}%;">
+                        <div class="bg-success h-100" style="width: {{ q_fills.3|stringformat:'f' }}%;" title="T4: {{ q_fills.3|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards de Totales -->
+    <div class="col-lg-4">
+        <div class="card card-stats p-4 mb-4 bg-primary text-white border-0">
+            <div class="small opacity-75">Crédito Total AA.PP.</div>
+            <h2 class="fw-bold mb-0">${{ credit.total_amount|localize }}</h2>
+            <i class="fa-solid fa-vault position-absolute end-0 bottom-0 opacity-25 me-3 mb-3 h1"></i>
+        </div>
+        
+        <div class="card card-stats p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-muted small">Distribuido a Unidades</span>
+                <span class="fw-bold text-success">${{ total_allocated|localize }}</span>
+            </div>
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar bg-success" role="progressbar" 
+                     style="width: {% widthratio total_allocated credit.total_amount 100 %}%">
+                </div>
+            </div>
+            <div class="text-end mt-2">
+                <small class="text-muted">Por distribuir: ${{ available_to_allocate|localize }}</small>
+            </div>
+        </div>
+
+        {% if is_admin %}
+        <div class="d-grid gap-2">
+            <a href="{% url 'budget:allocation_create' %}?credit={{ credit.id }}" class="btn btn-outline-primary rounded-pill py-2 shadow-sm">
+                <i class="fa-solid fa-share-nodes me-2"></i>Nueva Distribución
+            </a>
+            <a href="{% url 'budget:compensacion_create' %}?source_credit={{ credit.id }}" class="btn btn-outline-warning rounded-pill py-2 shadow-sm">
+                <i class="fa-solid fa-money-bill-transfer me-2"></i>Cambio de Inciso
+            </a>
+            <a href="{% url 'budget:credit_adjust' credit.id %}" class="btn btn-outline-info rounded-pill py-2 shadow-sm">
+                <i class="fa-solid fa-pen-to-square me-2"></i>Ajustar Montos
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Tabla de Distribuciones -->
+<div class="card card-stats p-4 animate__animated animate__fadeInUp">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="fw-bold mb-0">Distribución por Unidad Componente (UU.CC.)</h5>
+        {% if execution_percent > 0 %}
+            <span class="badge bg-info-subtle text-info rounded-pill px-3 py-2">
+                Ejecución Global: {{ execution_percent|floatformat:1 }}%
+            </span>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="bg-light">
+                <tr class="small text-uppercase text-muted">
+                    <th style="width: 40px;">
+                        <input class="form-check-input" type="checkbox" id="select-all-dist">
+                    </th>
+                    <th>Unidad Destino</th>
+                    <th class="text-center">Periodo</th>
+                    <th class="text-end">Monto Techo</th>
+                    <th class="text-end">Ejecutado (Comp.)</th>
+                    <th class="text-end">Disponible</th>
+                    <th class="text-center">Progreso</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alloc in allocations %}
+                <tr class="dist-row" 
+                    data-allocated="{{ alloc.allocated_amount|unlocalize }}"
+                    data-spent="{{ alloc.spent_amount|unlocalize }}"
+                    data-available="{{ alloc.available_amount|unlocalize }}">
+                    <td>
+                        <input class="form-check-input dist-checkbox" type="checkbox">
+                    </td>
+                    <td>
+                        <div class="fw-bold">{{ alloc.unit.name }}</div>
+                        <small class="text-muted">{{ alloc.unit.code|default:"" }}</small>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary bg-opacity-10 text-dark rounded-pill px-3">{{ alloc.get_quarters_display }}</span>
+                    </td>
+                    <td class="text-end fw-bold">${{ alloc.allocated_amount|localize }}</td>
+                    <td class="text-end text-danger">${{ alloc.spent_amount|localize }}</td>
+                    <td class="text-end text-success fw-bold">
+                        ${{ alloc.available_amount|localize }}
+                    </td>
+                    <td class="text-center" style="width: 150px;">
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-warning" role="progressbar" 
+                                 style="width: {% widthratio alloc.spent_amount alloc.allocated_amount 100 %}%">
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'budget:execution_commitment' %}?allocation={{ alloc.id }}" class="btn btn-sm btn-outline-warning rounded-pill px-2" title="Registrar Gasto">
+                            <i class="fa-solid fa-file-invoice-dollar"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted small">
+                        Aún no se han realizado distribuciones de este crédito a ninguna unidad.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-success bg-opacity-10 d-none" id="dist-summary-row">
+                <tr class="fw-bold">
+                    <td colspan="3" class="text-end py-2 small">SUMA SELECCIONADA:</td>
+                    <td class="text-end py-2 text-primary" id="sum-allocated">$0,00</td>
+                    <td class="text-end py-2 text-danger" id="sum-spent">-$0,00</td>
+                    <td class="text-end py-2 text-success" id="sum-available" style="font-size: 1rem;">$0,00</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- Historial de Ajustes -->
+{% if adjustments %}
+<div class="card card-stats p-4 mt-4 animate__animated animate__fadeInUp">
+    <h5 class="fw-bold mb-4 d-flex align-items-center">
+        <i class="fa-solid fa-clock-rotate-left text-info me-2"></i>
+        Historial de Modificaciones Presupuestarias
+    </h5>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead class="bg-light">
+                <tr class="small text-uppercase text-muted">
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Ajuste (Antes &rarr; Después)</th>
+                    <th>Motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for adj in adjustments %}
+                <tr>
+                    <td class="small">{{ adj.timestamp|date:"d/m/Y H:i" }}</td>
+                    <td class="small fw-bold">{{ adj.user.get_full_name|default:adj.user.username }}</td>
+                    <td class="small">
+                        <div class="row g-2" style="min-width: 400px;">
+                            {% if adj.q1_old != adj.q1_new %}
+                            <div class="col-12 border-bottom pb-1">
+                                <span class="badge bg-secondary me-1">T1</span>
+                                <span class="text-muted">${{ adj.q1_old|localize }}</span> &rarr; 
+                                <span class="fw-bold text-dark">${{ adj.q1_new|localize }}</span>
+                                <span class="ms-2 fw-bold {% if adj.q1_new > adj.q1_old %}text-success{% else %}text-danger{% endif %}">
+                                    ({% if adj.q1_new > adj.q1_old %}+{% endif %}{{ adj.get_q1_delta|localize }})
+                                </span>
+                            </div>
+                            {% endif %}
+                            {% if adj.q2_old != adj.q2_new %}
+                            <div class="col-12 border-bottom pb-1">
+                                <span class="badge bg-secondary me-1">T2</span>
+                                <span class="text-muted">${{ adj.q2_old|localize }}</span> &rarr; 
+                                <span class="fw-bold text-dark">${{ adj.q2_new|localize }}</span>
+                                <span class="ms-2 fw-bold {% if adj.q2_new > adj.q2_old %}text-success{% else %}text-danger{% endif %}">
+                                    ({% if adj.q2_new > adj.q2_old %}+{% endif %}{{ adj.get_q2_delta|localize }})
+                                </span>
+                            </div>
+                            {% endif %}
+                            {% if adj.q3_old != adj.q3_new %}
+                            <div class="col-12 border-bottom pb-1">
+                                <span class="badge bg-secondary me-1">T3</span>
+                                <span class="text-muted">${{ adj.q3_old|localize }}</span> &rarr; 
+                                <span class="fw-bold text-dark">${{ adj.q3_new|localize }}</span>
+                                <span class="ms-2 fw-bold {% if adj.q3_new > adj.q3_old %}text-success{% else %}text-danger{% endif %}">
+                                    ({% if adj.q3_new > adj.q3_old %}+{% endif %}{{ adj.get_q3_delta|localize }})
+                                </span>
+                            </div>
+                            {% endif %}
+                            {% if adj.q4_old != adj.q4_new %}
+                            <div class="col-12">
+                                <span class="badge bg-secondary me-1">T4</span>
+                                <span class="text-muted">${{ adj.q4_old|localize }}</span> &rarr; 
+                                <span class="fw-bold text-dark">${{ adj.q4_new|localize }}</span>
+                                <span class="ms-2 fw-bold {% if adj.q4_new > adj.q4_old %}text-success{% else %}text-danger{% endif %}">
+                                    ({% if adj.q4_new > adj.q4_old %}+{% endif %}{{ adj.get_q4_delta|localize }})
+                                </span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if adj.q1_old == adj.q1_new and adj.q2_old == adj.q2_new and adj.q3_old == adj.q3_new and adj.q4_old == adj.q4_new %}
+                            <div class="col-12 text-muted italic">
+                                Sin cambios en los montos trimestrales.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="small italic text-muted">{{ adj.reason }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formatCurrency = (value) => {
+        return new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            minimumFractionDigits: 2
+        }).format(value);
+    };
+
+    const selectAll = document.getElementById('select-all-dist');
+    const checkboxes = document.querySelectorAll('.dist-checkbox');
+    const summaryRow = document.getElementById('dist-summary-row');
+    const sumAllocated = document.getElementById('sum-allocated');
+    const sumSpent = document.getElementById('sum-spent');
+    const sumAvailable = document.getElementById('sum-available');
+
+    const updateTotals = () => {
+        const checked = document.querySelectorAll('.dist-checkbox:checked');
+        let totalAllocated = 0;
+        let totalSpent = 0;
+        let totalAvailable = 0;
+
+        checked.forEach(cb => {
+            const row = cb.closest('.dist-row');
+            totalAllocated += parseFloat(row.dataset.allocated || 0);
+            totalSpent += parseFloat(row.dataset.spent || 0);
+            totalAvailable += parseFloat(row.dataset.available || 0);
+            row.classList.add('table-primary', 'bg-opacity-10');
+        });
+
+        // Clear highlight from unchecked
+        document.querySelectorAll('.dist-checkbox:not(:checked)').forEach(cb => {
+            cb.closest('.dist-row').classList.remove('table-primary', 'bg-opacity-10');
+        });
+
+        if (checked.length > 0) {
+            summaryRow.classList.remove('d-none');
+            sumAllocated.textContent = formatCurrency(totalAllocated);
+            sumSpent.textContent = "-" + formatCurrency(totalSpent);
+            sumAvailable.textContent = formatCurrency(totalAvailable);
+        } else {
+            summaryRow.classList.add('d-none');
+        }
+
+        // Update select all state
+        if (selectAll) {
+            selectAll.checked = (checked.length === checkboxes.length && checkboxes.length > 0);
+            selectAll.indeterminate = (checked.length > 0 && checked.length < checkboxes.length);
+        }
+    };
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateTotals();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateTotals);
+    });
+});
+</script>
+{% endblock %}

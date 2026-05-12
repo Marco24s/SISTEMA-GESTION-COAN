@@ -1,0 +1,120 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row align-items-center mb-4 mt-2">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-0" style="color: #462880;"><i class="fa-solid fa-timeline me-2"></i>Historial de Movimientos</h2>
+        <p class="text-muted">Desglose de entregas y devoluciones del lote de ingresos seleccionado.</p>
+    </div>
+    <div class="col-md-4 text-md-end">
+        <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fa-solid fa-arrow-left me-2"></i>Volver
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 h-100" style="border-radius: 15px;">
+            <div class="card-body">
+                <h6 class="text-muted fw-bold text-uppercase mb-3"><i class="fa-solid fa-tag me-2"></i>Información del Lote</h6>
+                <div class="mb-2"><strong>Prenda:</strong> {{ batch.clothing_size.clothing_type.name }}</div>
+                <div class="mb-2"><strong>Talle:</strong> <span class="badge border bg-light text-dark">{{ batch.clothing_size.size }}</span></div>
+                <div class="mb-2"><strong>Fecha de Ingreso:</strong> {{ batch.reception_date|date:"d/m/Y" }}</div>
+                <div class="mb-2"><strong>Proveedor:</strong> {{ batch.provider|default:"-" }}</div>
+                <div><strong>O.C. / Remito:</strong> {{ batch.purchase_order|default:"-" }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 h-100 bg-light" style="border-radius: 15px;">
+            <div class="card-body text-center d-flex flex-column justify-content-center">
+                <h6 class="text-muted fw-bold text-uppercase mb-3"><i class="fa-solid fa-chart-pie me-2"></i>Estado del Stock</h6>
+                <div class="row">
+                    <div class="col-4">
+                        <h2 class="fw-bold mb-1" style="color: #6f42c1;">{{ batch.initial_quantity }}</h2>
+                        <span class="text-muted small text-uppercase">Ingresado</span>
+                    </div>
+                    <div class="col-4">
+                        <h2 class="fw-bold mb-1 text-danger">{{ batch.assignments.count }}</h2>
+                        <span class="text-muted small text-uppercase">Entregas</span>
+                    </div>
+                    <div class="col-4">
+                        <h2 class="fw-bold mb-1 text-success">{{ batch.available_quantity }}</h2>
+                        <span class="text-muted small text-uppercase">Disponible</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-5" style="border-radius: 15px; overflow: hidden;">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Registro de Actividad</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead style="background-color: #f8f9fa;">
+                    <tr>
+                        <th scope="col" class="py-3 px-4 text-muted">Fecha</th>
+                        <th scope="col" class="py-3 text-muted">Personal Asignado</th>
+                        <th scope="col" class="py-3 text-muted text-center">Cant.</th>
+                        <th scope="col" class="py-3 text-muted text-center">Estado de la Asignación</th>
+                        <th scope="col" class="py-3 text-muted text-center">Notas / Obs.</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    {% for item in assignments %}
+                        <tr>
+                            <td class="px-4 py-3 fw-bold">{{ item.assigned_date|date:"d/m/Y" }}</td>
+                            <td class="py-3">
+                                <a href="{% url 'sigera:personnel_edit' item.personnel.pk %}" class="text-decoration-none text-dark fw-semibold">
+                                    {{ item.personnel.last_name }}, {{ item.personnel.first_name }}
+                                </a>
+                                <br>
+                                <small class="text-muted">{{ item.personnel.get_rank_display }} ({{ item.personnel.dni }})</small>
+                            </td>
+                            <td class="py-3 text-center fw-bold">{{ item.quantity }}</td>
+                            <td class="py-3 text-center">
+                                {% if item.returned %}
+                                    <span class="badge rounded-pill bg-secondary px-3"><i class="fa-solid fa-check me-1"></i>Devuelto</span>
+                                    <br><small class="text-muted">{{ item.return_date|date:"d/m/Y" }}</small>
+                                {% else %}
+                                    <span class="badge rounded-pill bg-success px-3"><i class="fa-solid fa-user-check me-1"></i>Provisto</span>
+                                    {% if item.expiration_date %}
+                                        <br>
+                                        {% if item.is_expired %}
+                                            <small class="text-danger fw-bold" title="Vencido el {{ item.expiration_date|date:'d/m/Y' }}"><i class="fa-solid fa-circle-exclamation"></i> Vencido</small>
+                                        {% else %}
+                                            <small class="text-muted" title="Vence el {{ item.expiration_date|date:'d/m/Y' }}"><i class="fa-solid fa-hourglass-half"></i> Expira: {{ item.expiration_date|date:'m/Y' }}</small>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-center text-muted small">
+                                {% if item.notes %}
+                                    {{ item.notes }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-clock-rotate-left fa-3x mb-3" style="color: #e0cffc;"></i>
+                                <h5>Sin movimientos registrados</h5>
+                                <p>Este lote no ha tenido entregas ni movimientos aún.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

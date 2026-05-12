@@ -1,0 +1,324 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n budget_tags %}
+
+{% block budget_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold"><i class="fa-solid fa-list-check me-2 text-primary"></i>Créditos Presupuestarios (AA.PP.)</h2>
+    <div class="d-flex gap-2">
+        <a href="{% url 'budget:credit_type_log' %}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>Historial
+        </a>
+        <a href="{% url 'budget:credit_create' %}" class="btn btn-primary rounded-pill px-4 shadow-sm">
+            <i class="fa-solid fa-plus me-2"></i>Registrar Nuevo Crédito
+        </a>
+    </div>
+</div>
+
+<div class="card card-stats border-0 shadow-sm overflow-hidden">
+    <form id="bulk-action-form" method="POST" action="{% url 'budget:credit_bulk_delete' %}">
+        {% csrf_token %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 table-compact">
+                <thead class="bg-light">
+                    <tr class="small text-uppercase text-muted border-bottom-0">
+                        <th class="ps-4" style="width: 40px;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="select-all">
+                            </div>
+                        </th>
+                        <th style="width: 80px;">FF</th>
+                        <th>SUBPROG</th>
+                        <th>ACT. GENERAL</th>
+                        <th>INC-PPAL (SUBPC)</th>
+                        <th class="text-end">{% if is_admin %}Monto Total{% else %}Monto Asignado{% endif %}</th>
+                        <th class="text-center">Tipo</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for credit in credits %}
+                    <tr class="credit-row" data-amount="{% if is_admin %}{{ credit.total_amount|unlocalize }}{% else %}{{ credit.distributed_amount|unlocalize }}{% endif %}">
+                        <td class="ps-4">
+                            <div class="form-check">
+                                <input class="form-check-input select-item" type="checkbox" name="selected_ids" value="{{ credit.id }}">
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary-subtle text-secondary px-2 py-1">{{ credit.ff.code }}</span>
+                        </td>
+                        <td><span class="fw-bold">{{ credit.subprog.code }}</span></td>
+                        <td style="max-width: 200px;">
+                            <div class="text-truncate fw-semibold" title="{{ credit.programa.name }}" style="font-size: 0.8rem;">{{ credit.programa.name }}</div>
+                            <small class="text-muted" style="font-size: 0.7rem;">{{ credit.ppp_inc.code }} / {{ credit.pp_inc.code }}</small>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-primary">{{ credit.pre_inc.code|default:"00" }}</div>
+                            <small class="text-muted" style="font-size: 0.7rem;">({{ credit.pp_inc.code|default:"0" }}-{{ credit.ppp_inc.code|default:"0" }})</small>
+                        </td>
+                        <td class="text-end" style="width: 220px;">
+                            <div class="fw-bold text-dark mb-1">
+                                {% if is_admin %}
+                                    ${{ credit.total_amount|floatformat:2 }}
+                                {% else %}
+                                    ${{ credit.distributed_amount|floatformat:2 }}
+                                {% endif %}
+                            </div>
+                            {% with distributed=credit.distributed_amount|default:0 total=credit.total_amount %}
+                            {% widthratio distributed total 100 as percent %}
+                            <div class="progress shadow-sm" style="height: 6px; background-color: #198754;" 
+                                 title="Distribuido: ${{ distributed|floatformat:2 }} ({{ percent }}%)">
+                                <div class="progress-bar bg-danger" role="progressbar" 
+                                     style="width: {{ percent }}%" aria-valuenow="{{ percent }}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            {% endwith %}
+                        </td>
+                        <td class="text-center">
+                            {% if credit.credit_type %}
+                            <span class="badge {{ credit.credit_type.code|credit_type_badge_color }} rounded-pill small">{{ credit.credit_type.code }}</span>
+                            {% else %}
+                            <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4" style="width: 100px;">
+                            <div class="btn-group">
+                                <a href="{% url 'budget:allocation_create' %}?credit={{ credit.id }}" class="btn btn-sm btn-outline-success px-2 me-1" title="Distribuir a Unidad">
+                                    <i class="fa-solid fa-share-nodes"></i>
+                                </a>
+                                <a href="{% url 'budget:credit_detail' credit.id %}" class="btn btn-sm btn-outline-secondary px-2" title="Ver Detalles">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                {% if credit.credit_type %}
+                                <a href="{% url 'budget:credit_unassign_type' credit.id %}" class="btn btn-sm btn-outline-warning rounded-pill px-2 me-1" title="Desasignar Tipo">
+                                    <i class="fa-solid fa-link-slash"></i>
+                                </a>
+                                {% endif %}
+                                {% if user.is_superuser %}
+                                <a href="{% url 'budget:credit_delete' credit.id %}" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Eliminar Crédito">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="fa-solid fa-folder-open fa-3x mb-3 d-block opacity-25"></i>
+                                No hay créditos registrados para este ejercicio.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<!-- Floating Bulk Actions Bar -->
+<div id="bulk-actions-bar" class="position-fixed bottom-0 start-50 translate-middle-x mb-4 z-index-1000 d-none animate__animated animate__slideInUp">
+    <div class="card shadow-lg border-0 bg-dark text-white rounded-pill px-4 py-3">
+        <div class="d-flex align-items-center gap-4">
+            <div class="fs-6">
+                <span id="selected-count" class="fw-bold text-success">0</span> seleccionados
+            </div>
+            <div class="vr bg-secondary opacity-50" style="height: 24px;"></div>
+            <div class="fs-6">
+                Total: <span id="selected-sum" class="fw-bold text-success">$0,00</span>
+            </div>
+            <div class="vr bg-secondary opacity-50" style="height: 24px;"></div>
+            <div class="d-flex gap-2">
+                {% if user.is_superuser %}
+                <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm" id="btn-bulk-delete">
+                    <i class="fa-solid fa-trash me-1"></i> Eliminar Selección
+                </button>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3" id="btn-cancel-selection">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .z-index-1000 { z-index: 1000; }
+    .credit-row.selected { background-color: rgba(13, 110, 253, 0.05); }
+    #bulk-actions-bar { transition: all 0.3s ease; }
+    .transition-icon {
+        transition: transform 0.3s ease;
+    }
+    [data-bs-toggle="collapse"][aria-expanded="true"] .transition-icon {
+        transform: rotate(180deg);
+    }
+    [data-bs-toggle="collapse"]:hover {
+        background-color: rgba(0, 0, 0, 0.02) !important;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('select-all');
+    const selectItems = document.querySelectorAll('.select-item');
+    const bulkBar = document.getElementById('bulk-actions-bar');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const selectedSumSpan = document.getElementById('selected-sum');
+    const btnBulkDelete = document.getElementById('btn-bulk-delete');
+    const btnCancel = document.getElementById('btn-cancel-selection');
+    const form = document.getElementById('bulk-action-form');
+
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            minimumFractionDigits: 2
+        }).format(value);
+    }
+
+    function updateBulkActions() {
+        const checkedItems = document.querySelectorAll('.select-item:checked');
+        const count = checkedItems.length;
+        
+        if (count > 0) {
+            bulkBar.classList.remove('d-none');
+            selectedCountSpan.textContent = count;
+            
+            let sum = 0;
+            checkedItems.forEach(item => {
+                const row = item.closest('.credit-row');
+                sum += parseFloat(row.dataset.amount || 0);
+                row.classList.add('selected');
+            });
+            
+            selectedSumSpan.textContent = formatCurrency(sum);
+        } else {
+            bulkBar.classList.add('d-none');
+        }
+
+        // Unhighlight rows that are not checked
+        document.querySelectorAll('.select-item:not(:checked)').forEach(item => {
+            item.closest('.credit-row').classList.remove('selected');
+        });
+
+        // Update select all state
+        selectAll.checked = (count === selectItems.length && selectItems.length > 0);
+        selectAll.indeterminate = (count > 0 && count < selectItems.length);
+    }
+
+    selectAll.addEventListener('change', function() {
+        selectItems.forEach(item => {
+            const row = item.closest('tr');
+            if (selectAll.checked) {
+                // Solo seleccionar si la fila es visible
+                if (row.style.display !== 'none') {
+                    item.checked = true;
+                }
+            } else {
+                // Al desmarcar, desmarcamos todos (comportamiento estándar)
+                item.checked = false;
+            }
+        });
+        updateBulkActions();
+    });
+
+    selectItems.forEach(item => {
+        item.addEventListener('change', updateBulkActions);
+    });
+
+    btnCancel.addEventListener('click', function() {
+        selectItems.forEach(item => item.checked = false);
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+        updateBulkActions();
+    });
+
+    if (btnBulkDelete) {
+        btnBulkDelete.addEventListener('click', function() {
+            const count = document.querySelectorAll('.select-item:checked').length;
+            if (confirm(`¿Está seguro que desea eliminar los ${count} créditos seleccionados? Esta acción no se puede deshacer.`)) {
+                form.submit();
+            }
+        });
+    }
+});
+</script>
+
+<div class="row mt-4">
+    <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3 text-primary"><i class="fa-solid fa-chart-pie me-2"></i>Resumen por Tipo de Crédito</h6>
+                {% if credit_by_type or unassigned_total %}
+                    {% for row in credit_by_type %}
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-1" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#type-list-{{ forloop.counter }}">
+                                <span class="fw-bold text-dark">
+                                    <span class="badge {{ row.code|credit_type_badge_color }} px-2 py-1 me-2" style="color: white; font-size: 0.75rem;">{{ row.code }}</span>
+                                    {% if row.code|upper != row.name|upper %}
+                                        <span class="text-muted small">{{ row.name }}</span>
+                                    {% endif %}
+                                    <i class="fa-solid fa-chevron-down ms-1 small opacity-50 transition-icon" style="font-size: 0.7rem;"></i>
+                                </span>
+                                <div class="text-end">
+                                    <span class="fw-bold text-dark" style="font-size: 1.1rem;">${{ row.total_dist|floatformat:2 }}</span>
+                                    {% if is_admin %}
+                                        <div class="small text-muted" style="font-size: 0.7rem;">Techo AA.PP: ${{ row.total_aapp|floatformat:2 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="collapse" id="type-list-{{ forloop.counter }}">
+                                <div class="ms-2 ps-3 border-start border-2 mt-2" style="border-color: rgba(0,0,0,0.05) !important;">
+                                    {% for sub in row.subpcs %}
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="small text-dark fw-bold">SUBPC {{ sub.code }}</span>
+                                            <span class="small fw-bold text-primary">${{ sub.amount_dist|floatformat:2 }}</span>
+                                        </div>
+                                        {% if is_admin %}
+                                        <div class="d-flex justify-content-between small text-muted" style="font-size: 0.7rem;">
+                                            <span>Techo: ${{ sub.amount_aapp|floatformat:2 }}</span>
+                                            <span>Saldo: ${{ sub.available|floatformat:2 }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    {% if unassigned_total > 0 %}
+                        <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
+                            <span class="text-muted">
+                                <span class="badge bg-secondary-subtle text-secondary me-2">—</span> 
+                                Sin Asignar / Otros
+                            </span>
+                            <span class="fw-bold text-dark">${{ unassigned_total|floatformat:2 }}</span>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <p class="small text-muted mb-0 text-center py-3">No hay créditos registrados.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-3">
+        <div class="alert alert-info border-0 shadow-sm h-100 d-flex flex-column justify-content-center m-0 py-4">
+            <div class="d-flex align-items-center mb-3">
+                <i class="fa-solid fa-circle-info fa-2x me-3 opacity-50"></i>
+                <h6 class="fw-bold mb-0">Ayuda sobre Montos</h6>
+            </div>
+            <p class="small mb-2 text-dark">
+                <strong>Monto AA.PP. (Techo):</strong> Es el crédito total que la institución recibió del presupuesto nacional.
+            </p>
+            <p class="small mb-0 text-dark">
+                <strong>Monto Distribuido (Real):</strong> Es la suma de los créditos que ya fueron repartidos a las Unidades de gasto.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

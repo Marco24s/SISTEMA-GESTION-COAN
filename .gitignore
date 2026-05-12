@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Django
+*.log
+db.sqlite3
+/staticfiles/
+/media/
+.env
+
+# VSCode
+.vscode/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Entornos virtuales
+venv/
+ENV/
+.env/
+.venv/
+
+# Archivos de migración
+*/migrations/*.pyc
+*/migrations/*.pyo
+*/migrations/*.pyd
+
+# Archivos temporales
+*.tmp
+*.bak
+*.swp
+*.swo
+~$*
+
+# Archivos de configuración locales
+local_settings.py

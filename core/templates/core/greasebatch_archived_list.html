@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fa-solid fa-box-archive me-2 text-secondary"></i> Historial de Casamatas Archivadas (Sin Stock)</h2>
+    <a href="{% url 'batch_list' %}" class="btn btn-outline-primary"><i class="fa-solid fa-arrow-left me-1"></i> Volver a Stock Principal</a>
+</div>
+
+<div class="card shadow-sm border-secondary">
+    <div class="card-body p-0">
+        <table class="table table-hover table-striped mb-0 text-muted">
+            <thead class="table-secondary">
+                <tr>
+                    <th>Casamata</th>
+                    <th>Tipo de Grasa</th>
+                    <th>Fabricación</th>
+                    <th>Estado Original</th>
+                    <th>Cantidad</th>
+                    <th>Ubicación</th>
+                    <th class="text-end">Registro de Movimientos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in batches %}
+                <tr>
+                    <td><strong>{{ batch.batch_number }}</strong></td>
+                    <td>{{ batch.grease_type.nomenclatura }}</td>
+                    <td>{{ batch.manufacturing_date|date:"d M Y" }}</td>
+                    <td>
+                        <span class="badge bg-secondary"><i class="fa-solid fa-box-archive"></i> Archivado</span>
+                    </td>
+                    <td>
+                        de {{ batch.initial_quantity|smart_number }} {{ batch.grease_type.unidad }} iniciales
+                    </td>
+                    <td>{{ batch.storage_location }}</td>
+                    <td class="text-end text-nowrap">
+                        <a href="{% url 'batch_detail' batch.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver Historial de Consumos"><i class="fa-solid fa-list-ul me-1"></i>Ver consumos</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">No hay casamatas en el historial.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+
+{% block content %}
+<div class="mt-4 mb-3">
+    <a href="{% url 'grease_list' %}" class="text-decoration-none"><i class="fa-solid fa-arrow-left"></i> Volver a Tipos de Grasa</a>
+    <div class="d-flex justify-content-between align-items-center mt-2">
+        <h2><i class="fa-solid fa-file-invoice-dollar me-2"></i> Precios Ref: {{ grease_type.nomenclatura }}</h2>
+        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+        <a href="{% url 'grease_price_create' grease_type.id %}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Nueva Cotización</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-light shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Costo Promedio Estimado</h5>
+                <h3 class="text-primary mb-0">
+                    {% if grease_type.get_average_unit_price %}
+                        ${{ grease_type.get_average_unit_price|floatformat:2 }} <small class="text-muted fs-6">/ {{ grease_type.unidad }}</small>
+                    {% else %}
+                        <span class="text-muted">Sin datos</span>
+                    {% endif %}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Presentación ({{ grease_type.unidad }})</th>
+                    <th>Precio Total</th>
+                    <th>Costo por {{ grease_type.unidad }}</th>
+                    <th class="text-center">Promediable</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for price in prices %}
+                <tr>
+                    <td data-sort="{{ price.date_recorded|date:'Y-m-d' }}">{{ price.date_recorded|date:"d/m/Y" }}</td>
+                    <td>{{ price.supplier|default:"-" }}</td>
+                    <td>{{ price.presentation_quantity|smart_number }} {{ grease_type.unidad }}</td>
+                    <td><strong>${{ price.price|smart_number }}</strong></td>
+                    <td class="text-success fw-bold">${{ price.get_unit_price|floatformat:2 }} / {{ grease_type.unidad }}</td>
+                    <td class="text-center">
+                        {% if price.is_active %}
+                            <span class="badge bg-success">Sí</span>
+                        {% else %}
+                            <span class="badge bg-secondary">No</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+                        <a href="{% url 'grease_price_update' price.id %}" class="btn btn-sm btn-outline-warning" title="Editar / Activar Promedio"><i class="fa-solid fa-pen"></i></a>
+                        <a href="{% url 'grease_price_delete' price.id %}" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="fa-solid fa-trash"></i></a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">No hay precios de referencia cargados para este tipo de grasa.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

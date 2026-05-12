@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gestión de Materias Grasas Aeronáuticas{% endblock %}</title>
+    
+    <!-- Bootstrap CSS (LOCAL) -->
+    <link href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
+    
+    <!-- FontAwesome (LOCAL) -->
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    
+    <!-- Google Fonts (LOCAL) -->
+    <link rel="stylesheet" href="{% static 'vendor/inter/inter.css' %}">
+    
+    <!-- Custom CSS -->
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-light">
+
+    {% block navbar %}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm mb-4">
+        <div class="container">
+            <a href="/" class="btn btn-sm text-white border-white me-3" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1);" title="Volver al Portal">
+                <i class="fa-solid fa-arrow-left"></i>
+            </a>
+            <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
+                <i class="fa-solid fa-plane-departure me-2"></i> <!-- Ejemplo Icono Institucional -->
+                <strong>SGMG-COAN</strong>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <!-- Nav links here -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'home' %}">Inicio</a>
+                    </li>
+                    {% if user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'unit' in request.resolver_match.url_name and 'measurementunit' not in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'unit_list' %}">Unidades</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'aircraft' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'aircraft_list' %}">Aeronaves</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'grease' in request.resolver_match.url_name and 'batch' not in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'grease_list' %}">Catálogo Grasas</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'association' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'association_list' %}">Factores de Planeo</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'flightplan' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'flightplan_list' %}">Planes de Empleo</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'batch' in request.resolver_match.url_name or 'consume_grease' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'batch_list' %}">Stock / Lotes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'procurement_forecast' %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'procurement_forecast' %}">Abastecimiento</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if 'requirement' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'requirement_list' %}">Requerimientos de Compra</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fa-solid fa-user me-1"></i> {{ user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                                {% if user.is_staff %}
+                                    <li><a class="dropdown-item" href="/admin/">Administración</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                {% endif %}
+                                <li>
+                                    <form method="post" action="{% url 'logout' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
+                        {% if user.is_staff or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
+                        <li class="nav-item dropdown ms-2">
+                            <a class="nav-link dropdown-toggle" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Configuración del Sistema">
+                                <i class="fa-solid fa-gear"></i>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="configDropdown">
+                                <li><h6 class="dropdown-header">Diccionarios del Sistema</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'measurementunit_list' %}"><i class="fa-solid fa-scale-balanced me-2"></i>Unidades de Medida</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">Herramientas</h6></li>
+                                <li><a class="dropdown-item {% if request.resolver_match.url_name == 'flight_hours_calculator' %}active{% endif %}" href="{% url 'flight_hours_calculator' %}"><i class="fa-solid fa-calculator me-2"></i>Calculadora de Horas de Vuelo</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    {% endblock navbar %}
+
+    <div class="container mt-2">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert-premium alert-premium-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                    <div class="alert-icon">
+                        {% if message.tags == 'success' %}
+                            <i class="fa-solid fa-circle-check"></i>
+                        {% elif message.tags == 'error' or message.tags == 'danger' %}
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                        {% elif message.tags == 'warning' %}
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        {% else %}
+                            <i class="fa-solid fa-circle-info"></i>
+                        {% endif %}
+                    </div>
+                    <div class="alert-content">
+                        {{ message }}
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <footer class="text-center mt-5 mb-3 text-muted">
+        <small>Sistema de Gestión Integral - Comando de la Aviación Naval</small>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper (LOCAL) -->
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    
+    <!-- Script para búsqueda global y ordenamiento en tablas -->
+    <script>
+        // Inicializar Tooltips de Bootstrap
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const tables = document.querySelectorAll('table.table');
+            tables.forEach((table, tableIndex) => {
+                const thead = table.querySelector('thead');
+                const tbody = table.querySelector('tbody');
+                if (!thead || !tbody) return;
+
+                // 1. Agregar buscador global arriba de la tabla
+                const searchContainer = document.createElement('div');
+                searchContainer.className = 'mb-2 d-flex justify-content-end';
+                searchContainer.innerHTML = `
+                    <div class="input-group input-group-sm" style="max-width: 300px;">
+                        <span class="input-group-text bg-white"><i class="fa-solid fa-search"></i></span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Buscar en la tabla..." id="globalSearch${tableIndex}">
+                    </div>
+                `;
+                table.parentNode.insertBefore(searchContainer, table);
+
+                const searchInput = searchContainer.querySelector('input');
+                searchInput.addEventListener('input', function() {
+                    const filterValue = this.value.toLowerCase();
+                    const rows = tbody.querySelectorAll('tr');
+
+                    rows.forEach(row => {
+                        // Ignorar filas de estado vacío que usan colspan
+                        if (row.cells.length === 1 && row.cells[0].colSpan > 1) return;
+
+                        let showRow = false;
+                        for (let i = 0; i < row.cells.length; i++) {
+                            const cellText = row.cells[i].textContent.toLowerCase();
+                            if (cellText.includes(filterValue)) {
+                                showRow = true;
+                                break;
+                            }
+                        }
+                        row.style.display = showRow ? '' : 'none';
+                    });
+                });
+
+                // 2. Hacer columnas ordenables
+                const headers = thead.querySelectorAll('tr:first-child th');
+                headers.forEach((th, index) => {
+                    const headerText = th.textContent.trim().toLowerCase();
+                    
+                    // Excluir columnas de acciones
+                    if (headerText !== 'acciones' && headerText !== 'acción' && 
+                        headerText !== 'acción sugerida' && headerText !== 'auditoría' && 
+                        headerText !== '') {
+                        
+                        th.style.cursor = 'pointer';
+                        th.classList.add('position-relative', 'pe-4');
+                        
+                        // Agregar icono de ordenamiento por defecto
+                        const icon = document.createElement('i');
+                        icon.className = 'fa-solid fa-sort text-muted ms-1 position-absolute end-0 top-50 translate-middle-y pe-2';
+                        icon.style.opacity = '0.5';
+                        th.appendChild(icon);
+
+                        let sortOrder = 'asc';
+
+                        th.addEventListener('click', () => {
+                            // Resetear todos los iconos
+                            headers.forEach(h => {
+                                const i = h.querySelector('i.fa-sort, i.fa-sort-up, i.fa-sort-down');
+                                if (i) {
+                                    i.className = 'fa-solid fa-sort text-muted ms-1 position-absolute end-0 top-50 translate-middle-y pe-2';
+                                    i.style.opacity = '0.5';
+                                }
+                            });
+
+                            // Configurar icono actual
+                            icon.style.opacity = '1';
+                            if (sortOrder === 'asc') {
+                                icon.className = 'fa-solid fa-sort-up ms-1 position-absolute end-0 top-50 translate-middle-y pe-2 text-primary';
+                                sortOrder = 'desc';
+                            } else {
+                                icon.className = 'fa-solid fa-sort-down ms-1 position-absolute end-0 top-50 translate-middle-y pe-2 text-primary';
+                                sortOrder = 'asc';
+                            }
+
+                            // Ordenar filas
+                            const rows = Array.from(tbody.querySelectorAll('tr'));
+                            const emptyRow = rows.find(r => r.cells.length === 1 && r.cells[0].colSpan > 1);
+                            let rowsToSort = emptyRow ? rows.filter(r => r !== emptyRow) : rows;
+
+                            rowsToSort.sort((a, b) => {
+                                let cellA = a.cells[index];
+                                let cellB = b.cells[index];
+                                
+                                let dataSortA = cellA.getAttribute('data-sort');
+                                let dataSortB = cellB.getAttribute('data-sort');
+                                
+                                if (dataSortA !== null && dataSortB !== null) {
+                                    return sortOrder === 'asc' 
+                                        ? dataSortB.localeCompare(dataSortA) 
+                                        : dataSortA.localeCompare(dataSortB);
+                                }
+
+                                let valA = cellA.textContent.trim();
+                                let valB = cellB.textContent.trim();
+
+                                // Intentar orden numérico si es posible
+                                const numA = parseFloat(valA.replace(/[^0-9.-]+/g,""));
+                                const numB = parseFloat(valB.replace(/[^0-9.-]+/g,""));
+                                
+                                if (!isNaN(numA) && !isNaN(numB) && 
+                                    (valA.match(/^[0-9$.,\-\s]+[a-zA-Z\s]*$/) || valA.match(/^[a-zA-Z\s]*[0-9$.,\-\s]+$/))) {
+                                    return sortOrder === 'asc' ? numB - numA : numA - numB;
+                                }
+
+                                return sortOrder === 'asc' 
+                                    ? valB.localeCompare(valA) 
+                                    : valA.localeCompare(valB);
+                            });
+
+                            // Re-agregar filas ordenadas
+                            rowsToSort.forEach(row => tbody.appendChild(row));
+                        });
+                    }
+                });
+            });
+
+            // 3. Inicializar Tooltips de Bootstrap
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            })
+
+            // 4. Máscara de moneda en tiempo real (.currency-input)
+            const currencyInputs = document.querySelectorAll('.currency-input');
+            currencyInputs.forEach(input => {
+                const formatValue = (val) => {
+                    if (val === null || val === undefined) return '';
+                    let str = val.toString().trim();
+                    if (str === '') return '';
+
+                    // Si es un valor puramente numérico con punto decimal (ej: 1234.56 de Django)
+                    // y no tiene comas, lo convertimos a formato coma decimal primero
+                    if (/^\d+\.\d{1,2}$/.test(str)) {
+                        str = str.replace('.', ',');
+                    }
+
+                    let cleaned = str.replace(/[^0-9,]/g, '');
+                    if (cleaned === '') return '';
+
+                    const parts = cleaned.split(',');
+                    let integerPart = parts[0].replace(/^0+(?=\d)/, '');
+                    if (integerPart === '') integerPart = '0';
+                    let decimalPart = parts.length > 1 ? ',' + parts[1].substring(0, 2) : '';
+
+                    // Separador de miles: punto
+                    integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    return integerPart + decimalPart;
+                };
+
+                // Formatear valor inicial
+                if (input.value) {
+                    input.value = formatValue(input.value);
+                }
+
+                input.addEventListener('focus', function() {
+                    if (this.value === '0,00') this.value = '';
+                    setTimeout(() => this.select(), 10);
+                });
+
+                input.addEventListener('input', function(e) {
+                    const start = this.selectionStart;
+                    const oldVal = this.value;
+                    const formatted = formatValue(oldVal);
+                    
+                    if (formatted !== oldVal) {
+                        this.value = formatted;
+                        // Ajuste inteligente del cursor
+                        const diff = formatted.length - oldVal.length;
+                        const newCursor = Math.max(0, start + diff);
+                        this.setSelectionRange(newCursor, newCursor);
+                    }
+                });
+
+                const form = input.closest('form');
+                if (form && !form.dataset.currencyCleaned) {
+                    form.dataset.currencyCleaned = "true";
+                    form.addEventListener('submit', function() {
+                        form.querySelectorAll('.currency-input').forEach(i => {
+                            let raw = i.value.replace(/\./g, "").replace(",", ".");
+                            if (raw) i.value = raw;
+                        });
+                    });
+                }
+            });
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

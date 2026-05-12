@@ -1,0 +1,207 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block budget_css %}
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 3rem;
+        list-style: none;
+    }
+    .timeline::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 1rem;
+        width: 4px;
+        background: #e9ecef;
+        border-radius: 2px;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 3rem;
+    }
+    .timeline-item::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -2.35rem;
+        width: 1.5rem;
+        height: 1.5rem;
+        background: white;
+        border: 4px solid #adb5bd;
+        border-radius: 50%;
+        z-index: 1;
+    }
+    .timeline-item.active::before {
+        border-color: var(--budget-primary);
+    }
+    .timeline-item.completed::before {
+        background: var(--budget-primary);
+        border-color: var(--budget-primary);
+    }
+</style>
+{% endblock %}
+
+{% block budget_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold"><i class="fa-solid fa-timeline text-primary me-2"></i>Trazabilidad del Gasto</h2>
+    <div>
+        <a href="{% url 'budget:execution_list' %}" class="btn btn-outline-secondary rounded-pill px-4 me-2">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver al Listado
+        </a>
+        {% if request.user.is_superuser %}
+        <a href="{% url 'budget:execution_delete' execution.pk %}" class="btn btn-outline-danger rounded-pill px-3" title="Borrar Físicamente">
+            <i class="fa-solid fa-trash"></i>
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card card-stats p-4 h-100">
+            <h5 class="fw-bold mb-4">Línea de Tiempo Operativa</h5>
+            
+            <ul class="timeline">
+                <!-- Compromiso -->
+                <li class="timeline-item completed">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="fw-bold mb-1">Etapa 1: COMPROMISO</h6>
+                            <p class="text-muted small mb-0">Instrumento: {{ execution.reference_code }}</p>
+                            <p class="text-muted small">Fecha: {{ execution.commitment_date|date:"d/m/Y" }}</p>
+                        </div>
+                        <span class="badge bg-success">${{ execution.commitment_amount|localize }}</span>
+                    </div>
+                </li>
+
+                <!-- Devengado -->
+                <li class="timeline-item {% if execution.accrued_amount > 0 %}completed{% else %}active{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="fw-bold mb-1">Etapa 2: DEVENGADO</h6>
+                            {% if execution.accrued_amount > 0 %}
+                                <p class="text-muted small mb-0">Saldo Devengado exitosamente.</p>
+                                <p class="text-muted small">Fecha: {{ execution.accrued_date|date:"d/m/Y" }}</p>
+                            {% else %}
+                                <p class="text-muted small">Pendiente de recepción definitiva de bienes/servicios.</p>
+                                <a href="{% url 'budget:execution_accrual' execution.pk %}" class="btn btn-sm btn-info text-white rounded-pill px-3 mt-2">
+                                    Registrar Devengado
+                                </a>
+                            {% endif %}
+                        </div>
+                        <span class="badge {% if execution.accrued_amount > 0 %}bg-info{% else %}bg-light text-muted{% endif %}">${{ execution.accrued_amount|localize }}</span>
+                    </div>
+                </li>
+
+                <!-- Pago -->
+                <li class="timeline-item {% if execution.paid_amount > 0 %}completed{% elif execution.accrued_amount > 0 %}active{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="fw-bold mb-1">Etapa 3: PAGO</h6>
+                            {% if execution.paid_amount > 0 %}
+                                <p class="text-muted small mb-0">Gasto cancelado financieramente.</p>
+                                <p class="text-muted small">Fecha: {{ execution.paid_date|date:"d/m/Y" }}</p>
+                            {% elif execution.accrued_amount > 0 %}
+                                <p class="text-muted small">Pendiente de emisión de pago/transferencia.</p>
+                                <a href="{% url 'budget:execution_payment' execution.pk %}" class="btn btn-sm btn-success rounded-pill px-3 mt-2">
+                                    Registrar Pago
+                                </a>
+                            {% else %}
+                                <p class="text-muted small italic">Requiere devengamiento previo.</p>
+                            {% endif %}
+                        </div>
+                        <span class="badge {% if execution.paid_amount > 0 %}bg-success{% else %}bg-light text-muted{% endif %}">${{ execution.paid_amount|localize }}</span>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card card-stats p-4">
+            <h6 class="fw-bold mb-3">Detalle de Imputación</h6>
+            <div class="small mb-3">
+                <div class="text-muted">Unidad:</div>
+                <div class="fw-bold">{{ execution.allocation.unit.name }}</div>
+            </div>
+            <div class="small mb-3">
+                <div class="text-muted">Imputación Presupuestaria:</div>
+                <div class="fw-bold">{{ execution.allocation.credit }}</div>
+            </div>
+            <div class="small mb-3">
+                <div class="text-muted">Fuente Financiamiento:</div>
+                <div class="fw-bold">{{ execution.allocation.credit.ff|default:"N/A" }}</div>
+            </div>
+            <div class="small mb-3">
+                <div class="text-muted">Tipo de Gasto (TG) / Obra:</div>
+                <div class="fw-bold">
+                    {% if execution.allocation.credit.inc.code == '4' %}
+                        Obra: {{ execution.numero_obra|default:"99999" }}
+                    {% else %}
+                        TG: {{ execution.get_tipo_gasto_display|default:"Sin especificar" }}
+                        {% if execution.afecta_pg117 %} <span class="badge bg-info ms-1">PG 117</span> {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="small mb-3">
+                <div class="text-muted">Subcuenta (SC):</div>
+                <div class="fw-bold">{{ execution.subcuenta|default:"51" }}</div>
+            </div>
+            <div class="mt-3 p-2 bg-light border rounded text-center">
+                <div class="text-muted x-small text-uppercase fw-bold" style="font-size: 0.65rem;">Imputación Variable (28 Chars)</div>
+                <div class="fw-bold text-primary" style="letter-spacing: 1px; font-family: monospace;">{{ execution.get_imputacion_variable }}</div>
+            </div>
+            <hr>
+            <div class="small text-muted">
+                Registrado por: {{ execution.user.username }}<br>
+                {{ execution.created_at|date:"d/m/Y H:i" }}
+            </div>
+        </div>
+
+        {% if execution.commitment_amount > execution.accrued_amount %}
+        <div class="card card-stats p-4 mt-4 border-start border-4 border-warning shadow-sm animate__animated animate__pulse">
+            <h6 class="fw-bold text-warning mb-3">
+                <i class="fa-solid fa-hand-holding-dollar me-2"></i>
+                Saldo Sobrante Detectado
+            </h6>
+            <p class="small text-muted">
+                El monto comprometido ($ {{ execution.commitment_amount|localize }}) es superior al devengado ($ {{ execution.accrued_amount|localize }}). 
+                Hay <strong>$ {{ surplus|localize }}</strong> bloqueados.
+            </p>
+            <div class="d-grid">
+                <button type="button" class="btn btn-warning rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#releaseSurplusModal">
+                    <i class="fa-solid fa-unlock me-2"></i> Liberar Saldo a la Unidad
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal de Confirmación -->
+<div class="modal fade" id="releaseSurplusModal" tabindex="-1" aria-labelledby="releaseSurplusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title fw-bold" id="releaseSurplusModalLabel">Confirmar Liberación de Saldo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p>¿Está seguro de que desea liberar el saldo sobrante de este compromiso?</p>
+                <div class="alert alert-light border small">
+                    <strong>Impacto:</strong> El presupuesto comprometido se ajustará a <strong>$ {{ execution.accrued_amount|localize }}</strong> y el resto volverá al saldo disponible de la unidad. Esta acción es irreversible.
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <a href="{% url 'budget:execution_release_surplus' execution.pk %}" class="btn btn-warning rounded-pill px-4">
+                    Confirmar y Liberar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

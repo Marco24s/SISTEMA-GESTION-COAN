@@ -1,0 +1,78 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row align-items-center mb-4 mt-2">
+    <div class="col-md-6">
+        <h2 class="fw-bold mb-0" style="color: #462880;"><i class="fa-solid fa-book-open me-2"></i>Catálogo de Ropa</h2>
+        <p class="text-muted">Modelos de vestuario y equipamiento autorizados.</p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <a href="{% url 'sigera:home' %}" class="btn btn-outline-secondary rounded-pill px-4 me-2">
+            <i class="fa-solid fa-arrow-left me-2"></i>Volver al Panel
+        </a>
+        <a href="{% url 'sigera:catalog_size_create' %}" class="btn btn-outline-primary rounded-pill px-3 me-2">
+            <i class="fa-solid fa-ruler-combined me-2"></i>Añadir Talle
+        </a>
+        <a href="{% url 'sigera:catalog_create' %}" class="btn text-white rounded-pill px-3" style="background-color: #6f42c1;">
+            <i class="fa-solid fa-plus me-2"></i>Añadir Modelo
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-5" style="border-radius: 15px; overflow: hidden;">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Tipos de Prenda</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead style="background-color: #f8f9fa;">
+                    <tr>
+                        <th scope="col" class="py-3 px-4 text-muted">Nombre de la Prenda</th>
+                        <th scope="col" class="py-3 text-muted">N.S.N. / N.N.E.</th>
+                        <th scope="col" class="py-3 text-muted">Talles Existentes</th>
+                        <th scope="col" class="py-3 text-muted text-center">Vida Útil (M)</th>
+                        <th scope="col" class="py-3 text-muted text-center">Retornable</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    {% for item in clothing_types %}
+                        <tr>
+                            <td class="px-4 py-3 fw-bold">{{ item.name }}</td>
+                            <td class="py-3 font-monospace text-muted">{{ item.nato_stock_number|default:"-" }}</td>
+                            <td class="py-3">
+                                {% for size in item.sizes.all %}
+                                    {% if size.id in sizes_in_stock %}
+                                        <span class="badge bg-success text-white border me-1">{{ size.size }}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border me-1">{{ size.size }}</span>
+                                    {% endif %}
+                                {% empty %}
+                                    <span class="text-muted small fst-italic">Sin talles definidos</span>
+                                {% endfor %}
+                            </td>
+                            <td class="py-3 text-center">{{ item.shelf_life_months }}</td>
+                            <td class="py-3 text-center">
+                                {% if item.must_be_returned %}
+                                    <span class="badge bg-success"><i class="fa-solid fa-arrow-rotate-left me-1"></i>Retornable</span>
+                                {% else %}
+                                    <span class="badge bg-secondary"><i class="fa-solid fa-check me-1"></i>No retorna</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-book-open fa-3x mb-3" style="color: #e0cffc;"></i>
+                                <h5>No hay modelos registrados</h5>
+                                <p>Cargue el primer modelo de prenda en el sistema.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

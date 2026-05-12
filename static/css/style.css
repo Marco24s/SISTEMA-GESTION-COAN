@@ -1,0 +1,165 @@
+/* --- Local Fonts: Inter --- */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/inter/inter-400-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/inter/inter-500-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../fonts/inter/inter-600-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/inter/inter-700-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- Design System --- */
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #0dcaf0;
+    
+    --premium-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    --premium-border-radius: 16px;
+}
+
+/* Base aesthetics */
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #334155;
+    background-color: #f8fafc;
+}
+
+.card {
+    border-radius: var(--premium-border-radius);
+    border: none;
+    box-shadow: var(--premium-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
+}
+
+/* --- Premium Alerts / Messaging --- */
+.alert-premium {
+    position: relative;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    animation: slideInUp 0.4s ease-out forwards;
+}
+
+/* Alert Types Specific Styles */
+.alert-premium-success { border-left: 5px solid var(--success-color); background: rgba(25, 135, 84, 0.05); }
+.alert-premium-success .alert-icon { color: var(--success-color); }
+
+.alert-premium-danger, .alert-premium-error { border-left: 5px solid var(--danger-color); background: rgba(220, 53, 69, 0.05); }
+.alert-premium-danger .alert-icon, .alert-premium-error .alert-icon { color: var(--danger-color); }
+
+.alert-premium-warning { border-left: 5px solid var(--warning-color); background: rgba(255, 193, 7, 0.05); }
+.alert-premium-warning .alert-icon { color: var(--warning-color); }
+
+.alert-premium-info { border-left: 5px solid var(--info-color); background: rgba(13, 202, 240, 0.05); }
+.alert-premium-info .alert-icon { color: var(--info-color); }
+
+.alert-icon {
+    font-size: 1.25rem;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.alert-content {
+    flex-grow: 1;
+    font-weight: 500;
+}
+
+.alert-premium .btn-close {
+    padding: 1.25rem;
+    box-shadow: none !important;
+}
+
+/* Animations */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Custom transitions for buttons and links */
+.btn {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+/* --- Compact Table Styles --- */
+.table-compact {
+    font-size: 0.85rem;
+}
+
+.table-compact th {
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.table-compact td {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.table-compact .badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}

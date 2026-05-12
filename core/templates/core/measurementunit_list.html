@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h2><i class="fa-solid fa-gears me-2 text-secondary"></i> Configuración: Unidades de Medida</h2>
+    {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+    <a href="{% url 'measurementunit_create' %}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Nueva Unidad</a>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre de la Unidad</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for unit in units %}
+                        <tr>
+                            <td><strong>{{ unit.name }}</strong></td>
+                            <td class="text-end">
+                                {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+                                <a href="{% url 'measurementunit_update' unit.pk %}" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-pen"></i></a>
+                                <form action="{% url 'measurementunit_delete' unit.pk %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger ms-1" onclick="return confirm('¿Está seguro de eliminar esta unidad de medida? Si hay grasas usándola, la eliminación fallará para proteger la base de datos.')"><i class="fa-solid fa-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="text-center py-4 text-muted">No hay unidades de medida configuradas. Agregue "Kg" o "Lts" para empezar.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

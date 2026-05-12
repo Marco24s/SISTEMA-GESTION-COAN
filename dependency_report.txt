@@ -1,0 +1,25 @@
+DEBUG: Found 2 grease types matching ['AEROLUBRICANTE 1003', 'AEROGRASA 1005']
+
+========================================
+Analizando GT: 10 - AEROLUBRICANTE 1003
+  Lotes (GreaseBatch): 1
+    - Lote 27: CT1501485 (Archivado: True)
+      Estado: SERVICEABLE
+      Movimientos: 5
+  Asociaciones (AircraftGrease): 0
+  Precios de Referencia: 0
+  RESULT: Bloqueado por las relaciones arriba indicadas.
+
+========================================
+Analizando GT: 16 - AEROGRASA 1005
+  Lotes (GreaseBatch): 2
+    - Lote 22: 24509AC49522 (Archivado: True)
+      Estado: SERVICEABLE
+      Movimientos: 3
+    - Lote 23: 23523C49520 (Archivado: True)
+      Estado: SERVICEABLE
+      Movimientos: 5
+  Asociaciones (AircraftGrease): 0
+  Precios de Referencia: 0
+  RESULT: Bloqueado por las relaciones arriba indicadas.
+========================================

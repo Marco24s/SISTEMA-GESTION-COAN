@@ -1,0 +1,130 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row align-items-center mb-4 mt-2">
+    <div class="col-md-6">
+        <h2 class="fw-bold mb-0" style="color: #462880;"><i class="fa-solid fa-boxes-stacked me-2"></i>Inventario de Pañol</h2>
+        <p class="text-muted">Gestión de prendas de vestuario y equipamiento almacenado.</p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <a href="{% url 'sigera:home' %}" class="btn btn-outline-secondary rounded-pill px-4 me-2 mb-2 mb-md-0">
+            <i class="fa-solid fa-arrow-left me-2"></i>Volver al Panel
+        </a>
+        <a href="{% url 'sigera:catalog_list' %}" class="btn btn-outline-primary rounded-pill px-4 me-2 mb-2 mb-md-0">
+            <i class="fa-solid fa-book-open me-2"></i>Catálogo
+        </a>
+        <a href="{% url 'sigera:batch_create' %}" class="btn btn-success rounded-pill px-4 mb-2 mb-md-0">
+            <i class="fa-solid fa-truck-ramp-box me-2"></i>Recibir Material
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-5" style="border-radius: 15px; overflow: hidden;">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Stock Detallado por Lotes</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle mb-0">
+                <thead style="background-color: #f8f9fa;">
+                    <tr>
+                        <th scope="col" class="py-3 px-4 text-muted">Prenda</th>
+                        <th scope="col" class="py-3 text-muted">Talle</th>
+                        <th scope="col" class="py-3 text-muted">Fecha Recepción</th>
+                        <th scope="col" class="py-3 text-muted">Proveedor</th>
+                        <th scope="col" class="py-3 text-muted">Orden/Remito</th>
+                        <th scope="col" class="py-3 text-muted text-center">Cant. Disponible</th>
+                        <th scope="col" class="py-3 text-muted text-center">Estado</th>
+                        <th scope="col" class="py-3 text-muted text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    {% for group in grouped_stock %}
+                        <!-- Main Master Row -->
+                        <tr data-bs-toggle="collapse" data-bs-target="#group-{{ forloop.counter }}" style="cursor: pointer; background-color: #fdfdfd;" class="accordion-toggle border-bottom">
+                            <td class="px-4 py-3 fw-bold">{{ group.clothing_type_name }} <a href="javascript:void(0)" class="ms-1 text-muted" title="Ver detalle de lotes"><i class="fa-solid fa-chevron-down fa-xs"></i></a></td>
+                            <td class="py-3">
+                                <span class="badge bg-light text-dark border px-2 py-1 fs-6">{{ group.size }}</span>
+                            </td>
+                            <td colspan="3" class="py-3 text-muted" style="font-size: 0.9em;">
+                                <i class="fa-solid fa-layer-group me-1"></i> {{ group.batches|length }} lote(s) conforman el stock
+                            </td>
+                            <td class="text-center py-3">
+                                <span class="fs-5 fw-bold">{{ group.total_available }}</span> <span class="text-muted small">/ {{ group.total_initial }}</span>
+                            </td>
+                            <td class="text-center py-3">
+                                {% if group.stock_category %}
+                                    <span class="badge rounded-pill bg-{{ group.stock_category.color }} px-3 shadow-sm border border-white" title="{{ group.stock_category.name }}">
+                                        <i class="fa-solid {{ group.stock_category.icon }} me-1"></i> 
+                                        {% if group.stock_category.max_quantity and group.stock_category.min_quantity != group.stock_category.max_quantity %}
+                                            {{ group.total_available }} ({{ group.stock_category.name }})
+                                        {% else %}
+                                            {{ group.stock_category.name }}
+                                        {% endif %}
+                                    </span>
+                                {% else %}
+                                    <span class="badge rounded-pill bg-secondary px-3 shadow-sm border border-white">
+                                        <i class="fa-solid fa-question me-1"></i> {{ group.total_available }} (SIN CATEGORÍA)
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-center">
+                                <button class="btn btn-sm btn-light border text-muted" disabled title="Haz clic en la fila para ver los lotes">Ver Detalles</button>
+                            </td>
+                        </tr>
+                        
+                        <!-- Collapsible Detail Row -->
+                        <tr class="collapse" id="group-{{ forloop.counter }}">
+                            <td colspan="8" class="p-0 border-0">
+                                <div class="bg-light p-3 border-bottom shadow-sm" style="background-color: #f8f9fa !important; box-shadow: inset 0px 3px 5px rgba(0,0,0,0.02) !important;">
+                                    <table class="table table-sm table-bordered bg-white mb-0">
+                                        <thead class="table-light text-muted" style="font-size: 0.85em;">
+                                            <tr>
+                                                <th>Fecha Recepción</th>
+                                                <th>Proveedor</th>
+                                                <th>Orden/Remito</th>
+                                                <th class="text-center">Cant. Disp. Lote</th>
+                                                <th class="text-center">Acciones Lote</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for batch in group.batches %}
+                                            <tr>
+                                                <td class="py-2"><i class="fa-regular fa-calendar-alt text-muted me-1"></i> {{ batch.reception_date|date:"d/m/Y" }}</td>
+                                                <td class="py-2">{{ batch.provider|default:"-" }}</td>
+                                                <td class="py-2">{{ batch.purchase_order|default:"-" }}</td>
+                                                <td class="text-center py-2"><strong>{{ batch.available_quantity }}</strong> <span class="text-muted small">/ {{ batch.initial_quantity }}</span></td>
+                                                <td class="text-center py-1">
+                                                    <a href="{% url 'sigera:batch_movements' batch.pk %}" class="btn btn-sm btn-outline-secondary me-1 py-0 px-2" title="Movimientos">
+                                                        <i class="fa-solid fa-list"></i>
+                                                    </a>
+                                                    <form action="#" method="post" class="d-inline">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="return confirm('¿Marcar el lote completo como consumido?');" title="Eliminar / Consumir">
+                                                            <i class="fa-solid fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-box-open fa-3x mb-3" style="color: #e0cffc;"></i>
+                                <h5>No hay registros de inventario</h5>
+                                <p>Comience cargando tipos de prendas y lotes de ingreso en el sistema.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

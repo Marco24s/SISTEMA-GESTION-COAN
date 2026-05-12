@@ -1,0 +1,130 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row justify-content-center mt-4 mb-5">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold text-success"><i class="fa-solid fa-boxes-packing me-2"></i>Registrar Ingreso de Material</h3>
+            <a href="{% url 'sigera:stock_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left me-2"></i>Volver
+            </a>
+        </div>
+
+        <div class="alert alert-success border-success shadow-sm mb-4">
+            <i class="fa-solid fa-circle-info me-2"></i><strong>Atención:</strong> Las unidades ingresadas aquí se sumarán automáticamente al pañol disponible para ser entregadas.
+        </div>
+
+        <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 text-muted">Datos del Lote/Remito Recibido</h6>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.clothing_type|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.clothing_size|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.reception_date|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.initial_quantity|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.provider|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.purchase_order|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.unit_price|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{% url 'sigera:stock_list' %}" class="btn btn-light px-4 border">Cancelar</a>
+                        <button type="submit" class="btn btn-success px-5 fw-bold">
+                            <i class="fa-solid fa-check me-2"></i>Abastecer Pañol
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ sizes_by_type|json_script:'sizes-by-type-data' }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const sizesData = JSON.parse(document.getElementById('sizes-by-type-data').textContent || '[]');
+        const sizesByType = {};
+        sizesData.forEach(item => {
+            sizesByType[item.clothing_type_id] = sizesByType[item.clothing_type_id] || [];
+            sizesByType[item.clothing_type_id].push(item);
+        });
+
+        const typeSelect = document.getElementById('id_clothing_type');
+        const sizeSelect = document.getElementById('id_clothing_size');
+        if (!typeSelect || !sizeSelect) {
+            return;
+        }
+
+        const initialSize = sizeSelect.value;
+        function setOptionsForType(typeId) {
+            sizeSelect.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            placeholder.textContent = 'Seleccionar talle...';
+            sizeSelect.appendChild(placeholder);
+
+            const sizes = sizesByType[typeId] || [];
+            sizes.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.size;
+                if (item.id.toString() === initialSize) {
+                    option.selected = true;
+                }
+                sizeSelect.appendChild(option);
+            });
+
+            sizeSelect.disabled = sizes.length === 0;
+        }
+
+        typeSelect.addEventListener('change', function () {
+            setOptionsForType(this.value);
+        });
+
+        if (typeSelect.value) {
+            setOptionsForType(typeSelect.value);
+        } else {
+            sizeSelect.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            placeholder.textContent = 'Seleccione una prenda primero...';
+            sizeSelect.appendChild(placeholder);
+            sizeSelect.disabled = true;
+        }
+    });
+</script>
+        </div>
+    </div>
+</div>
+{% endblock %}

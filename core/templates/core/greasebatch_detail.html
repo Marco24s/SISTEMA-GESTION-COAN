@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+
+{% block content %}
+<div class="mt-4 mb-3 d-flex justify-content-between align-items-center">
+    <div>
+        <a href="{% url 'batch_list' %}" class="text-decoration-none"><i class="fa-solid fa-arrow-left"></i> Volver a Stock</a>
+        <h2 class="mt-2"><i class="fa-solid fa-box-open me-2"></i> Detalle Casamata: {{ batch.batch_number }}</h2>
+    </div>
+    <div>
+        {% if batch.can_be_retested %}
+            {% if batch.status == 'PENDING_RETEST' %}
+                <a href="{% url 'batch_retest' batch.id %}" class="btn btn-success shadow-sm"><i class="fa-solid fa-flask-vial me-2"></i> Cargar Resultados</a>
+            {% elif batch.status == 'EXPIRED' or batch.status == 'NEAR_EXPIRATION' %}
+                <form action="{% url 'batch_start_retest' batch.id %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning shadow-sm"><i class="fa-solid fa-share-from-square me-2"></i> Enviar a Retesteo</button>
+                </form>
+            {% else %}
+                <form action="{% url 'batch_start_retest' batch.id %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary shadow-sm btn-sm" title="Adelantar Envio a Retesteo"><i class="fa-solid fa-share-from-square me-2"></i> Enviar a Retesteo</button>
+                </form>
+            {% endif %}
+        {% else %}
+            <span class="badge bg-secondary fs-6"><i class="fa-solid fa-ban me-1"></i> No admite retesteo posterior</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">Información de la Casamata</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Tipo de Grasa:</strong> {{ batch.grease_type.nomenclatura }} ({{ batch.grease_type.unidad }})</p>
+                {% if batch.container_size and batch.container_count %}
+                <p><strong>Envases:</strong> {{ batch.container_count }} × {{ batch.container_size }} {{ batch.grease_type.unidad }}</p>
+                {% endif %}
+                <p><strong>Fabricación:</strong> {{ batch.manufacturing_date|date:"d M Y" }}</p>
+                <p>
+                    <strong>Vencimiento:</strong> {{ batch.expiration_date|date:"d M Y" }} 
+                    <span class="badge {% if batch.available_quantity <= 0 %}bg-secondary{% elif batch.status == 'EXPIRED' %}bg-danger{% elif batch.status == 'NEAR_EXPIRATION' %}bg-warning text-dark{% elif batch.status == 'PENDING_RETEST' %}bg-info text-dark{% else %}bg-success{% endif %} ms-2">
+                        {% if batch.available_quantity <= 0 %}Sin Stock{% else %}{{ batch.get_status_display }}{% endif %}
+                    </span>
+                    {% if not batch.can_be_retested %}
+                    <span class="badge bg-dark ms-1" title="Este lote alcanzó su límite de vida útil y ya no puede extenderse más allá de esta fecha."><i class="fa-solid fa-ban me-1"></i>Vencimiento Definitivo</span>
+                    {% endif %}
+                </p>
+                <p><strong>Ubicación:</strong> {{ batch.storage_location }}</p>
+                <h4 class="mt-4 text-primary">Disponibilidad</h4>
+                <p class="display-6 mb-0">
+                <strong>{{ batch.available_quantity|smart_number }}</strong>
+                <small class="text-muted fs-6">{{ batch.grease_type.unidad }} disponibles</small>
+                </p>
+                <p class="text-muted mt-1">
+                    <small>de {{ batch.initial_quantity|smart_number }} {{ batch.grease_type.unidad }} cargados inicialmente.</small>
+                </p>
+                {% if batch.unit_price %}
+                <h4 class="mt-4 text-success">Costo Unitario / Valor Total</h4>
+                <p class="display-6 text-success">
+                <strong>${{ batch.unit_price|floatformat:2 }} / ${{ batch.get_total_value|floatformat:2 }}</strong>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-info">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fa-solid fa-timeline me-2"></i> Auditoría de Movimientos</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha y Hora</th>
+                    <th>Tipo</th>
+                    <th>Cantidad Alterada</th>
+                    <th>Usuario Responsable</th>
+                    <th>Referencia / Motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for movement in movements %}
+                <tr>
+                    <td>{{ movement.movement_date|date:"d M Y H:i" }}</td>
+                    <td>
+                        {% if movement.movement_type == 'INCOMING' %}
+                            <span class="badge bg-success">Ingreso</span>
+                        {% elif movement.movement_type == 'CONSUMPTION' %}
+                            <span class="badge bg-warning text-dark">Consumo</span>
+                        {% elif movement.movement_type == 'RETEST' %}
+                            <span class="badge bg-info text-dark">Retesteo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Ajuste</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong class="{% if movement.quantity_changed > 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ movement.quantity_changed }}
+                        </strong>
+                    </td>
+                    <td>{{ movement.user.username }}</td>
+                    <td>
+                        {% if movement.reference %}<strong>Ref:</strong> {{ movement.reference }}<br>{% endif %}
+                        <small class="text-muted">{{ movement.reason|default:"-" }}</small>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-3 text-muted">No se registran movimientos.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

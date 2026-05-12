@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}SIGERA - Sistema de Gestión de Ropa Aeronaval{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark shadow-sm mb-4" style="background-color: #6f42c1;">
+    <div class="container">
+        <!-- Botón volver al portal general -->
+        <a href="/" class="btn btn-sm text-white border-white me-3" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1);" title="Volver al Portal">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'sigera:home' %}">
+            <i class="fa-solid fa-shirt me-2"></i>
+            <strong>SIGERA-COAN</strong>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sigeraNav" aria-controls="sigeraNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="sigeraNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:home' %}">Panel Principal</a>
+                </li>
+                {% if user.is_authenticated %}
+                <li class="nav-item">
+                    <a class="nav-link {% if 'stock' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:stock_list' %}">Inventario</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'personnel' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:personnel_list' %}">Personal</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'assignment' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:assignment_list' %}">Entregas</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'catalog' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:catalog_list' %}">Catálogo</a>
+                </li>
+                {% endif %}
+            </ul>
+            <ul class="navbar-nav ms-auto">
+                {% if user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fa-solid fa-user me-1"></i> {{ user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="/admin/sigera/stockthreshold/"><i class="fa-solid fa-sliders me-2"></i>Configurar Categorías</a></li>
+                            {% if user.is_staff %}
+                                <li><a class="dropdown-item" href="/admin/"><i class="fa-solid fa-gear me-2"></i>Administración</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                            {% endif %}
+                            <li>
+                                <form method="post" action="{% url 'logout' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item"><i class="fa-solid fa-right-from-bracket me-2"></i>Cerrar Sesión</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "budget/form_base.html" %}
+{% load l10n %}
+
+{% block budget_content %}
+{{ block.super }}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const amountsMap = {{ amounts_map|safe }};
+    const metadataMap = {{ allocations_metadata|safe }};
+    const allocationSelect = document.getElementById('id_allocation');
+    const useTotalCheckbox = document.getElementById('id_use_total_amount');
+    const amountInput = document.getElementById('id_commitment_amount');
+    
+    // Rendicion fields
+    const tgField = document.getElementById('id_tipo_gasto').closest('.mb-3');
+    const obraField = document.getElementById('id_numero_obra').closest('.mb-3');
+
+    function updateUI() {
+        const selectedId = allocationSelect.value;
+        if (!selectedId) return;
+
+        // 1. Handle Amount
+        if (useTotalCheckbox.checked && amountsMap[selectedId] !== undefined) {
+            const val = amountsMap[selectedId];
+            amountInput.value = val.toFixed(2).replace('.', ',');
+            amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // 2. Handle Rendicion Visibility & Defaults
+        const meta = metadataMap[selectedId];
+        if (meta) {
+            const inciso = meta.inciso;
+            const ff = meta.ff;
+
+            if (inciso === '4') {
+                // Inciso 4: Show Obra, Hide TG/Afecta
+                tgField.style.display = 'none';
+                obraField.style.display = 'block';
+                
+                if (ff === '13' || ff === '99') {
+                    obraField.querySelector('input').value = '99999';
+                    obraField.style.opacity = '0.6';
+                    obraField.style.pointerEvents = 'none';
+                } else {
+                    obraField.style.opacity = '1';
+                    obraField.style.pointerEvents = 'auto';
+                }
+            } else {
+                // Other Incisos: Show TG/Afecta, Hide Obra
+                tgField.style.display = 'block';
+                obraField.style.display = 'none';
+            }
+
+        }
+    }
+
+    allocationSelect.addEventListener('change', updateUI);
+    useTotalCheckbox.addEventListener('change', updateUI);
+    
+    // Run once on load
+    updateUI();
+});
+</script>
+{% endblock %}

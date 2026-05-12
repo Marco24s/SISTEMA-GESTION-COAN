@@ -1,0 +1,77 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block budget_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold"><i class="fa-solid fa-shuffle text-primary me-2"></i>Órdenes de Compensación de Partidas</h2>
+    <a href="{% url 'budget:compensacion_create' %}" class="btn btn-primary rounded-pill px-4 shadow-sm">
+        <i class="fa-solid fa-plus me-2"></i>Nueva Solicitud
+    </a>
+</div>
+
+<div class="card card-stats border-0 shadow-sm overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr class="small text-uppercase text-muted border-bottom-0">
+                    <th class="ps-4">ID / Fecha</th>
+                    <th>Programa</th>
+                    <th>Crédito Origen</th>
+                    <th class="text-end">Monto Total</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-end pe-4">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for comp in compensaciones %}
+                <tr>
+                    <td class="ps-4">
+                        <div class="fw-bold">#{{ comp.id }}</div>
+                        <small class="text-muted">{{ comp.created_at|date:"d/m/Y H:i" }}</small>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-subtle text-secondary px-2 py-1">{{ comp.programa.code }}</span>
+                    </td>
+                    <td>
+                        <div class="small fw-semibold">{{ comp.source_credit }}</div>
+                        <small class="text-muted">Solicitado por: {{ comp.requested_by.get_full_name|default:comp.requested_by.username }}</small>
+                    </td>
+                    <td class="text-end fw-bold">
+                        ${{ comp.total_amount|localize }}
+                    </td>
+                    <td class="text-center">
+                        {% if comp.status == 'PENDIENTE' %}
+                            <span class="badge bg-warning text-dark rounded-pill">PENDIENTE</span>
+                        {% elif comp.status == 'EJECUTADO' %}
+                            <span class="badge bg-success rounded-pill">EJECUTADO</span>
+                        {% elif comp.status == 'RECHAZADO' %}
+                            <span class="badge bg-danger rounded-pill">RECHAZADO</span>
+                        {% else %}
+                            <span class="badge bg-info rounded-pill">{{ comp.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4">
+                        {% if comp.status == 'PENDIENTE' %}
+                        <a href="{% url 'budget:compensacion_approve' comp.id %}" class="btn btn-sm btn-outline-success rounded-pill px-3">
+                            <i class="fa-solid fa-check-double me-1"></i> Aprobar y Ejecutar
+                        </a>
+                        {% else %}
+                        <span class="text-muted small">Sin acciones</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <div class="text-muted">
+                            <i class="fa-solid fa-inbox fa-3x mb-3 d-block opacity-25"></i>
+                            No hay órdenes de compensación registradas.
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

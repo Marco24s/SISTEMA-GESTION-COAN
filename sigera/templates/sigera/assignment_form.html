@@ -1,0 +1,61 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row justify-content-center mt-4 mb-5">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold text-warning" style="color: #fd7e14 !important;"><i class="fa-solid fa-shirt me-2"></i>Registrar Entrega de Prenda</h3>
+            <a href="{% url 'sigera:assignment_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left me-2"></i>Volver
+            </a>
+        </div>
+
+        <div class="alert alert-warning border-warning shadow-sm mb-4">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i><strong>Atención:</strong> Registrar esta entrega descontará automáticamente la cantidad elegida del inventario de pañol disponible.
+        </div>
+
+        <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 text-muted">Complete los datos de la asignación de cargo</h6>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        {{ form.personnel|as_crispy_field }}
+                    </div>
+                    
+                    <div class="card bg-light border-0 mb-4">
+                        <div class="card-body">
+                            <h6 class="text-uppercase text-muted fw-bold mb-3" style="font-size: 0.8rem;">Detalle del Material</h6>
+                            <div class="row">
+                                <div class="col-md-9 mb-3 mb-md-0">
+                                    {{ form.batch|as_crispy_field }}
+                                    <small class="text-muted fst-italic">Solo se muestran los lotes que contienen stock disponible en pañol.</small>
+                                </div>
+                                <div class="col-md-3">
+                                    {{ form.quantity|as_crispy_field }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        {{ form.notes|as_crispy_field }}
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{% url 'sigera:assignment_list' %}" class="btn btn-light px-4 border">Cancelar</a>
+                        <button type="submit" class="btn btn-warning px-5 fw-bold text-dark" style="background-color: #ffc107;">
+                            <i class="fa-solid fa-check-double me-2"></i>Confirmar Entrega
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

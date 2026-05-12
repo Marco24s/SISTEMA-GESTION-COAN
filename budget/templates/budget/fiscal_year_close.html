@@ -1,0 +1,75 @@
+{% extends "budget/base_budget.html" %}
+
+{% block budget_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-danger"><i class="fa-solid fa-calendar-xmark me-2"></i>Cierre de Ejercicio {{ year.year }}</h2>
+            <a href="{% url 'budget:fiscal_year_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left"></i> Cancelar
+            </a>
+        </div>
+
+        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-dark mb-4 shadow-sm">
+            <h5 class="fw-bold"><i class="fa-solid fa-triangle-exclamation me-2"></i> Advertencia de Cierre Administrativo</h5>
+            <p class="mb-0">
+                Al cerrar el ejercicio, no se podrán registrar nuevos créditos, distribuciones ni compromisos para el año {{ year.year }}. 
+                Los compromisos que no hayan sido devengados pasarán a ser considerados **Residuo Pasivo** y deberán ser reprogramados en el próximo ejercicio presupuestario.
+            </p>
+        </div>
+
+        <div class="card card-stats p-4 mb-4">
+            <h5 class="fw-bold mb-4">Saldos a Reprogramar (Residuos Pasivos)</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-light">
+                        <tr class="small text-muted">
+                            <th>Referencia</th>
+                            <th>Unidad</th>
+                            <th class="text-end">Compromiso</th>
+                            <th class="text-end">Devengado</th>
+                            <th class="text-end">Saldo Pendiente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in pending_reprogram %}
+                        <tr>
+                            <td><strong>{{ item.reference_code }}</strong></td>
+                            <td>{{ item.allocation.unit.name }}</td>
+                            <td class="text-end">${{ item.commitment_amount|floatformat:2 }}</td>
+                            <td class="text-end">${{ item.accrued_amount|floatformat:2 }}</td>
+                            <td class="text-end text-danger fw-bold">
+                                ${{ item.pending_balance|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-3 text-success">
+                                <i class="fa-solid fa-check-circle me-1"></i> No hay residuos pasivos pendientes. Todo lo comprometido fue devengado.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card card-stats p-4 border-danger">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label class="form-check-label h6 fw-bold">
+                        <input type="checkbox" required class="form-check-input me-2">
+                        Confirmo que he verificado los estados contables y deseo CERRAR el ejercicio económico.
+                    </label>
+                </div>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-danger btn-lg rounded-pill fw-bold">
+                        <i class="fa-solid fa-lock me-2"></i> CERRAR EJERCICIO DEFINITIVAMENTE
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

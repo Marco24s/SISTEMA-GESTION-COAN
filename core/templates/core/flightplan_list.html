@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h2><i class="fa-solid fa-calendar-days me-2"></i> Plan de empleo</h2>
+    {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+    <a href="{% url 'flightplan_create' %}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Nuevo Plan</a>
+    {% endif %}
+</div>
+
+<div class="row">
+    {% for plan in flight_plans %}
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100 border-start border-primary border-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-primary">{{ plan.aircraft_model.name }}</h5>
+                <span class="badge bg-secondary">{{ plan.get_period_type_display }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <small class="text-muted d-block">Período de Validez</small>
+                        <strong>{{ plan.period_start_date|date:"d M y" }}</strong>
+                        {% if plan.period_end_date %}
+                        <small class="text-muted">al</small> <strong>{{ plan.period_end_date|date:"d M y" }}</strong>
+                        {% endif %}
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">Horas Planificadas</small>
+                        <strong>{{ plan.planned_hours|smart_number }} hs</strong>
+                    </div>
+                </div>
+                
+                <h6 class="border-bottom pb-2 mt-3"><i class="fa-solid fa-calculator me-1"></i> Consumo Proyectado</h6>
+                {% if plan.get_projected_consumption %}
+                <ul class="list-group list-group-flush mt-2">
+                    {% for item in plan.get_projected_consumption %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-1 border-0">
+                        <small>{{ item.grease_type.nomenclatura }}</small>
+                        <span class="badge rounded-pill {% if item.insufficient_stock %}bg-danger{% else %}bg-info text-dark{% endif %}" 
+                              translate="no"
+                              data-bs-toggle="tooltip" 
+                              data-bs-placement="top"
+                              data-bs-title="{% if item.insufficient_stock %}{% if item.safe_stock == 0 %}Sin stock seguro para este periodo. El stock actual disponible ({{ item.total_physical_stock|smart_number }} {{ item.grease_type.unidad }}) vence el {{ item.next_expiry|date:'d/m/Y'|default:'N/A' }}.{% else %}Stock SEGURO insuficiente ({{ item.safe_stock|smart_number }} {{ item.grease_type.unidad }}). Faltante proyectado: {{ item.projected_amount|add_decimal_inverse:item.safe_stock|smart_number }} {{ item.grease_type.unidad }}.{% endif %}{% else %}{% if item.expiring_info %}Cant {{ item.projected_amount|smart_number }} SUFICIENTE, pero {{ item.expiring_info.0.amount|smart_number }} {{ item.grease_type.unidad }} se vencen el {{ item.expiring_info.0.date|date:'d/m/Y' }}.{% else %}Stock suficiente y seguro para todo el periodo.{% endif %}{% endif %}">
+                            {{ item.projected_amount|smart_number }} {{ item.grease_type.unidad }}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0">No hay grasas asociadas a este modelo.</p>
+                {% endif %}
+            </div>
+            {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+            <div class="card-footer bg-white text-end">
+                <a href="{% url 'flightplan_update' plan.id %}" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-pen"></i> Editar</a>
+                <a href="{% url 'flightplan_delete' plan.id %}" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-trash"></i></a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-light text-center py-5 shadow-sm">
+            <i class="fa-solid fa-calendar-xmark fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No hay planes de empleo registrados</h5>
+            <p class="mb-0">Cree un nuevo plan para visualizar los consumos proyectados.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

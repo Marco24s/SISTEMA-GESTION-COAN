@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="p-5 mb-4 bg-light rounded-3 shadow-sm border">
+            <div class="container-fluid py-2">
+                <h1 class="display-5 fw-bold text-primary"><i class="fa-solid fa-shield-halved me-3"></i>SGMG-COAN</h1>
+                <p class="col-md-8 fs-4">Sistema de Gestión de Materias Grasas Aeronáuticas del Comando de la Aviación Naval.</p>
+                {% if not user.is_authenticated %}
+                <a class="btn btn-primary btn-lg mt-3" href="{% url 'login' %}">Ingresar al Sistema</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if user.is_authenticated %}
+
+<div class="row mt-2">
+    <!-- Fast Access Cards using generic info for now - will be replaced with dashboard logic later if needed -->
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100 border-start border-primary border-4">
+            <div class="card-body">
+                <h5 class="card-title text-primary"><i class="fa-solid fa-plane me-2"></i> Flota</h5>
+                <p class="card-text text-muted">Gestión de Unidades y Modelos de Aeronaves.</p>
+                <a href="{% url 'aircraft_list' %}" class="btn btn-outline-primary btn-sm">Ver Aeronaves</a>
+                <a href="{% url 'unit_list' %}" class="btn btn-outline-secondary btn-sm">Ver Unidades</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100 border-start border-success border-4">
+            <div class="card-body">
+                <h5 class="card-title text-success"><i class="fa-solid fa-oil-can me-2"></i> Catálogo</h5>
+                <p class="card-text text-muted">Gestión de Tipos de Grasas y Especificaciones.</p>
+                <a href="{% url 'grease_list' %}" class="btn btn-outline-success btn-sm">Ver Catálogo</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm h-100 border-start border-warning border-4">
+            <div class="card-body">
+                <h5 class="card-title text-warning"><i class="fa-solid fa-boxes-stacked me-2"></i> Logística</h5>
+                <p class="card-text text-muted">Control de Stock, Consumos y Abastecimiento.</p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'batch_list' %}" class="btn btn-outline-warning btn-sm">Gestionar Stock</a>
+                    <a href="{% url 'procurement_forecast' %}" class="btn btn-outline-info btn-sm">Análisis de Abastecimiento</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if stock_alerts %}
+<div class="row mt-2 mb-4">
+    <div class="col-12">
+        <div class="card border-warning shadow-sm">
+            <div class="card-header bg-warning text-dark fw-bold">
+                <i class="fa-solid fa-cart-arrow-down me-2"></i> Alerta de Abastecimiento (Stock Insuficiente para Planes de Empleo)
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for alert in stock_alerts %}
+                    <div class="list-group-item list-group-item-warning d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ alert.grease_type.nomenclatura }}</strong>
+                            <br>
+                            <small>Proyectado: {{ alert.projected|smart_number }} {{ alert.grease_type.unidad }} | Disponible: {{ alert.available|smart_number }} {{ alert.grease_type.unidad }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-danger rounded-pill fs-6 mb-1">
+                                Faltante: {{ alert.shortfall|smart_number }} {{ alert.grease_type.unidad }}
+                            </span>
+                            <br>
+                            {% if alert.active_requirement %}
+                                <span class="badge bg-secondary p-2"><i class="fa-solid fa-clock"></i> Cargado para compra</span>
+                            {% else %}
+                                <a href="{% url 'procurement_forecast' %}" class="btn btn-sm btn-outline-danger">Adquirir</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if critical_stock_alerts %}
+<div class="row mt-2 mb-4">
+    <div class="col-12">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white fw-bold">
+                <i class="fa-solid fa-battery-quarter me-2"></i> Alerta de Stock Crítico (Punto de Pedido)
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for alert in critical_stock_alerts %}
+                    <div class="list-group-item list-group-item-danger d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ alert.grease_type.nomenclatura }}</strong>
+                            <br>
+                            <small>Mínimo Requerido: {{ alert.minimum_stock|smart_number }} {{ alert.grease_type.unidad }} | Stock Actual: {{ alert.available|smart_number }} {{ alert.grease_type.unidad }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-danger rounded-pill fs-6 mb-1">
+                                Comprar: {{ alert.shortfall|abs_val|smart_number }} {{ alert.grease_type.unidad }}
+                            </span>
+                            <br>
+                            {% if alert.active_requirement %}
+                                <span class="badge bg-secondary p-2"><i class="fa-solid fa-clock"></i> Cargado para compra</span>
+                            {% else %}
+                                <a href="{% url 'procurement_forecast' %}" class="btn btn-sm btn-outline-danger">Adquirir</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if alerts %}
+<div class="row mt-2 mb-4">
+    <div class="col-12">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white fw-bold">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i> Alertas de Stock (Casamatas Vencidas / Próximas a Vencer)
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Grasa</th>
+                                <th>Casamata</th>
+                                <th>Estado</th>
+                                <th>Vencimiento</th>
+                                <th>Ubicación</th>
+                                <th>Disponible</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for batch in alerts %}
+                            <tr class="{% if batch.status == 'EXPIRED' %}table-danger{% else %}table-warning{% endif %}">
+                                <td>{{ batch.grease_type.nomenclatura }}</td>
+                                <td><a href="{% url 'batch_detail' batch.id %}"><strong>{{ batch.batch_number }}</strong></a></td>
+                                <td><span class="badge {% if batch.status == 'EXPIRED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ batch.get_status_display }}</span></td>
+                                <td data-sort="{{ batch.expiration_date|date:'Y-m-d' }}">{{ batch.expiration_date|date:'d/m/Y' }}</td>
+                                <td>{{ batch.storage_location }}</td>
+                                <td>{{ batch.available_quantity|smart_number }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

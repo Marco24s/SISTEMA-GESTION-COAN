@@ -1,0 +1,167 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .module-card {
+        border-radius: 15px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: none;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        height: 100%;
+        overflow: hidden;
+    }
+    
+    .module-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(111, 66, 193, 0.2);
+    }
+    
+    .module-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: white;
+    }
+    
+    .bg-sigera { background-color: #6f42c1; }
+    .bg-sigera-light { background-color: #e0cffc; color: #6f42c1; }
+    .text-sigera { color: #6f42c1; }
+    
+    .stats-badge {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #495057;
+    }
+</style>
+
+<div class="row mb-4">
+    <div class="col-12 text-center mt-3 mb-4">
+        <h2 class="fw-bold" style="color: #462880;">Panel de Control SIGERA</h2>
+        <p class="text-muted">Sistema General de Gestión de Ropa Aeronaval</p>
+    </div>
+</div>
+
+<div class="row g-4 justify-content-center">
+    
+    <!-- Inventario Card -->
+    <div class="col-md-4">
+        <div class="card module-card">
+            <div class="card-body d-flex flex-column text-center p-4">
+                <div class="module-icon bg-sigera mx-auto">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+                <h4 class="card-title fw-bold">Inventario</h4>
+                <p class="card-text text-muted mb-4 flex-grow-1">Consulta de stock de prendas, talles disponibles y control de lotes ingresados a pañol.</p>
+                <div class="d-flex justify-content-between align-items-center mb-3 px-3">
+                    <span class="text-muted small">Prendas Modelos</span>
+                    <span class="stats-badge">{{ total_stock|default:"-" }}</span>
+                </div>
+                <a href="{% url 'sigera:stock_list' %}" class="btn btn-outline-primary w-100" style="border-color: #6f42c1; color: #6f42c1;">Ir a Inventario</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personal Card -->
+    <div class="col-md-4">
+        <div class="card module-card">
+            <div class="card-body d-flex flex-column text-center p-4">
+                <div class="module-icon mx-auto" style="background-color: #17a2b8;">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <h4 class="card-title fw-bold">Personal</h4>
+                <p class="card-text text-muted mb-4 flex-grow-1">Administración de personal naval y civil, jerarquías y unidades asignadas.</p>
+                <div class="d-flex justify-content-between align-items-center mb-3 px-3">
+                    <span class="text-muted small">Personal Registrado</span>
+                    <span class="stats-badge">{{ total_personnel|default:"-" }}</span>
+                </div>
+                <a href="{% url 'sigera:personnel_list' %}" class="btn btn-outline-info w-100" style="color: #17a2b8; border-color: #17a2b8;">Ver Personal</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entregas Card -->
+    <div class="col-md-4">
+        <div class="card module-card">
+            <div class="card-body d-flex flex-column text-center p-4">
+                <div class="module-icon mx-auto" style="background-color: #fd7e14;">
+                    <i class="fa-solid fa-hand-holding-hand"></i>
+                </div>
+                <h4 class="card-title fw-bold">Entregas</h4>
+                <p class="card-text text-muted mb-4 flex-grow-1">Registro de cargo de prendas, altas y devoluciones de vestuario y equipamiento.</p>
+                <div class="d-flex justify-content-between align-items-center mb-3 px-3">
+                    <span class="text-muted small">Entregas Activas</span>
+                    <span class="stats-badge">{{ active_assignments|default:"-" }}</span>
+                </div>
+                <a href="{% url 'sigera:assignment_list' %}" class="btn btn-outline-warning w-100" style="color: #fd7e14; border-color: #fd7e14;">Ver Entregas</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actividad Reciente -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold" style="color: #6f42c1;"><i class="fa-solid fa-clock-rotate-left me-2"></i>Actividad Reciente en Entregas</h5>
+                    <a href="{% url 'sigera:assignment_list' %}" class="btn btn-sm btn-link text-decoration-none">Ver todo</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="px-4 py-3 text-muted small text-uppercase">Fecha</th>
+                                    <th class="py-3 text-muted small text-uppercase">Personal</th>
+                                    <th class="py-3 text-muted small text-uppercase">Material</th>
+                                    <th class="py-3 text-muted small text-uppercase text-center">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in recent_assignments %}
+                                <tr>
+                                    <td class="px-4 py-3 fw-bold">{{ item.assigned_date|date:"d/m/Y" }}</td>
+                                    <td class="py-3">
+                                        <div class="fw-semibold">{{ item.personnel.last_name }}, {{ item.personnel.first_name }}</div>
+                                        <small class="text-muted">{{ item.personnel.get_rank_display }}</small>
+                                    </td>
+                                    <td class="py-3">
+                                        <div>{{ item.batch.clothing_size.clothing_type.name }}</div>
+                                        <span class="badge bg-light text-dark border">Talle: {{ item.batch.clothing_size.size }}</span>
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        {% if item.returned %}
+                                            <span class="badge rounded-pill bg-secondary">Devuelto</span>
+                                        {% else %}
+                                            <span class="badge rounded-pill bg-success">Entregado</span>
+                                            {% if item.expiration_date %}
+                                                <div class="mt-1">
+                                                {% if item.is_expired %}
+                                                    <small class="text-danger fw-bold" title="Vencido el {{ item.expiration_date|date:'d/m/Y' }}"><i class="fa-solid fa-circle-exclamation"></i> Vencido</small>
+                                                {% else %}
+                                                    <small class="text-muted" title="Vence el {{ item.expiration_date|date:'d/m/Y' }}"><i class="fa-solid fa-hourglass-half"></i> Expira: {{ item.expiration_date|date:'m/Y' }}</small>
+                                                {% endif %}
+                                                </div>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">No hay actividad reciente registrada.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

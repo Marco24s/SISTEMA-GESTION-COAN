@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% block title %}Requerimientos de Adquisición{% endblock %}
+
+{% block content %}
+<style>
+  @media print {
+    /* Ocultar todo lo que no sea la tabla */
+    .navbar, .sidebar, footer, .no-print, .btn, nav { display: none !important; }
+    .card { box-shadow: none !important; border: none !important; }
+    body { font-size: 12px; }
+    .badge { border: 1px solid #000 !important; color: #000 !important; background: none !important; }
+  }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <div>
+        <h2 class="mb-0"><i class="fa-solid fa-cart-shopping me-2"></i> Requerimientos de Compra</h2>
+        <p class="text-muted mb-0 mt-1">Listado de solicitudes generadas a partir del pronóstico de abastecimiento.</p>
+    </div>
+    <div class="d-flex gap-2 no-print">
+        <a href="{% url 'export_requirements_csv' %}" class="btn btn-success" title="Exportar a Excel (CSV)">
+            <i class="fa-solid fa-file-excel me-1"></i> Exportar Excel
+        </a>
+        <button onclick="window.print()" class="btn btn-outline-secondary" title="Imprimir listado">
+            <i class="fa-solid fa-print me-1"></i> Imprimir
+        </button>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID Req.</th>
+                        <th>Fecha de Solicitud</th>
+                        <th>Grasa (Nomenclatura)</th>
+                        <th class="text-end">Cantidad Solicitada</th>
+                        <th>Estado</th>
+                        <th>Solicitado Por</th>
+                        <th class="no-print">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requirements %}
+                    <tr>
+                        <td><strong>#{{ req.id }}</strong></td>
+                        <td data-sort="{{ req.request_date|date:'Y-m-d' }}">{{ req.request_date|date:"d/m/Y H:i" }}</td>
+                        <td>{{ req.grease_type.nomenclatura }} <br><small class="text-muted">{{ req.grease_type.unidad }}</small></td>
+                        <td class="text-end"><strong>{{ req.requested_quantity|smart_number }}</strong></td>
+                        <td>
+                            {% if req.status == 'PENDING' %}
+                                <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i> Pendiente</span>
+                            {% elif req.status == 'ORDERED' %}
+                                <span class="badge bg-primary"><i class="fa-solid fa-truck-fast me-1"></i> En Compra</span>
+                            {% elif req.status == 'DELIVERED' %}
+                                <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i> Completado</span>
+                            {% elif req.status == 'CANCELLED' %}
+                                <span class="badge bg-danger"><i class="fa-solid fa-xmark me-1"></i> Cancelado</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ req.requested_by.username|default:"-" }}</td>
+                        <td class="no-print">
+                            <a href="{% url 'requirement_update' req.id %}" class="btn btn-sm btn-outline-primary" title="Actualizar Estado o Notas"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
+                            <form method="post" action="{% url 'requirement_delete' req.id %}" class="d-inline" onsubmit="return confirm('¿Eliminar el requerimiento #{{ req.id }} de {{ req.grease_type.nomenclatura }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger ms-1" title="Eliminar Requerimiento"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">No hay requerimientos de compra generados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

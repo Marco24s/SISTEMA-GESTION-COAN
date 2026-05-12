@@ -1,0 +1,281 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% block title %}Calculadora de Horas de Vuelo{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <div>
+        <h2 class="mb-0"><i class="fa-solid fa-calculator me-2"></i> Calculadora de Horas de Vuelo</h2>
+        <p class="text-muted mb-0 mt-1">Calcula cuántas horas se puede volar con el stock actual de grasa, según los factores de planeo cargados.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Panel de Filtros -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <i class="fa-solid fa-sliders me-2"></i> Filtros de Cálculo
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'flight_hours_calculator' %}">
+                    {% csrf_token %}
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold"><i class="fa-solid fa-plane me-1 text-primary"></i> Aeronaves</label>
+                        <small class="d-block text-muted mb-2">Sin selección = todas las aeronaves</small>
+                        
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-filter fa-xs text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Filtrar aeronaves..." onkeyup="filterCheckboxes('aircraft-container', this.value)">
+                        </div>
+
+                        <div class="border rounded p-2 overflow-auto shadow-sm bg-white" style="max-height: 200px;" id="aircraft-container">
+                            {% for aircraft in aircrafts %}
+                            <div class="form-check checkbox-item">
+                                <input class="form-check-input aircraft-check" type="checkbox" name="aircraft_ids" value="{{ aircraft.id }}" id="ac_{{ aircraft.id }}"
+                                    {% if aircraft.id in selected_aircraft_ids %}checked{% endif %}>
+                                <label class="form-check-label d-block" for="ac_{{ aircraft.id }}" style="cursor: pointer;">
+                                    {{ aircraft.name }} <small class="text-muted">({{ aircraft.unit.name }})</small>
+                                    {% if not aircraft.is_active %}<span class="badge bg-secondary ms-1" style="font-size: 0.7em;">Inactiva</span>{% endif %}
+                                </label>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted small mb-0">No hay aeronaves cargadas</p>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mt-2 d-flex gap-2">
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAll('aircraft-check', true)">Seleccionar todas</button>
+                            <span class="text-muted">|</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAll('aircraft-check', false)">Limpiar selección</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold"><i class="fa-solid fa-oil-can me-1 text-success"></i> Tipos de Grasa</label>
+                        <small class="d-block text-muted mb-2">Sin selección = todas las grasas en stock</small>
+                        
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-filter fa-xs text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Filtrar grasas..." onkeyup="filterCheckboxes('grease-container', this.value)">
+                        </div>
+
+                        <div class="border rounded p-2 overflow-auto shadow-sm bg-white" style="max-height: 200px;" id="grease-container">
+                            {% for gt in grease_types %}
+                            <div class="form-check checkbox-item">
+                                <input class="form-check-input grease-check" type="checkbox" name="grease_ids" value="{{ gt.id }}" id="gt_{{ gt.id }}"
+                                    {% if gt.id in selected_grease_ids %}checked{% endif %}>
+                                <label class="form-check-label d-block" for="gt_{{ gt.id }}" style="cursor: pointer;">
+                                    {{ gt.nomenclatura }}
+                                </label>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted small mb-0">No hay tipos de grasa cargados</p>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mt-2 d-flex gap-2">
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAll('grease-check', true)">Seleccionar todas</button>
+                            <span class="text-muted">|</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAll('grease-check', false)">Limpiar selección</button>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg border-0 shadow-sm" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+                            <i class="fa-solid fa-calculator me-2"></i> Calcular Horas Máximas
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de Resultados -->
+    <div class="col-lg-8">
+        {% if calculated %}
+            {% if no_consumption %}
+            <div class="alert alert-warning shadow-sm border-0 border-start border-4 border-warning">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                No se encontraron factores de planeo cargados para las aeronaves y grasas seleccionadas.
+            </div>
+            {% elif max_hours is None %}
+            <div class="alert alert-secondary shadow-sm border-0 border-start border-4 border-secondary">
+                <i class="fa-solid fa-circle-info me-2"></i>
+                No hay datos suficientes para calcular. Verifique los factores de planeo.
+            </div>
+            {% else %}
+
+            <!-- Resultado Principal -->
+            <div class="card shadow-sm mb-4 border-0" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+                <div class="card-body text-white text-center py-4">
+                    <p class="mb-1 fs-6 opacity-75"><i class="fa-solid fa-clock me-1"></i> Horas Máximas Volables con el Stock Actual</p>
+                    <div class="display-3 fw-bold">{{ max_hours|floatformat:1 }} <small class="fs-3">hs</small></div>
+                    {% if bottleneck %}
+                    <p class="mt-2 mb-0 opacity-85">
+                        <i class="fa-solid fa-triangle-exclamation me-1 text-warning"></i>
+                        Cuello de botella: <strong>{{ bottleneck }}</strong>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Tabla de Desglose -->
+            <div class="card shadow-sm border-0 overflow-hidden">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <span class="fw-bold"><i class="fa-solid fa-table me-2 text-primary"></i> Desglose de Consumo Estimado</span>
+                    <div class="form-check form-switch mb-0 d-flex align-items-center gap-2" title="Oculta las grasas que no se consumen con los filtros seleccionados">
+                        <input class="form-check-input" type="checkbox" role="switch" id="toggleInactivas" {% if selected_aircraft_ids or selected_grease_ids %}checked{% endif %} onchange="toggleFilasInactivas(this.checked)">
+                        <label class="form-check-label small text-muted fw-normal" for="toggleInactivas">Solo grasas afectadas</label>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Grasa (Nomenclatura)</th>
+                                    <th class="text-end">Stock Disp.</th>
+                                    <th class="text-end">Autonomía (hs)</th>
+                                    <th class="text-end">Consumo ({{ max_hours|floatformat:1 }}hs)</th>
+                                    <th class="text-end">Remanente</th>
+                                    <th class="text-center">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in breakdown %}
+                                <tr class="{% if item.is_bottleneck %}table-warning{% elif item.no_consumption %}table-light text-muted row-inactiva{% endif %}" {% if item.no_consumption %}data-inactiva="true"{% endif %}>
+                                    <td>
+                                        <div class="fw-bold">{{ item.nomenclatura }}</div>
+                                        {% if item.is_bottleneck %}
+                                        <span class="badge bg-warning text-dark" style="font-size: 0.75em;"><i class="fa-solid fa-triangle-exclamation me-1"></i>Crítica (Limitante)</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ item.stock|floatformat:"-1" }}</td>
+                                    <td class="text-end">
+                                        {% if item.no_consumption %}
+                                            <span class="text-muted small">sin consumo</span>
+                                        {% else %}
+                                            <span class="{% if item.is_bottleneck %}text-danger fw-bold{% else %}text-primary{% endif %}" 
+                                                  data-bs-toggle="popover" 
+                                                  data-bs-trigger="hover focus" 
+                                                  data-bs-placement="top"
+                                                  title="Factores Computados"
+                                                  data-bs-content="{{ item.details_str }} | Total: {{ item.rate }} kg/h"
+                                                  style="cursor: help; text-decoration: underline dotted; text-underline-offset: 3px;">
+                                                {{ item.h_max|floatformat:"-1" }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if item.no_consumption %}
+                                            <span class="text-muted small">sin consumo</span>
+                                        {% else %}
+                                            {{ item.consumption_at_max|floatformat:"-1" }}
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if item.no_consumption %}
+                                            <span class="text-muted">{{ item.stock|floatformat:"-1" }}</span>
+                                        {% else %}
+                                            <span class="{% if item.is_bottleneck %}text-danger fw-bold{% else %}text-success fw-bold{% endif %}">
+                                                {{ item.stock_remaining|floatformat:"-1" }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if item.no_consumption %}
+                                            <span class="badge bg-secondary rounded-pill">Inactiva</span>
+                                        {% elif item.is_bottleneck %}
+                                            <span class="badge bg-danger rounded-pill">Agotada</span>
+                                        {% else %}
+                                            <span class="badge bg-success rounded-pill">OK</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info mt-3 py-2 border-0 shadow-sm bg-white" style="border-left: 4px solid #0dcaf0 !important;">
+                <small class="text-muted">
+                    <i class="fa-solid fa-circle-info me-1 text-info"></i>
+                    El cálculo proyecta el consumo sumando las tasas individuales de cada aeronave seleccionada sobre el stock disponible de cada grasa.
+                </small>
+            </div>
+            {% endif %}
+
+        {% else %}
+        <!-- Estado inicial -->
+        <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center bg-white" style="min-height: 400px; border-radius: 15px;">
+            <div class="card-body text-center py-5">
+                <div class="mb-4 text-primary opacity-25">
+                    <i class="fa-solid fa-calculator fa-5x"></i>
+                </div>
+                <h4 class="text-dark fw-bold">Simulador de Autonomía Logística</h4>
+                <p class="text-muted">Seleccione los elementos a la izquierda para proyectar<br>el alcance máximo de vuelo según el stock actual.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleAll(className, value) {
+    const checks = document.getElementsByClassName(className);
+    for (let check of checks) {
+        // Only toggle those that are currently visible (not filtered out)
+        if (check.closest('.checkbox-item').style.display !== 'none') {
+            check.checked = value;
+        }
+    }
+}
+
+function filterCheckboxes(containerId, query) {
+    const container = document.getElementById(containerId);
+    const items = container.getElementsByClassName('checkbox-item');
+    const filter = query.toLowerCase();
+    
+    for (let item of items) {
+        const text = item.textContent || item.innerText;
+        if (text.toLowerCase().indexOf(filter) > -1) {
+            item.style.display = "";
+        } else {
+            item.style.display = "none";
+        }
+    }
+}
+
+function toggleFilasInactivas(soloAfectadas) {
+    const filas = document.querySelectorAll('tr[data-inactiva="true"]');
+    filas.forEach(function(fila) {
+        fila.style.display = soloAfectadas ? 'none' : '';
+    });
+}
+
+// Aplicar estado inicial del toggle al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    const toggle = document.getElementById('toggleInactivas');
+    if (toggle) {
+        toggleFilasInactivas(toggle.checked);
+    }
+});
+</script>
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl, {
+            container: 'body'
+        });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

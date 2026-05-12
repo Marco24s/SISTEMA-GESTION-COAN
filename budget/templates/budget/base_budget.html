@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --budget-primary: #198754;
+        --budget-secondary: #0b422a;
+    }
+
+    .sidebar {
+        min-height: calc(100vh - 56px);
+        background: #ffffff;
+        border-right: 1px solid rgba(0,0,0,0.08);
+        padding-top: 1.5rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .nav-link-sidebar {
+        color: #495057;
+        font-weight: 550;
+        padding: 0.9rem 1.5rem;
+        display: flex;
+        align-items: center;
+        border-radius: 0 50px 50px 0;
+        margin-right: 1rem;
+        margin-bottom: 0.2rem;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none !important;
+        white-space: normal;
+    }
+
+    .nav-link-sidebar i {
+        width: 32px;
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .nav-link-sidebar:hover {
+        background: rgba(25, 135, 84, 0.05);
+        color: var(--budget-primary);
+    }
+
+    .nav-link-sidebar.active {
+        background: var(--budget-primary);
+        color: white !important;
+        box-shadow: 0 4px 10px rgba(25, 135, 84, 0.3);
+    }
+
+    .budget-header {
+        background: linear-gradient(135deg, var(--budget-primary) 0%, var(--budget-secondary) 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+
+    .card-stats {
+        border: none;
+        border-radius: 15px;
+        transition: transform 0.3s;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+
+    .card-stats:hover {
+        transform: translateY(-5px);
+    }
+</style>
+{% block budget_css %}{% endblock %}
+{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-md navbar-dark bg-success shadow-sm">
+    <div class="container-fluid px-4">
+        <a href="/" class="btn btn-sm text-white border-white me-3" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1);" title="Volver al Portal">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'budget:dashboard' %}">
+            <i class="fa-solid fa-money-bill-trend-up me-2"></i>
+            <strong>SGP - Aviación Naval</strong>
+        </a>
+        
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#budgetSidebar" aria-controls="budgetSidebar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <span class="navbar-text ms-auto text-white d-none d-lg-block">
+            <i class="fa-solid fa-calendar-check me-1"></i> Módulo de Gestión Presupuestaria
+        </span>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="row g-0">
+    <!-- Sidebar / Mobile Nav -->
+    <div class="col-md-3 col-lg-2 collapse d-md-block sidebar" id="budgetSidebar">
+        <div class="mb-3 mt-2 px-4 text-muted small text-uppercase fw-bold d-none d-md-block">Gestión Central</div>
+        <a href="{% url 'budget:dashboard' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+            <i class="fa-solid fa-gauge"></i> Dashboard
+        </a>
+        <a href="{% url 'budget:fiscal_year_list' %}" class="nav-link-sidebar {% if 'fiscal_year' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="fa-solid fa-calendar"></i> Ejercicios
+        </a>
+        <a href="{% url 'budget:credit_list' %}" class="nav-link-sidebar {% if 'credit' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="fa-solid fa-vault"></i> Créditos AA.PP.
+        </a>
+        <a href="{% url 'budget:allocation_list' %}" class="nav-link-sidebar {% if 'allocation' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="fa-solid fa-diagram-project"></i> Distribución
+        </a>
+
+        {% if user.is_superuser or user.groups.all.0.name in 'Administrador,Logistica' %}
+        <div class="mt-4 mb-3 px-4 text-muted small text-uppercase fw-bold d-none d-md-block">Configuración</div>
+        <a href="{% url 'budget:nomenclature_dashboard' %}" class="nav-link-sidebar {% if 'nomenclature' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="fa-solid fa-gears"></i> Nomencladores
+        </a>
+        {% endif %}
+
+        <div class="mt-4 mb-3 px-4 text-muted small text-uppercase fw-bold d-none d-md-block">Ejecución UU.CC.</div>
+        <a href="{% url 'budget:execution_list' %}" class="nav-link-sidebar {% if 'execution' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="fa-solid fa-file-invoice-dollar"></i> Gastos / Ejecución
+        </a>
+        <a href="{% url 'budget:execution_commitment' %}" class="nav-link-sidebar {% if 'commitment' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="fa-solid fa-plus-circle"></i> Nuevo Gasto
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9 col-lg-10 p-4" style="background: #f8f9fa; min-height: calc(100vh - 56px);">
+        {% block budget_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "budget/base_budget.html" %}
+
+{% block budget_content %}
+<div class="row animate__animated animate__fadeIn">
+    <div class="col-12 mb-4">
+        <h2 class="fw-bold">Configuración de Nomencladores</h2>
+        <div class="d-flex justify-content-between align-items-center">
+            <p class="text-muted mb-0">Gestione los catálogos y códigos base utilizados en el sistema presupuestario.</p>
+            <a href="{% url 'budget:seed_tipo_gasto' %}" class="btn btn-sm btn-success rounded-pill px-3">
+                <i class="fa-solid fa-cloud-arrow-down me-2"></i> Cargar Tipos de Gasto Predeterminados
+            </a>
+        </div>
+    </div>
+
+    {% for cat in catalogs %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card card-stats h-100 p-4 border-0 shadow-sm">
+            <div class="d-flex align-items-center mb-3">
+                <div class="bg-success bg-opacity-10 p-3 rounded-3 me-3">
+                    <i class="fa-solid {{ cat.icon }} text-success h3 mb-0"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0">{{ cat.name }}</h5>
+                    <small class="text-muted">{{ cat.count }} registros</small>
+                </div>
+            </div>
+            <p class="small text-muted mb-4 opacity-75">Configuración de códigos y descripciones para {{ cat.name|lower }}.</p>
+            <div class="mt-auto">
+                <a href="{% url 'budget:nomenclature_list' cat.id %}" class="btn btn-outline-success btn-sm w-100 rounded-pill">
+                    Gestionar Catálogo <i class="fa-solid fa-arrow-right ms-2"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

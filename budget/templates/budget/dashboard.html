@@ -1,0 +1,740 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block budget_content %}
+<div class="budget-header animate__animated animate__fadeIn">
+    <div class="row align-items-center">
+        <div class="col">
+            <h1 class="h2 mb-1">Panel de Control Presupuestario</h1>
+            <p class="mb-0 opacity-75">
+                {% if fiscal_year %}
+                    Monitoreo del Ejercicio Económico {{ fiscal_year.year }}
+                {% else %}
+                    No hay un ejercicio económico activo actualmente.
+                {% endif %}
+            </p>
+        </div>
+        <div class="col-auto">
+            <span class="badge bg-white text-success px-3 py-2 rounded-pill shadow-sm">
+                <i class="fa-solid fa-clock me-1"></i> Estado: {{ fiscal_year.get_status_display|default:"N/A" }}
+            </span>
+        </div>
+    </div>
+</div>
+
+{% if fiscal_year %}
+<style>
+    .card-quarter:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+        cursor: pointer;
+    }
+    .card-quarter {
+        transition: all 0.3s ease;
+        border-radius: 8px;
+    }
+    .modal-body-scroll {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+    .transition-icon {
+        transition: transform 0.3s ease;
+    }
+    .unit-row[aria-expanded="true"] .transition-icon,
+    [data-bs-toggle="collapse"][aria-expanded="true"] .transition-icon {
+        transform: rotate(180deg);
+    }
+    .unit-row:hover, [data-bs-toggle="collapse"]:hover {
+        background-color: rgba(25, 135, 84, 0.02) !important;
+    }
+    .distrib-btn {
+        text-decoration: none;
+        border-bottom: 1px dashed currentColor;
+        border-radius: 0;
+        cursor: zoom-in;
+    }
+    .distrib-btn:hover {
+        opacity: 0.75;
+    }
+</style>
+<div class="row g-4 mb-4">
+    <!-- Columna Izquierda: AA.PP. -->
+    <div class="col-lg-8">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card card-stats h-100 p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-primary bg-opacity-10 p-2 rounded-3 me-3">
+                            <i class="fa-solid fa-vault text-primary h4 mb-0"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Crédito Total AA.PP.</div>
+                            <h5 class="fw-bold mb-0">${{ stats.total_credit|floatformat:2 }}</h5>
+                        </div>
+                    </div>
+                    {% if stats.credit_by_type %}
+                    <hr class="my-2 opacity-25">
+                    <div class="small">
+                        <div class="text-uppercase text-muted fw-bold mb-3 small" style="letter-spacing: 0.5px;">Resumen por Tipo de Crédito</div>
+                        {% for row in stats.credit_by_type %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#type-breakdown-{{ forloop.counter }}">
+                                <span class="fw-bold text-dark">
+                                    <span class="badge {% if 'ASIGN' in row.name|upper %}bg-primary{% elif 'REFUERZO' in row.name|upper %}bg-warning{% else %}bg-secondary{% endif %} me-2" style="font-size: 0.7rem; vertical-align: middle;">{{ row.name|upper }}</span>
+                                    <span class="text-muted" style="font-size: 0.85rem;">{{ row.name }}</span>
+                                    <i class="fa-solid fa-chevron-down ms-1 small opacity-50 transition-icon" style="font-size: 0.7rem;"></i>
+                                </span>
+                                <span class="fw-bold text-dark" style="font-size: 1rem;">${{ row.total|localize }}</span>
+                            </div>
+                            
+                            <!-- Desglose por SUBPC (Colapsable) -->
+                            <div class="collapse" id="type-breakdown-{{ forloop.counter }}">
+                                <div class="ms-2 ps-3 border-start border-2 mt-2" style="border-color: rgba(0,0,0,0.05) !important;">
+                                    {% for sub in row.subpcs %}
+                                    <div class="d-flex justify-content-between align-items-center py-1">
+                                        <span class="text-muted small">
+                                            <i class="fa-solid fa-caret-right me-1 opacity-50" style="font-size: 0.7rem;"></i> 
+                                            <strong>{{ sub.code }}</strong>
+                                        </span>
+                                        <span class="text-muted small fw-bold">${{ sub.amount|localize }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            {% if stats.total_credit > 0 %}
+                            <div class="progress mt-2" style="height: 3px; background-color: rgba(0,0,0,0.05);">
+                                <div class="progress-bar {% if 'ASIGN' in row.name|upper %}bg-primary{% else %}bg-warning{% endif %}" style="width: {% widthratio row.total stats.total_credit 100 %}%"></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card card-stats h-100 p-3">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-success bg-opacity-10 p-2 rounded-3 me-3">
+                            <i class="fa-solid fa-diagram-project text-success h4 mb-0"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Crédito Distribuido (Techos)</div>
+                            <h5 class="fw-bold mb-0">${{ stats.total_allocated|floatformat:2 }}</h5>
+                        </div>
+                    </div>
+                    {% if stats.total_credit > 0 %}
+                    <div class="progress mt-2" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {% widthratio stats.total_allocated stats.total_credit 100 %}%" 
+                             aria-valuenow="50" aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="progress mt-2" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    {% endif %}
+
+                    {% if stats.allocated_by_subpc %}
+                    <div class="mt-3 pt-2 border-top">
+                        <div class="d-flex justify-content-between align-items-center mb-2" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#distrib-subpc-collapse">
+                            <span class="small fw-bold text-success text-uppercase" style="letter-spacing: 0.5px;">Desglose</span>
+                            <i class="fa-solid fa-chevron-down small text-success transition-icon"></i>
+                        </div>
+                        <div class="collapse" id="distrib-subpc-collapse">
+                            {% for row in stats.allocated_by_subpc %}
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small text-muted">
+                                    <i class="fa-solid fa-caret-right me-1 opacity-50"></i>
+                                    {{ row.credit__pre_inc__code }}
+                                </span>
+                                <span class="small fw-bold">${{ row.subtotal|localize }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-stats mt-4 p-4">
+            <h5 class="fw-bold mb-4">Progreso de la Ejecución (Total General)</h5>
+            
+            <div class="mb-4">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Comprometido</span>
+                    <span class="fw-bold">${{ stats.total_commitment|floatformat:2 }}</span>
+                </div>
+                <div class="progress" style="height: 10px;">
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Devengado</span>
+                    <span class="fw-bold">${{ stats.total_accrued|floatformat:2 }}</span>
+                </div>
+                <div class="progress" style="height: 10px;">
+                    {% if stats.total_commitment > 0 %}
+                    <div class="progress-bar bg-info" role="progressbar" style="width: {% widthratio stats.total_accrued stats.total_commitment 100 %}%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                    {% else %}
+                    <div class="progress-bar bg-info" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mb-0">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="text-muted">Pagado</span>
+                    <span class="fw-bold">${{ stats.total_paid|floatformat:2 }}</span>
+                </div>
+                <div class="progress" style="height: 10px;">
+                    {% if stats.total_accrued > 0 %}
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {% widthratio stats.total_paid stats.total_accrued 100 %}%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                    {% else %}
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Columna Derecha: Alertas/Quick Actions -->
+    <div class="col-lg-4">
+        <div class="card card-stats p-4 mb-4">
+            <h6 class="fw-bold mb-3"><i class="fa-solid fa-bolt text-warning me-2"></i>Acciones Rápidas</h6>
+            <div class="d-grid gap-2">
+                <a href="{% url 'budget:execution_commitment' %}" class="btn btn-outline-success btn-sm text-start py-2">
+                    <i class="fa-solid fa-plus-circle me-2"></i> Registrar Compromiso
+                </a>
+                <a href="{% url 'budget:credit_create' %}" class="btn btn-outline-primary btn-sm text-start py-2">
+                    <i class="fa-solid fa-circle-plus me-2"></i> Dar de Alta Crédito
+                </a>
+                <a href="{% url 'budget:allocation_create' %}" class="btn btn-outline-dark btn-sm text-start py-2">
+                   <i class="fa-solid fa-share-nodes me-2"></i> Distribuir a Unidad
+                </a>
+                <a href="{% url 'budget:classification_list' %}" class="btn btn-outline-info btn-sm text-start py-2 mt-1 border-2 text-dark">
+                    <i class="fa-solid fa-umbrella text-info me-2"></i> <strong>Mis Clasificaciones</strong> Especiales
+                </a>
+                <a href="{% url 'budget:compensacion_list' %}" class="btn btn-outline-primary btn-sm text-start py-2 mt-2 border-2 border-primary fw-bold">
+                    <i class="fa-solid fa-shuffle me-2"></i> Compensación de Partidas
+                </a>
+                <a href="{% url 'budget:statistics' %}" class="btn btn-primary btn-sm text-start py-2 mt-2 shadow-sm border-0" style="background: linear-gradient(45deg, #198754, #0b422a);">
+                    <i class="fa-solid fa-chart-pie me-2"></i> Ver Estadísticas y Gráficos
+                </a>
+            </div>
+        </div>
+
+        <div class="card card-stats p-4 border-start border-4 border-warning">
+            <h6 class="fw-bold mb-3">Resumen de Saldos AA.PP.</h6>
+            <div class="small mb-2 d-flex justify-content-between">
+                <span>Saldo por Distribuir:</span>
+                <span class="fw-bold text-success">${{ stats.available_to_allocate|floatformat:2 }}</span>
+            </div>
+            <div class="small d-flex justify-content-between">
+                <span>Saldo por Ejecutar:</span>
+                <span class="fw-bold text-warning">${{ stats.available_to_execute|floatformat:2 }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row animate__animated animate__fadeInUp mb-4">
+    <div class="col-12">
+        <div class="card card-stats p-4 border-start border-4 border-warning shadow-sm">
+            <h5 class="fw-bold mb-4">
+                <i class="fa-solid fa-calendar-days text-warning me-2"></i>
+                Programación Trimestral AA.PP. vs. Compromisos
+            </h5>
+            <div class="row text-center g-2 mb-4">
+                <div class="col-6 col-md-3 border-end">
+                    <div class="bg-white rounded-3 p-3 shadow-sm h-100 d-flex flex-column justify-content-between">
+                        <label class="text-muted small d-block mb-2 fw-bold text-uppercase" style="letter-spacing: 1px;">1er Trimestre</label>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Asignado:</span>
+                                <span class="fw-bold" style="font-size: 0.80rem;">${{ stats.q1_asignacion|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Refuerzo:</span>
+                               <span class="fw-bold text-info" style="font-size: 0.80rem;">${{ stats.q1_refuerzo|localize }}</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-top mt-auto card-quarter" data-bs-toggle="modal" data-bs-target="#modalQ1">
+                            <div class="fw-bold text-primary mb-1 d-flex justify-content-between align-items-center" style="font-size: 1rem;">
+                                <span>Total: ${{ stats.q1_total|localize }}</span>
+                                <i class="fa-solid fa-magnifying-glass-chart fa-xs opacity-50"></i>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Distribuido:</span>
+                                <span class="fw-bold text-success" style="font-size: 0.80rem;">${{ stats.q1_alloc|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Disponible:</span>
+                                <span class="fw-bold {% if stats.q1_available > 0 %}text-secondary{% else %}text-danger{% endif %}" style="font-size: 0.80rem">${{ stats.q1_available|localize }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 border-end">
+                    <div class="bg-white rounded-3 p-3 shadow-sm h-100 d-flex flex-column justify-content-between">
+                        <label class="text-muted small d-block mb-2 fw-bold text-uppercase" style="letter-spacing: 1px;">2do Trimestre</label>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Asignado:</span>
+                               <span class="fw-bold" style="font-size: 0.80rem;">${{ stats.q2_asignacion|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Refuerzo:</span>
+                                <span class="fw-bold text-info" style="font-size: 0.80rem;">${{ stats.q2_refuerzo|localize }}</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-top mt-auto card-quarter" data-bs-toggle="modal" data-bs-target="#modalQ2">
+                            <div class="fw-bold text-primary mb-1 d-flex justify-content-between align-items-center" style="font-size: 1rem;">
+                                <span>Total: ${{ stats.q2_total|localize }}</span>
+                                <i class="fa-solid fa-magnifying-glass-chart fa-xs opacity-50"></i>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Distribuido:</span>
+                                 <span class="fw-bold text-success" style="font-size: 0.80rem;">${{ stats.q2_alloc|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Disponible:</span>
+                                <span class="fw-bold {% if stats.q2_available > 0 %}text-secondary{% else %}text-danger{% endif %}" style="font-size: 0.80rem;">${{ stats.q2_available|localize }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 border-end">
+                    <div class="bg-white rounded-3 p-3 shadow-sm h-100 d-flex flex-column justify-content-between">
+                        <label class="text-muted small d-block mb-2 fw-bold text-uppercase" style="letter-spacing: 1px;">3er Trimestre</label>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Asignado:</span>
+                                <span class="fw-bold" style="font-size: 0.80rem;">${{ stats.q3_asignacion|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Refuerzo:</span>
+                                <span class="fw-bold text-info" style="font-size: 0.80rem;">${{ stats.q3_refuerzo|localize }}</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-top mt-auto card-quarter" data-bs-toggle="modal" data-bs-target="#modalQ3">
+                            <div class="fw-bold text-primary mb-1 d-flex justify-content-between align-items-center" style="font-size: 1rem;">
+                                <span>Total: ${{ stats.q3_total|localize }}</span>
+                                <i class="fa-solid fa-magnifying-glass-chart fa-xs opacity-50"></i>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Distribuido:</span>
+                                 <span class="fw-bold text-success" style="font-size: 0.80rem;">${{ stats.q3_alloc|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Disponible:</span>
+                                <span class="fw-bold {% if stats.q3_available > 0 %}text-secondary{% else %}text-danger{% endif %}" style="font-size: 0.80rem;">${{ stats.q3_available|localize }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-white rounded-3 p-3 shadow-sm h-100 d-flex flex-column justify-content-between">
+                        <label class="text-muted small d-block mb-2 fw-bold text-uppercase" style="letter-spacing: 1px;">4to Trimestre</label>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">Asignado:</span>
+                                <span class="fw-bold" style="font-size: 0.80rem;">${{ stats.q4_asignacion|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Refuerzo:</span>
+                                <span class="fw-bold text-info" style="font-size: 0.80rem;">${{ stats.q4_refuerzo|localize }}</span>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-top mt-auto card-quarter" data-bs-toggle="modal" data-bs-target="#modalQ4">
+                            <div class="fw-bold text-primary mb-1 d-flex justify-content-between align-items-center" style="font-size: 1rem;">
+                                <span>Total: ${{ stats.q4_total|localize }}</span>
+                                <i class="fa-solid fa-magnifying-glass-chart fa-xs opacity-50"></i>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Distribuido:</span>
+                                 <span class="fw-bold text-success" style="font-size: 0.80rem;">${{ stats.q4_alloc|localize }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="text-muted">Disponible:</span>
+                                <span class="fw-bold {% if stats.q4_available > 0 %}text-secondary{% else %}text-danger{% endif %}" style="font-size: 0.80rem;">${{ stats.q4_available|localize }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Barra de Distribución a Unidades (Techos) -->
+            <div class="px-2 mb-4">
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Progreso de Distribución a Unidades (Techos)</span>
+                    <span>Total Distribuido: <strong class="text-success">${{ stats.total_allocated|localize }}</strong></span>
+                </div>
+                <div class="progress shadow-sm" style="height: 12px; background: rgba(0,0,0,0.05); border-radius: 6px;">
+                    <!-- Segmento T1 -->
+                    <div class="d-flex" style="width: {{ stats.q1_seg|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-success h-100" style="width: {{ stats.q1_alloc_fill|stringformat:'f' }}%;" title="T1 Distribuido: {{ stats.q1_alloc_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T2 -->
+                    <div class="d-flex" style="width: {{ stats.q2_seg|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-success h-100" style="width: {{ stats.q2_alloc_fill|stringformat:'f' }}%;" title="T2 Distribuido: {{ stats.q2_alloc_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T3 -->
+                    <div class="d-flex" style="width: {{ stats.q3_seg|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-success h-100" style="width: {{ stats.q3_alloc_fill|stringformat:'f' }}%;" title="T3 Distribuido: {{ stats.q3_alloc_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T4 -->
+                    <div class="d-flex" style="width: {{ stats.q4_seg|stringformat:'f' }}%;">
+                        <div class="bg-success h-100" style="width: {{ stats.q4_alloc_fill|stringformat:'f' }}%;" title="T4 Distribuido: {{ stats.q4_alloc_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Barra de Distribución Acumulada (Basada en Comprometido) -->
+            <div class="px-2">
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Progreso de Montos Comprometidos</span>
+                    <span>Total Comprometido: <strong class="text-warning">${{ stats.total_commitment|localize }}</strong></span>
+                </div>
+                <div class="progress shadow-sm" style="height: 12px; background: rgba(0,0,0,0.05); border-radius: 6px;">
+                    <!-- Segmento T1 -->
+                    <div class="d-flex" style="width: {{ stats.q1_seg|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-warning h-100" style="width: {{ stats.q1_fill|stringformat:'f' }}%;" title="T1: {{ stats.q1_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T2 -->
+                    <div class="d-flex" style="width: {{ stats.q2_seg|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-warning h-100" style="width: {{ stats.q2_fill|stringformat:'f' }}%;" title="T2: {{ stats.q2_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T3 -->
+                    <div class="d-flex" style="width: {{ stats.q3_seg|stringformat:'f' }}%; border-right: 2px solid white;">
+                        <div class="bg-warning h-100" style="width: {{ stats.q3_fill|stringformat:'f' }}%;" title="T3: {{ stats.q3_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                    <!-- Segmento T4 -->
+                    <div class="d-flex" style="width: {{ stats.q4_seg|stringformat:'f' }}%;">
+                        <div class="bg-warning h-100" style="width: {{ stats.q4_fill|stringformat:'f' }}%;" title="T4: {{ stats.q4_fill|floatformat:1 }}%"></div>
+                        <div class="bg-secondary bg-opacity-10 h-100 flex-grow-1"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if unit_report %}
+<div class="row animate__animated animate__fadeInUp">
+    <div class="col-12">
+        <div class="card card-stats p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold mb-0">
+                    <i class="fa-solid fa-table-list text-success me-2"></i> 
+                    Estado Crediticio Mensual (Desglose por Unidad)
+                </h5>
+                <span class="badge bg-light text-muted border px-3">Valores en Pesos ($)</span>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border-top">
+                    <thead class="bg-light">
+                        <tr class="small text-uppercase text-muted">
+                            <th>Unidad</th>
+                            <th class="text-end">Techo Asig.</th>
+                            <th class="text-end">Compromiso</th>
+                            <th class="text-end">Devengado</th>
+                            <th class="text-end">Pagado</th>
+                            <th class="text-center">Ejecución (%)</th>
+                            <th class="text-end">Residuos/Deudas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in unit_report %}
+                        <tr data-bs-toggle="collapse" data-bs-target="#unit-{{ row.unit.id }}" style="cursor: pointer;" class="unit-row">
+                            <td>
+                                <i class="fa-solid fa-chevron-right me-2 text-muted transition-icon"></i>
+                                <strong>{{ row.unit.name }}</strong>
+                            </td>
+                            <td class="text-end">${{ row.allocated|floatformat:2 }}</td>
+                            <td class="text-end fw-bold">${{ row.commitment|floatformat:2 }}</td>
+                            <td class="text-end text-info">${{ row.accrued|floatformat:2 }}</td>
+                            <td class="text-end text-success">${{ row.paid|floatformat:2 }}</td>
+                            <td class="text-center">
+                                <div class="progress" style="height: 12px; min-width: 100px;">
+                                    <div class="progress-bar {% if row.percent_executed > 90 %}bg-danger{% elif row.percent_executed > 70 %}bg-warning{% else %}bg-success{% endif %}" 
+                                         role="progressbar" style="width: {{ row.percent_executed|floatformat:0 }}%">
+                                    </div>
+                                </div>
+                                <small class="text-muted">{{ row.percent_executed|floatformat:1 }}%</small>
+                            </td>
+                            <td class="text-end small">
+                                <div title="Residuos Pasivos (Comp. - Dev.)">R.P: ${{ row.residuos|floatformat:2 }}</div>
+                                <div class="text-muted" title="Deuda Flotante (Dev. - Pag.)">D.F: ${{ row.deuda_flotante|floatformat:2 }}</div>
+                            </td>
+                        </tr>
+                        <tr class="collapse" id="unit-{{ row.unit.id }}">
+                            <td colspan="7" class="p-0 border-0">
+                                <div class="px-4 py-3 bg-light-subtle border-start border-4 border-success m-2 rounded-3 shadow-sm">
+                                    <h6 class="fw-bold small text-uppercase text-success mb-3">
+                                        <i class="fa-solid fa-sitemap me-2"></i>Desglose de Créditos Asignados a {{ row.unit.name }}
+                                    </h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-borderless mb-0 dashboard-breakdown-table">
+                                            <thead>
+                                                <tr class="text-muted small">
+                                                    <th style="width: 30px;"></th>
+                                                    <th>SUBPC</th>
+                                                    <th class="text-center">Trimestre</th>
+                                                    <th class="text-end">Monto Asignado</th>
+                                                    <th class="text-end">Gastado</th>
+                                                    <th class="text-end">Disponible</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for alloc in row.allocations %}
+                                                <tr class="border-bottom border-light allocation-selectable-row" 
+                                                    data-total="{{ alloc.total|unlocalize }}" 
+                                                    data-spent="{{ alloc.spent|unlocalize }}" 
+                                                    data-available="{{ alloc.available|unlocalize }}">
+                                                    <td class="py-2">
+                                                        <input type="checkbox" class="form-check-input allocation-checkbox">
+                                                    </td>
+                                                    <td class="small py-2">
+                                                        <div class="fw-semibold">
+                                                            <span class="badge bg-secondary-subtle text-secondary me-2">{{ alloc.ff }}</span>
+                                                            {{ alloc.subpc }}
+                                                        </div>
+                                                        {% if alloc.notes %}
+                                                        <div class="text-muted mt-1 italic" style="font-size: 0.75rem;">
+                                                            <i class="fa-solid fa-comment-dots me-1 opacity-50"></i>{{ alloc.notes }}
+                                                        </div>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td class="text-center py-2">
+                                                        <span class="badge bg-light text-dark border-0 shadow-sm" style="font-size: 0.7rem;">{{ alloc.quarters }}</span>
+                                                    </td>
+                                                    <td class="text-end py-2">${{ alloc.total|floatformat:2 }}</td>
+                                                    <td class="text-end py-2 text-danger">-${{ alloc.spent|floatformat:2 }}</td>
+                                                    <td class="text-end py-2 fw-bold text-success">${{ alloc.available|floatformat:2 }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                             <tfoot>
+                                                <tr class="bg-success bg-opacity-10 d-none selection-summary-row">
+                                                    <td colspan="3" class="text-end py-2 small fw-bold">SUMA SELECCIONADA:</td>
+                                                    <td class="text-end py-2 fw-bold text-primary selection-total-cell">$0,00</td>
+                                                    <td class="text-end py-2 fw-bold text-danger selection-spent-cell">-$0,00</td>
+                                                    <td class="text-end py-2 fw-bold text-success selection-available-cell" style="font-size: 1.1rem;">$0,00</td>
+                                                </tr>
+                                             </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% else %}
+<div class="text-center py-5">
+    <div class="bg-white p-5 rounded-4 shadow-sm d-inline-block">
+        <i class="fa-solid fa-calendar-xmark text-muted h1 mb-4"></i>
+        <h3>Configuración Necesaria</h3>
+        <p class="text-muted">Para comenzar, debe crear un Ejercicio Económico activo.</p>
+        <a href="{% url 'budget:fiscal_year_create' %}" class="btn btn-success rounded-pill px-4">
+            Crear Ejercicio 2026
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modales de Detalle Trimestral -->
+{% for q_num in "1234" %}
+<div class="modal fade" id="modalQ{{ q_num }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-list-check me-2"></i>
+                    Detalle Presupuestario - {{ q_num }}er Trimestre
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body modal-body-scroll p-4">
+                {% if q_num == "1" %}{{ stats.q1_tooltip|safe }}
+                {% elif q_num == "2" %}{{ stats.q2_tooltip|safe }}
+                {% elif q_num == "3" %}{{ stats.q3_tooltip|safe }}
+                {% elif q_num == "4" %}{{ stats.q4_tooltip|safe }}
+                {% endif %}
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary px-4 rounded-pill" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Sub-Modal: Detalle de Distribución por Unidad -->
+<div class="modal fade" id="modalDistribDetail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-users me-2"></i>
+                    Distribución por Unidad
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3" id="distrib-credit-label"></p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr class="small text-uppercase text-muted">
+                                <th><i class="fa-solid fa-building me-1 opacity-50"></i> Unidad</th>
+                                <th class="text-center">SUBPC</th>
+                                <th class="text-end">Monto Distribuido</th>
+                            </tr>
+                        </thead>
+                        <tbody id="distrib-detail-tbody">
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold border-top">
+                                <td colspan="2" class="text-muted">TOTAL</td>
+                                <td class="text-end text-success" id="distrib-detail-total"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary px-4 rounded-pill" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const formatCurrency = (value) => {
+        return new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            minimumFractionDigits: 2
+        }).format(value);
+    };
+
+    const updateSum = (table) => {
+        const checkboxes = table.querySelectorAll('.allocation-checkbox:checked');
+        const summaryRow = table.querySelector('.selection-summary-row');
+        const totalCell = table.querySelector('.selection-total-cell');
+        const spentCell = table.querySelector('.selection-spent-cell');
+        const availableCell = table.querySelector('.selection-available-cell');
+        
+        let sumTotal = 0;
+        let sumSpent = 0;
+        let sumAvailable = 0;
+
+        checkboxes.forEach(cb => {
+            const row = cb.closest('.allocation-selectable-row');
+            sumTotal += parseFloat(row.dataset.total || 0);
+            sumSpent += parseFloat(row.dataset.spent || 0);
+            sumAvailable += parseFloat(row.dataset.available || 0);
+            row.classList.add('bg-success', 'bg-opacity-10');
+        });
+
+        // Limpiar resaltado de las no seleccionadas
+        table.querySelectorAll('.allocation-checkbox:not(:checked)').forEach(cb => {
+            cb.closest('.allocation-selectable-row').classList.remove('bg-success', 'bg-opacity-10');
+        });
+
+        if (checkboxes.length > 0) {
+            summaryRow.classList.remove('d-none');
+            totalCell.textContent = formatCurrency(sumTotal);
+            spentCell.textContent = "-" + formatCurrency(sumSpent);
+            availableCell.textContent = formatCurrency(sumAvailable);
+        } else {
+            summaryRow.classList.add('d-none');
+        }
+    };
+
+    // Delegación de eventos para las tablas de desglose (ya que están dentro de collapses)
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('allocation-checkbox')) {
+            const table = e.target.closest('.dashboard-breakdown-table');
+            updateSum(table);
+        }
+    });
+
+    // ─── Sub-modal: Detalle de distribución por unidad ───────────────────────
+    const distribModal = new bootstrap.Modal(document.getElementById('modalDistribDetail'));
+    const distribTbody = document.getElementById('distrib-detail-tbody');
+    const distribTotal = document.getElementById('distrib-detail-total');
+    const distribLabel = document.getElementById('distrib-credit-label');
+
+    // Escucha clicks en CUALQUIER botón .distrib-btn dentro de los modales
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.distrib-btn');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const credit = btn.dataset.credit || '';
+        // Los atributos data-* en HTML tienen los caracteres especiales como entidades;
+        // el DOM los decodifica automáticamente al acceder via .dataset.
+        let allocations = [];
+        try {
+            allocations = JSON.parse(btn.dataset.allocations);
+        } catch(err) {
+            console.error('Error al parsear distribuciones', err);
+        }
+
+        // Poblar modal
+        distribLabel.textContent = credit;
+        distribTbody.innerHTML = '';
+        let totalPesos = 0;
+
+        allocations.forEach(function(item) {
+            // Parsear monto: formato '1.234.567' (puntos como miles, sin decimales)
+            const rawAmount = parseFloat(String(item.amount).replace(/\./g, ''));
+            totalPesos += isNaN(rawAmount) ? 0 : rawAmount;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="small">
+                    <i class="fa-solid fa-building-user text-success me-2 opacity-50"></i>
+                    ${item.unit}
+                </td>
+                <td class="text-center small fw-bold text-muted">${item.subpc || '--'}</td>
+                <td class="text-end small fw-bold text-success">$${item.amount}</td>
+            `;
+            distribTbody.appendChild(tr);
+        });
+
+        distribTotal.textContent = '$' + totalPesos.toLocaleString('es-AR');
+
+        distribModal.show();
+    });
+});
+</script>
+{% endblock %}

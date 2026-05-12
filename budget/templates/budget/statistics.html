@@ -1,0 +1,239 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    .stat-card {
+        transition: all 0.3s ease;
+        border: none;
+        border-radius: 15px;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+    }
+</style>
+{% endblock %}
+
+{% block budget_content %}
+<div class="mb-4 animate__animated animate__fadeIn">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 mb-1">Estadísticas Presupuestarias</h1>
+            <p class="text-muted small mb-0">Visualización gráfica del Ejercicio Económico {{ fiscal_year.year }}</p>
+        </div>
+        <a href="{% url 'budget:dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver al Panel
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- 1. Crédito por Tipo -->
+        <div class="col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h6 class="fw-bold mb-0 text-uppercase small text-muted" style="letter-spacing: 1px;">Crédito por Tipo</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="chart-container">
+                        <canvas id="chartCreditType"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Crédito por SUBPC -->
+        <div class="col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h6 class="fw-bold mb-0 text-uppercase small text-muted" style="letter-spacing: 1px;">Por Crédito</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="chart-container">
+                        <canvas id="chartCreditSubpc"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Estado de Ejecución -->
+        <div class="col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h6 class="fw-bold mb-0 text-uppercase small text-muted" style="letter-spacing: 1px;">Estado de Ejecución (Flujo)</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="chart-container">
+                        <canvas id="chartExecutionStages"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Distribución por Unidad (Solo Admin) -->
+        {% if is_admin %}
+        <div class="col-md-6">
+            <div class="card stat-card shadow-sm h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h6 class="fw-bold mb-0 text-uppercase small text-muted" style="letter-spacing: 1px;">Distribución por Unidad</h6>
+                </div>
+                <div class="card-body p-4">
+                    <div class="chart-container">
+                        <canvas id="chartUnitDistrib"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{{ credit_by_type_json|json_script:"credit-type-data" }}
+{{ credit_by_subpc_json|json_script:"credit-subpc-data" }}
+{{ execution_stages_json|json_script:"execution-stages-data" }}
+{{ unit_distribution_json|json_script:"unit-distrib-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js and DataLabels Plugin via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Registrar el plugin de etiquetas de datos
+    Chart.register(ChartDataLabels);
+
+    // Configuración General de Colores
+    const palette = [
+        '#198754', '#106cfc', '#ffc107', '#0dcaf0', 
+        '#6610f2', '#6f42c1', '#d63384', '#fd7e14',
+        '#20c997', '#adb5bd'
+    ];
+
+    const formatCurrency = (val) => {
+        return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(val);
+    };
+
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom' },
+            datalabels: {
+                color: '#fff',
+                font: { weight: 'bold', size: 11 },
+                formatter: (value, ctx) => {
+                    let sum = 0;
+                    let dataArr = ctx.chart.data.datasets[0].data;
+                    dataArr.map(data => {
+                        let val = parseFloat(data) || 0;
+                        sum += val;
+                    });
+                    let numericValue = parseFloat(value) || 0;
+                    if (sum === 0) return "";
+                    let percentage = (numericValue * 100 / sum).toFixed(1) + "%";
+                    return percentage === "0.0%" ? "" : percentage;
+                },
+                anchor: 'center',
+                align: 'center',
+                display: 'auto'
+            },
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => ` ${ctx.label}: ${formatCurrency(ctx.raw)}`
+                }
+            }
+        }
+    };
+
+    // 1. Crédito por Tipo
+    const creditTypeData = JSON.parse(document.getElementById('credit-type-data').textContent);
+    new Chart(document.getElementById('chartCreditType'), {
+        type: 'pie',
+        data: {
+            labels: creditTypeData.map(d => d.credit_type__name),
+            datasets: [{
+                data: creditTypeData.map(d => parseFloat(d.total) || 0),
+                backgroundColor: palette,
+                borderWidth: 0
+            }]
+        },
+        options: commonOptions
+    });
+
+    // 2. Crédito por SUBPC (Por Crédito)
+    const creditSubpcData = JSON.parse(document.getElementById('credit-subpc-data').textContent);
+    new Chart(document.getElementById('chartCreditSubpc'), {
+        type: 'doughnut',
+        data: {
+            labels: creditSubpcData.map(d => `${d.pre_inc__code}`),
+            datasets: [{
+                data: creditSubpcData.map(d => parseFloat(d.total) || 0),
+                backgroundColor: palette,
+                borderWidth: 0
+            }]
+        },
+        options: commonOptions
+    });
+
+    // 3. Estado de Ejecución
+    const executionStagesData = JSON.parse(document.getElementById('execution-stages-data').textContent);
+    new Chart(document.getElementById('chartExecutionStages'), {
+        type: 'pie',
+        data: {
+            labels: executionStagesData.map(d => d.name),
+            datasets: [{
+                data: executionStagesData.map(d => parseFloat(d.value) || 0),
+                backgroundColor: ['#adb5bd', '#ffc107', '#0dcaf0', '#198754'],
+                borderWidth: 0
+            }]
+        },
+        options: commonOptions
+    });
+
+    // 4. Distribución por Unidad
+    const unitDistribData = JSON.parse(document.getElementById('unit-distrib-data').textContent);
+    if (unitDistribData.length > 0) {
+        // Clonar opciones manualmente para no perder funciones
+        let unitOptions = { ...commonOptions };
+        unitOptions.plugins = { ...commonOptions.plugins };
+        unitOptions.plugins.legend = { ...commonOptions.plugins.legend, display: false };
+        
+        // Formateador específico para incluir el nombre de la unidad
+        unitOptions.plugins.datalabels = {
+            ...commonOptions.plugins.datalabels,
+            formatter: (value, ctx) => {
+                let sum = 0;
+                let dataArr = ctx.chart.data.datasets[0].data;
+                dataArr.map(data => { sum += data; });
+                let percentage = (value * 100 / sum).toFixed(1) + "%";
+                let label = ctx.chart.data.labels[ctx.dataIndex];
+                return percentage === "0.0%" ? "" : label + ": " + percentage;
+            },
+            font: { weight: 'bold', size: 10 } // Un poco más chico para que entre
+        };
+
+        new Chart(document.getElementById('chartUnitDistrib'), {
+            type: 'doughnut',
+            data: {
+                labels: unitDistribData.map(d => d.unit__name),
+                datasets: [{
+                    data: unitDistribData.map(d => parseFloat(d.total) || 0),
+                    backgroundColor: palette,
+                    borderWidth: 0
+                }]
+            },
+            options: unitOptions
+        });
+    }
+});
+</script>
+{% endblock %}

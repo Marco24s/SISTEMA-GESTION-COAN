@@ -1,0 +1,93 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row justify-content-center mt-4 mb-5">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold" style="color: #462880;">
+                <i class="fa-solid fa-file-import text-info me-2"></i>
+                Importación Masiva de Personal
+            </h3>
+            <a href="{% url 'sigera:personnel_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left me-2"></i>Volver
+            </a>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 text-muted">Instrucciones para el archivo Excel</h6>
+            </div>
+            <div class="card-body p-4">
+                <p>Para cargar el personal correctamente, el archivo Excel debe tener las siguientes columnas (los nombres de las columnas pueden estar en minúsculas):</p>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Columna</th>
+                                <th>Descripción</th>
+                                <th>Ejemplo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Nombres</strong></td>
+                                <td>Nombres de la persona</td>
+                                <td>JUAN CARLOS</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Apellidos</strong></td>
+                                <td>Apellidos de la persona</td>
+                                <td>PEREZ</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Matricula</strong></td>
+                                <td>Matrícula de Revista (Única)</td>
+                                <td>12345678</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Jerarquia</strong></td>
+                                <td>Grado o rango (se mapea automáticamente)</td>
+                                <td>Suboficial Primero</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Unidad</strong></td>
+                                <td>Unidad asignada (Opcional)</td>
+                                <td>BAPI</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="alert alert-info py-2 small mb-0">
+                    <i class="fa-solid fa-circle-info me-2"></i>
+                    Si el Excel tiene una matrícula que ya existe en el sistema, los datos de esa persona se <strong>actualizarán</strong> automáticamente.
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 text-muted">Seleccionar Archivo</h6>
+            </div>
+            <div class="card-body p-4 text-center">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="excel_file" class="form-label d-block text-muted mb-3">Suba el archivo .xlsx o .xls aquí</label>
+                        <div class="input-group">
+                            <input type="file" name="excel_file" id="excel_file" class="form-control form-control-lg" accept=".xlsx, .xls" required>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{% url 'sigera:personnel_list' %}" class="btn btn-light px-4 border">Cancelar</a>
+                        <button type="submit" class="btn btn-info px-5 text-white fw-bold shadow-sm">
+                            <i class="fa-solid fa-cloud-upload-alt me-2"></i>Iniciar Importación
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

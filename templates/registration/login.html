@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Iniciar Sesión - SGMG-COAN{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm border-primary">
+            <div class="card-header bg-primary text-white text-center py-3">
+                <h4 class="mb-0"><i class="fa-solid fa-user-lock me-2"></i>Iniciar Sesión</h4>
+            </div>
+            <div class="card-body p-4">
+                {% if form.errors %}
+                <div class="alert alert-danger" role="alert">
+                    Usuario o contraseña incorrectos. Por favor, intente nuevamente.
+                </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'login' %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.username.id_for_label }}" class="form-label fw-bold">Usuario</label>
+                        {{ form.username }}
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.password.id_for_label }}" class="form-label fw-bold">Contraseña</label>
+                        {{ form.password }}
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">Ingresar</button>
+                    </div>
+                    
+                    <input type="hidden" name="next" value="{{ next|default:'/' }}" />
+                </form>
+            </div>
+            <div class="card-footer text-center text-muted py-3">
+                <small>Sistema de Gestión de Materias Grasas Aeronáuticas</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

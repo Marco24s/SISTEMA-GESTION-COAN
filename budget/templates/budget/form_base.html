@@ -1,0 +1,61 @@
+{% extends "budget/base_budget.html" %}
+{% load crispy_forms_tags %}
+{% load l10n %}
+
+{% block budget_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold">{{ title|default:"Formulario de Gestión" }}</h2>
+            <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left"></i> Cancelar
+            </a>
+        </div>
+
+        <div class="card card-stats p-4">
+            {% if fixed_credit %}
+                <div class="alert alert-secondary border-0 bg-secondary bg-opacity-10 d-flex align-items-center mb-4">
+                    <div class="me-3">
+                        <i class="fa-solid fa-file-invoice text-secondary fa-2x"></i>
+                    </div>
+                    <div>
+                        <div class="small fw-bold text-uppercase text-muted lh-1 mb-1">Crédito Seleccionado</div>
+                        <div class="fs-5 fw-bold text-dark">{{ fixed_credit }}</div>
+                        <small class="text-muted">Total: <strong>${{ fixed_credit.total_amount|localize }}</strong></small>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if reference_amount %}
+                <div class="alert alert-warning border-0 bg-warning bg-opacity-10 d-flex align-items-center mb-4">
+                    <div class="me-3">
+                        <i class="fa-solid fa-circle-dollar-to-slot text-warning fa-2x"></i>
+                    </div>
+                    <div>
+                        <div class="small fw-bold text-uppercase text-muted lh-1 mb-1">{{ reference_label|default:"Referencia" }}</div>
+                        <div class="fs-4 fw-bold text-dark">${{ reference_amount|localize }}</div>
+                        <small class="text-muted">El monto actual no debe superar este valor.</small>
+                    </div>
+                </div>
+            {% endif %}
+            
+            {% if help_text %}
+                <div class="alert alert-info border-0 bg-info bg-opacity-10 text-dark small mb-4">
+                    <i class="fa-solid fa-circle-info me-1 text-info"></i> {{ help_text }}
+                </div>
+            {% endif %}
+
+            <form method="post" autocomplete="off">
+                {% csrf_token %}
+                {{ form|crispy }}
+                
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-success btn-lg rounded-pill fw-bold">
+                        <i class="fa-solid fa-save me-2"></i> Guardar Registro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
