@@ -8,6 +8,7 @@ from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, Clothi
 from .forms import PersonnelForm, ClothingAssignmentForm
 import pandas as pd
 from core.models import Unit
+from core.decorators import pin_required
 
 @login_required
 def home(request):

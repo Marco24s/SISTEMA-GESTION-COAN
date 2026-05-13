@@ -23,10 +23,13 @@ from .forms import (
     BudgetCreditAdjustmentForm, BudgetTipoGastoForm
 )
 from . import services
+from core.decorators import pin_required
+from django.contrib.auth.decorators import login_required
 
 def is_admin(user):
     return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
 
+@login_required
 def dashboard(request):
     fiscal_year = BudgetFiscalYear.objects.filter(status='OPEN').first()
     is_admin_user = is_admin(request.user)

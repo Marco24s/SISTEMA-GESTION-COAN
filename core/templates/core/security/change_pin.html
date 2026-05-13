@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="fw-bold mb-0">
+                        <i class="fa-solid fa-shield-halved text-primary me-2"></i> Cambiar PIN de Seguridad
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" action="{% url 'change_pin' %}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Sistema</label>
+                            <select name="system_code" class="form-select py-3" required>
+                                <option value="" disabled {% if not selected_system %}selected{% endif %}>Seleccione sistema...</option>
+                                {% for access in user_systems %}
+                                <option value="{{ access.system_code }}" {% if access.system_code == selected_system %}selected{% endif %}>
+                                    {{ access.get_system_code_display }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">PIN Actual</label>
+                            <input type="password" name="current_pin" class="form-control py-3 text-center fs-4 pin-field" maxlength="4" inputmode="numeric" required autocomplete="off">
+                        </div>
+
+                        <hr class="my-4 opacity-10">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Nuevo PIN</label>
+                            <input type="password" name="new_pin" class="form-control py-3 text-center fs-4 pin-field" maxlength="4" inputmode="numeric" required autocomplete="off">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Confirmar Nuevo PIN</label>
+                            <input type="password" name="confirm_pin" class="form-control py-3 text-center fs-4 pin-field" maxlength="4" inputmode="numeric" required autocomplete="off">
+                        </div>
+
+                        <div class="alert alert-warning border-0 small py-2 mb-4">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i> Al cambiar el PIN, se cerrarán todas sus sesiones de validación activas.
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary py-3 fw-bold rounded-3">
+                                ACTUALIZAR PIN DE SEGURIDAD
+                            </button>
+                            <a href="{% url 'portal' %}" class="btn btn-light py-3 fw-semibold text-muted border-0">
+                                CANCELAR
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.pin-field').forEach(input => {
+    input.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '');
+    });
+});
+</script>
+{% endblock %}

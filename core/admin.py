@@ -8,8 +8,22 @@ from .models import (
     AircraftGrease, 
     FlightPlan, 
     GreaseBatch, 
-    StockMovement
+    StockMovement,
+    UserSystemPIN
 )
+from django.contrib.auth.hashers import make_password
+
+@admin.register(UserSystemPIN)
+class UserSystemPINAdmin(admin.ModelAdmin):
+    list_display = ('user', 'system_code', 'created_at', 'updated_at')
+    list_filter = ('system_code', 'user')
+    search_fields = ('user__username', 'system_code')
+
+    def save_model(self, request, obj, form, change):
+        # Si el PIN es corto (ej: 4 dígitos), asumimos que el admin lo ingresó en texto plano y lo hasheamos
+        if obj.pin_hash and len(obj.pin_hash) <= 10:
+            obj.pin_hash = make_password(obj.pin_hash)
+        super().save_model(request, obj, form, change)
 
 class CustomUserAdmin(UserAdmin):
     model = CustomUser

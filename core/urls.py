@@ -75,4 +75,10 @@ urlpatterns = [
     # Exports
     path('stock/export/', views.export_grease_batches_csv, name='export_grease_batches_csv'),
     path('stock/export/pdf/', views.export_grease_batches_pdf, name='export_grease_batches_pdf'),
+
+    # Security PIN
+    path('security/pin/verify/', views.VerifyPinView.as_view(), name='verify_pin'),
+    path('security/pin/create/', views.CreatePinView.as_view(), name='create_pin'),
+    path('security/pin/change/', views.ChangePinView.as_view(), name='change_pin'),
+    path('security/pin/lock/', views.LockSystemsView.as_view(), name='lock_systems'),
 ]

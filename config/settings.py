@@ -67,6 +67,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.PINSecurityMiddleware",
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -171,3 +172,9 @@ LOGOUT_REDIRECT_URL = 'login'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# --- Configuración de Seguridad PIN ---
+PIN_EXPIRATION_MINUTES = 20
+PIN_MAX_ATTEMPTS = 5
+PIN_BLOCK_MINUTES = 5
+PIN_ALLOWED_SYSTEMS = ['sgmg', 'sigera', 'sgp']

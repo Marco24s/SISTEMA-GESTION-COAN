@@ -16,6 +16,15 @@ from .models import Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGr
 from .forms import UnitForm, MeasurementUnitForm, AircraftModelForm, GreaseTypeForm, AircraftGreaseForm, FlightPlanForm, GreaseBatchForm, ConsumeGreaseForm, GreaseReferencePriceForm, RetestBatchForm, ProcurementRequirementForm
 from .services import update_batch_statuses, consume_grease
 from django.db.models import ProtectedError
+from .decorators import pin_required
+
+import logging
+import time
+from django.contrib.auth.hashers import make_password, check_password
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 class ActiveUserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
@@ -36,9 +45,12 @@ class LogisticsRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
 # Portal View
 @login_required
 def portal(request):
-    return render(request, 'core/portal.html')
+    from .models import UserSystemPIN
+    user_systems = UserSystemPIN.objects.filter(user=request.user).values_list('system_code', flat=True)
+    return render(request, 'core/portal.html', {'user_systems': list(user_systems)})
 
 # Home View
+@login_required
 def home(request):
     expiration_alerts = []
     stock_alerts = []
@@ -1068,3 +1080,174 @@ def export_requirements_csv(request):
             getattr(req, 'notes', '') or '',
         ])
     return response
+
+# --- PIN Security Views ---
+
+class VerifyPinView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/security/verify_pin.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['system'] = self.request.GET.get('system', '')
+        context['next'] = self.request.GET.get('next', '')
+        return context
+
+    def post(self, request, *args, **kwargs):
+        system = request.POST.get('system')
+        next_url = request.POST.get('next', 'portal')
+        pin = request.POST.get('pin')
+
+        # 1. Validation
+        if system not in settings.PIN_ALLOWED_SYSTEMS:
+            return redirect('portal')
+
+        # 2. Brute Force Protection check
+        pin_attempts = request.session.get('pin_attempts', {'count': 0, 'blocked_until': None})
+        blocked_until = pin_attempts.get('blocked_until')
+        
+        if blocked_until and time.time() < blocked_until:
+            messages.error(request, "Credenciales de seguridad bloqueadas temporalmente.")
+            return redirect('portal')
+
+        # 3. Progressive Delay
+        attempt_count = pin_attempts.get('count', 0)
+        if attempt_count > 0:
+            time.sleep(min(attempt_count, 4)) # Progressive delay up to 4 seconds
+
+        # 4. PIN Check
+        from .models import UserSystemPIN
+        try:
+            user_access = UserSystemPIN.objects.get(user=request.user, system_code=system)
+            pin_match = check_password(pin, user_access.pin_hash)
+        except UserSystemPIN.DoesNotExist:
+            pin_match = False
+
+        if pin_match:
+            # Success
+            verified_pins = request.session.get('verified_pins', {})
+            verified_pins[system] = time.time()
+            request.session['verified_pins'] = verified_pins
+            
+            # Reset attempts
+            request.session['pin_attempts'] = {'count': 0, 'blocked_until': None}
+            
+            # Redirect to next
+            if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                next_url = 'portal'
+            return redirect(next_url)
+        else:
+            # Failure
+            attempt_count += 1
+            pin_attempts['count'] = attempt_count
+            
+            logger.warning(f"Intento de PIN inválido para usuario {request.user.username} en sistema {system}")
+            
+            if attempt_count >= settings.PIN_MAX_ATTEMPTS:
+                block_time = settings.PIN_BLOCK_MINUTES * 60
+                pin_attempts['blocked_until'] = time.time() + block_time
+                request.session['pin_attempts'] = pin_attempts
+                logger.error(f"Usuario {request.user.username} bloqueado por fuerza bruta en PIN")
+                messages.error(request, f"Demasiados intentos fallidos. Acceso bloqueado por {settings.PIN_BLOCK_MINUTES} min.")
+                return redirect('portal')
+            
+            request.session['pin_attempts'] = pin_attempts
+            messages.error(request, "Credenciales de seguridad inválidas.")
+            # Re-render the view with error
+            return self.get(request, *args, **kwargs)
+
+class CreatePinView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/security/create_pin.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['system'] = self.request.GET.get('system', '')
+        context['next'] = self.request.GET.get('next', '')
+        return context
+
+    def post(self, request, *args, **kwargs):
+        pin = request.POST.get('pin')
+        confirm_pin = request.POST.get('confirm_pin')
+        system = request.POST.get('system')
+        next_url = request.POST.get('next', 'portal')
+
+        if pin != confirm_pin:
+            messages.error(request, "Los PINs no coinciden.")
+            return self.get(request)
+
+        if pin in ['0000', '1111', '1234', '2222', '1212']:
+            messages.error(request, "PIN demasiado débil. Elija uno más seguro.")
+            return self.get(request)
+
+        from .models import UserSystemPIN
+        # Solo permitimos crear si el admin ya habilitó el registro (permiso de acceso)
+        try:
+            access = UserSystemPIN.objects.get(user=request.user, system_code=system)
+            access.pin_hash = make_password(pin)
+            access.save()
+            logger.info(f"Usuario {request.user.username} creó PIN para sistema {system}")
+            messages.success(request, f"PIN de seguridad para {system.upper()} configurado exitosamente.")
+        except UserSystemPIN.DoesNotExist:
+            messages.error(request, "No tiene permisos autorizados para este sistema.")
+            return redirect('portal')
+        
+        # Auto-verify
+        verified_pins = request.session.get('verified_pins', {})
+        verified_pins[system] = time.time()
+        request.session['verified_pins'] = verified_pins
+            
+        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+            next_url = 'portal'
+        return redirect(next_url)
+
+class ChangePinView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/security/change_pin.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from .models import UserSystemPIN
+        # Pasar los sistemas a los que el usuario tiene acceso
+        context['user_systems'] = UserSystemPIN.objects.filter(user=self.request.user)
+        context['selected_system'] = self.request.GET.get('system', '')
+        return context
+
+    def post(self, request, *args, **kwargs):
+        system_code = request.POST.get('system_code')
+        current_pin = request.POST.get('current_pin')
+        new_pin = request.POST.get('new_pin')
+        confirm_pin = request.POST.get('confirm_pin')
+
+        from .models import UserSystemPIN
+        try:
+            access = UserSystemPIN.objects.get(user=request.user, system_code=system_code)
+        except UserSystemPIN.DoesNotExist:
+            messages.error(request, "No tiene acceso a este sistema.")
+            return redirect('portal')
+
+        if not check_password(current_pin, access.pin_hash):
+            messages.error(request, "El PIN actual es incorrecto para este sistema.")
+            return self.get(request)
+
+        if new_pin != confirm_pin:
+            messages.error(request, "El nuevo PIN y su confirmación no coinciden.")
+            return self.get(request)
+
+        if new_pin in ['0000', '1111', '1234', '2222']:
+            messages.error(request, "El nuevo PIN es demasiado débil.")
+            return self.get(request)
+
+        access.pin_hash = make_password(new_pin)
+        access.save()
+        
+        # Invalidate only this system's session or all? 
+        # Better all for security when a change happens.
+        request.session['verified_pins'] = {}
+        
+        logger.info(f"Usuario {request.user.username} cambió PIN de {system_code}")
+        messages.success(request, f"PIN de {system_code.upper()} cambiado exitosamente.")
+        return redirect('portal')
+
+class LockSystemsView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        request.session['verified_pins'] = {}
+        messages.info(request, "Sistemas bloqueados. Se requerirá PIN para ingresar nuevamente.")
+        return redirect('portal')

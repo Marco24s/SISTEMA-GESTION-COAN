@@ -13,6 +13,27 @@ class CustomUser(AbstractUser):
         help_text="Asignar una unidad para restringir al usuario a consumos únicamente de esta ubicación."
     )
 
+class UserSystemPIN(models.Model):
+    SYSTEM_CHOICES = [
+        ('sgmg', 'Materias Grasas (SGMG)'),
+        ('sigera', 'Ropa de Trabajo (SIGERA)'),
+        ('sgp', 'Presupuesto (SGP)'),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='system_access')
+    system_code = models.CharField(max_length=20, choices=SYSTEM_CHOICES, verbose_name="Sistema")
+    pin_hash = models.CharField(max_length=128, verbose_name="PIN de Seguridad (Hashed)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'system_code')
+        verbose_name = "Acceso por PIN a Sistema"
+        verbose_name_plural = "Accesos por PIN a Sistemas"
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_system_code_display()}"
+
 class Unit(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la Unidad")
     component_code = models.CharField(max_length=6, blank=True, null=True, verbose_name="Código Unidad Componente (6 chars)", help_text="Ej: UUUUUU")

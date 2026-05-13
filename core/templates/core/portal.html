@@ -187,6 +187,27 @@
                 <span class="text-muted me-3">
                     <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}
                 </span>
+                <div class="dropdown d-inline me-2">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle rounded-pill" type="button" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-shield-halved"></i> Seguridad
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3 mt-2">
+                        <li>
+                            <a class="dropdown-item small" href="{% url 'change_pin' %}">
+                                <i class="fa-solid fa-key me-2 text-muted"></i> Cambiar PIN
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form method="POST" action="{% url 'lock_systems' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item small text-danger">
+                                    <i class="fa-solid fa-lock me-2"></i> Bloquear Sistemas
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
                 <form method="post" action="{% url 'logout' %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3">
