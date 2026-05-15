@@ -16,7 +16,7 @@ def home(request):
     Vista principal de SIGERA (Dashboard)
     """
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
 
     total_stock = ClothingType.objects.count()
     
@@ -153,7 +153,7 @@ def personnel_list(request):
     personnel = Personnel.objects.select_related('assigned_unit')
     
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     
     if not is_admin:
         if getattr(user, 'unit', None):
@@ -183,7 +183,7 @@ def assignment_list(request):
     """
     query = request.GET.get('q', '')
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     
     # 1. Historial General
     assignments = ClothingAssignment.objects.select_related(
@@ -401,6 +401,9 @@ def personnel_delete(request, pk):
     """
     Vista para eliminar un registro de personal
     """
+    if not (request.user.is_superuser or request.user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
+        messages.error(request, "Acceso denegado: No tienes permisos para eliminar personal.")
+        return redirect('sigera:personnel_list')
     person = get_object_or_404(Personnel, pk=pk)
     if request.method == 'POST':
         name = f"{person.last_name}, {person.first_name}"
@@ -420,7 +423,7 @@ def assignment_create(request):
     Vista para registrar una nueva entrega de cargo con deducción de stock
     """
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     if not is_admin:
         messages.error(request, "Acceso denegado: No tienes permisos para registrar entregas de material.")
         return redirect('sigera:assignment_list')
@@ -525,6 +528,9 @@ def catalog_size_edit(request, pk):
 
 @login_required
 def catalog_size_delete(request, pk):
+    if not (request.user.is_superuser or request.user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
+        messages.error(request, "Acceso denegado: No tienes permisos para eliminar talles.")
+        return redirect('sigera:stock_list')
     size = get_object_or_404(ClothingSize, pk=pk)
     if request.method == 'POST':
         size.delete()
@@ -563,7 +569,7 @@ def assignment_return_view(request, pk):
     Cambia el estado del cargo y repone el stock.
     """
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     if not is_admin:
         messages.error(request, "Acceso denegado: No tienes permisos para registrar devoluciones.")
         return redirect('sigera:assignment_list')

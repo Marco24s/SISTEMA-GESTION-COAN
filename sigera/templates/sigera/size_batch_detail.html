@@ -53,12 +53,14 @@
                                 {% endif %}
                             </td>
                             <td class="py-3 text-center">
+                                {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
                                 <form action="#" method="post" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Marcar como consumido?');" title="Marcar como Consumido">
                                         <i class="fa-solid fa-trash"></i>
                                     </button>
                                 </form>
+                                {% endif %}
                             </td>
                         </tr>
                     {% empty %}

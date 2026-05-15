@@ -63,11 +63,15 @@
                         </td>
                         <td>{{ req.requested_by.username|default:"-" }}</td>
                         <td class="no-print">
+                            {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
                             <a href="{% url 'requirement_update' req.id %}" class="btn btn-sm btn-outline-primary" title="Actualizar Estado o Notas"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
+                            {% endif %}
+                            {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
                             <form method="post" action="{% url 'requirement_delete' req.id %}" class="d-inline" onsubmit="return confirm('¿Eliminar el requerimiento #{{ req.id }} de {{ req.grease_type.nomenclatura }}?');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-danger ms-1" title="Eliminar Requerimiento"><i class="fa-solid fa-trash"></i></button>
                             </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

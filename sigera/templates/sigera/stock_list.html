@@ -99,12 +99,14 @@
                                                     <a href="{% url 'sigera:batch_movements' batch.pk %}" class="btn btn-sm btn-outline-secondary me-1 py-0 px-2" title="Movimientos">
                                                         <i class="fa-solid fa-list"></i>
                                                     </a>
+                                                    {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
                                                     <form action="#" method="post" class="d-inline">
                                                         {% csrf_token %}
                                                         <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="return confirm('¿Marcar el lote completo como consumido?');" title="Eliminar / Consumir">
                                                             <i class="fa-solid fa-trash"></i>
                                                         </button>
                                                     </form>
+                                                    {% endif %}
                                                 </td>
                                             </tr>
                                             {% endfor %}

@@ -37,10 +37,12 @@
                                 <a href="{% url 'budget:nomenclature_update' config.id item.pk %}" class="btn btn-sm btn-outline-primary rounded-circle me-1" title="Editar">
                                     <i class="fa-solid fa-pen"></i>
                                 </a>
+                                {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
                                 <button type="button" class="btn btn-sm btn-outline-danger rounded-circle" 
                                         data-bs-toggle="modal" data-bs-target="#deleteModal{{ item.pk }}">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}

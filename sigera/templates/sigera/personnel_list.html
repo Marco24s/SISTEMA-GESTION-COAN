@@ -74,9 +74,11 @@
                                     <a href="{% url 'sigera:personnel_edit' person.pk %}" class="btn btn-sm btn-outline-primary shadow-sm" style="color: #6f42c1; border-color: #6f42c1;" title="Editar Datos">
                                         <i class="fa-solid fa-user-pen"></i>
                                     </a>
+                                    {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
                                     <a href="{% url 'sigera:personnel_delete' person.pk %}" class="btn btn-sm btn-outline-danger shadow-sm" title="Eliminar Registro">
                                         <i class="fa-solid fa-trash"></i>
                                     </a>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>

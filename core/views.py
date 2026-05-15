@@ -31,16 +31,24 @@ class ActiveUserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
         user = self.request.user
         if not user.is_authenticated:
             return False
-        return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists() or user.unit is not None
+        return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists() or user.unit is not None
 
 class LogisticsRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
-        # RBAC: Requiere que el usuario pertenezca al grupo Administrador o Logistica,
+        # RBAC: Requiere que el usuario pertenezca al grupo Administrador, Logistica o Editor,
         # o que sea superusuario.
         user = self.request.user
         if not user.is_authenticated:
             return False
-        return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+
+class LogisticsOnlyRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        # RBAC: Requiere estrictamente Administrador o Logistica (Excluye Editor).
+        user = self.request.user
+        if not user.is_authenticated:
+            return False
+        return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
 
 # Portal View
 @login_required
@@ -60,7 +68,7 @@ def home(request):
         update_batch_statuses()
         
         user = request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
         user_unit_name = user.unit.name if getattr(user, 'unit', None) else None
         
         # Alertas de Vencimiento
@@ -175,7 +183,7 @@ class UnitUpdateView(LogisticsRequiredMixin, SuccessMessageMixin, UpdateView):
     success_message = "Unidad actualizada exitosamente."
     extra_context = {'title': 'Editar Unidad'}
 
-class UnitDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+class UnitDeleteView(LogisticsOnlyRequiredMixin, SuccessMessageMixin, DeleteView):
     model = Unit
     template_name = 'core/unit_confirm_delete.html'
     success_url = reverse_lazy('unit_list')
@@ -205,7 +213,7 @@ class MeasurementUnitUpdateView(LogisticsRequiredMixin, SuccessMessageMixin, Upd
     success_url = reverse_lazy('measurementunit_list')
     success_message = "Unidad de medida actualizada exitosamente."
 
-class MeasurementUnitDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+class MeasurementUnitDeleteView(LogisticsOnlyRequiredMixin, SuccessMessageMixin, DeleteView):
     model = MeasurementUnit
     template_name = 'core/measurementunit_confirm_delete.html'
     success_url = reverse_lazy('measurementunit_list')
@@ -226,7 +234,7 @@ class AircraftListView(LoginRequiredMixin, ListView):
         qs = super().get_queryset()
         
         # Admin y Logística ven todo
-        if user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists():
+        if user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists():
             return qs
             
         # Usuarios con unidad ven solo sus modelos
@@ -252,7 +260,7 @@ class AircraftUpdateView(LogisticsRequiredMixin, SuccessMessageMixin, UpdateView
     success_message = "Aeronave actualizada exitosamente."
     extra_context = {'title': 'Editar Modelo de Aeronave'}
 
-class AircraftDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+class AircraftDeleteView(LogisticsOnlyRequiredMixin, SuccessMessageMixin, DeleteView):
     model = AircraftModel
     template_name = 'core/confirm_delete.html'
     success_url = reverse_lazy('aircraft_list')
@@ -280,7 +288,7 @@ class GreaseTypeUpdateView(LogisticsRequiredMixin, SuccessMessageMixin, UpdateVi
     success_message = "Tipo de Grasa actualizado exitosamente."
     extra_context = {'title': 'Editar Tipo de Grasa'}
 
-class GreaseTypeDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+class GreaseTypeDeleteView(LogisticsOnlyRequiredMixin, SuccessMessageMixin, DeleteView):
     model = GreaseType
     template_name = 'core/grease_confirm_delete.html'
     success_url = reverse_lazy('grease_list')
@@ -357,7 +365,7 @@ class GreaseReferencePriceUpdateView(LogisticsRequiredMixin, SuccessMessageMixin
     def get_success_url(self):
         return reverse_lazy('grease_price_list', kwargs={'pk': self.object.grease_type_id})
 
-class GreaseReferencePriceDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+class GreaseReferencePriceDeleteView(LogisticsOnlyRequiredMixin, SuccessMessageMixin, DeleteView):
     model = GreaseReferencePrice
     template_name = 'core/confirm_delete.html'
     success_message = "Precio de Referencia eliminado exitosamente."
@@ -376,7 +384,7 @@ class AircraftGreaseListView(LoginRequiredMixin, ListView):
         qs = super().get_queryset()
         
         # Admin y Logística ven todo
-        if user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists():
+        if user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists():
             return qs
             
         # Usuarios con unidad ven solo lo de su aeronave
@@ -402,7 +410,7 @@ class AircraftGreaseUpdateView(LogisticsRequiredMixin, SuccessMessageMixin, Upda
     success_message = "Asociación actualizada exitosamente."
     extra_context = {'title': 'Editar Asociación Aeronave-Grasa'}
 
-class AircraftGreaseDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+class AircraftGreaseDeleteView(LogisticsOnlyRequiredMixin, SuccessMessageMixin, DeleteView):
     model = AircraftGrease
     template_name = 'core/confirm_delete.html'
     success_url = reverse_lazy('association_list')
@@ -420,7 +428,7 @@ class FlightPlanListView(LoginRequiredMixin, ListView):
         qs = super().get_queryset()
         
         # Admin y Logística ven todo
-        if user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists():
+        if user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists():
             return qs
             
         # Usuarios con unidad ven solo sus planes
@@ -446,7 +454,7 @@ class FlightPlanUpdateView(LogisticsRequiredMixin, SuccessMessageMixin, UpdateVi
     success_message = "Plan de empleo actualizado exitosamente."
     extra_context = {'title': 'Editar Plan de Empleo'}
 
-class FlightPlanDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+class FlightPlanDeleteView(LogisticsOnlyRequiredMixin, SuccessMessageMixin, DeleteView):
     model = FlightPlan
     template_name = 'core/confirm_delete.html'
     success_url = reverse_lazy('flightplan_list')
@@ -465,7 +473,7 @@ class GreaseBatchListView(LoginRequiredMixin, ListView):
         qs = super().get_queryset().active()
         
         user = self.request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
         
         if not is_admin and getattr(user, 'unit', None):
             # Particular user: ONLY see their unit
@@ -493,7 +501,7 @@ class ArchivedBatchListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = super().get_queryset().archived()
         user = self.request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
 
         if not is_admin and getattr(user, 'unit', None):
             # Particular user: ONLY see their unit
@@ -519,7 +527,7 @@ class ArchiveBatchView(ActiveUserRequiredMixin, View):
         
         # Verify permissions
         user = request.user
-        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
+        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()):
             if user.unit and batch.storage_location != user.unit.name:
                 messages.error(request, "No tienes permiso para modificar lotes que no pertenecen a tu unidad.")
                 return redirect('batch_list')
@@ -617,7 +625,7 @@ class ConsumeGreaseView(ActiveUserRequiredMixin, FormView):
         location = None
         
         # Si el usuario no es staff/admin/logística, pero tiene una unidad, forzamos esa ubicación
-        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
+        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()):
             if user.unit:
                 location = user.unit.name
         
@@ -637,7 +645,7 @@ class ConsumeGreaseView(ActiveUserRequiredMixin, FormView):
             form.add_error(None, e.message)
             return self.form_invalid(form)
 
-class GreaseBatchDeleteView(LogisticsRequiredMixin, DeleteView):
+class GreaseBatchDeleteView(LogisticsOnlyRequiredMixin, DeleteView):
     model = GreaseBatch
     template_name = 'core/confirm_delete.html'
     success_url = reverse_lazy('batch_list')
@@ -660,7 +668,7 @@ class StartRetestView(ActiveUserRequiredMixin, View):
         
         # Verificar permisos de unidad
         user = request.user
-        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
+        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()):
             if user.unit and batch.storage_location != user.unit.name:
                 messages.error(request, "No tienes permiso para modificar lotes que no pertenecen a tu unidad.")
                 return redirect('batch_detail', pk=batch.pk)
@@ -704,7 +712,7 @@ class RetestBatchView(ActiveUserRequiredMixin, UpdateView):
     def dispatch(self, request, *args, **kwargs):
         batch = self.get_object()
         user = request.user
-        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
+        if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()):
             if user.unit and batch.storage_location != user.unit.name:
                 messages.error(request, "No tienes permiso para modificar lotes que no pertenecen a tu unidad.")
                 return redirect('batch_detail', pk=batch.pk)
@@ -748,7 +756,7 @@ class ProcurementForecastingView(LoginRequiredMixin, TemplateView):
         from .services import update_batch_statuses
         
         user = self.request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
         location = user.unit.name if (not is_admin and getattr(user, 'unit', None)) else None
 
         update_batch_statuses()
@@ -764,7 +772,7 @@ class FlightHoursCalculatorView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
         
         aircraft_qs = AircraftModel.objects.all().order_by('name')
         if not is_admin and getattr(user, 'unit', None):
@@ -781,7 +789,7 @@ class FlightHoursCalculatorView(LoginRequiredMixin, TemplateView):
         from .services import calculate_flight_hours_projection
         
         user = request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
         location = user.unit.name if (not is_admin and getattr(user, 'unit', None)) else None
 
         selected_aircraft_ids = request.POST.getlist('aircraft_ids')
@@ -820,7 +828,7 @@ class FlightHoursCalculatorView(LoginRequiredMixin, TemplateView):
 def export_grease_batches_csv(request):
     update_batch_statuses()
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="stock_casamatas.csv"'
@@ -850,7 +858,7 @@ def export_grease_batches_csv(request):
 def export_procurement_forecast_csv(request):
     update_batch_statuses()
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     location = user.unit.name if (not is_admin and getattr(user, 'unit', None)) else None
 
     response = HttpResponse(content_type='text/csv; charset=utf-8')
@@ -887,7 +895,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 def export_grease_batches_pdf(request):
     update_batch_statuses()
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
@@ -940,7 +948,7 @@ def export_grease_batches_pdf(request):
 def export_procurement_forecast_pdf(request):
     update_batch_statuses()
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     location = user.unit.name if (not is_admin and getattr(user, 'unit', None)) else None
 
     buffer = io.BytesIO()
@@ -1000,7 +1008,7 @@ class ProcurementRequirementListView(ActiveUserRequiredMixin, ListView):
     def get_queryset(self):
         qs = super().get_queryset().order_by('-request_date')
         user = self.request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
         
         if not is_admin and getattr(user, 'unit', None):
             return qs.filter(requested_by__unit=user.unit)
@@ -1035,7 +1043,7 @@ class ProcurementRequirementUpdateView(ActiveUserRequiredMixin, SuccessMessageMi
     success_message = "Requerimiento actualizado exitosamente."
     extra_context = {'title': 'Editar Requerimiento de Adquisición'}
 
-class ProcurementRequirementDeleteView(ActiveUserRequiredMixin, View):
+class ProcurementRequirementDeleteView(LogisticsOnlyRequiredMixin, View):
     def post(self, request, pk, *args, **kwargs):
         from django.shortcuts import get_object_or_404
         req = get_object_or_404(ProcurementRequirement, pk=pk)
@@ -1063,7 +1071,7 @@ def export_requirements_csv(request):
 
     requirements = ProcurementRequirement.objects.all().order_by('-request_date')
     user = request.user
-    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     
     if not is_admin and getattr(user, 'unit', None):
         requirements = requirements.filter(requested_by__unit=user.unit)

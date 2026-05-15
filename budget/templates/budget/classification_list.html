@@ -51,9 +51,11 @@
                                     <a href="{% url 'budget:classification_update' c.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
                                         <i class="fa-solid fa-pen"></i>
                                     </a>
+                                    {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
                                     <a href="{% url 'budget:classification_delete' c.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar">
                                         <i class="fa-solid fa-trash"></i>
                                     </a>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>

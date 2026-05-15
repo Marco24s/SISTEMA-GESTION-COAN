@@ -27,6 +27,9 @@ from core.decorators import pin_required
 from django.contrib.auth.decorators import login_required
 
 def is_admin(user):
+    return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+
+def is_strict_admin(user):
     return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
 
 @login_required
@@ -1198,7 +1201,7 @@ def nomenclature_update(request, catalog_type, pk):
     })
 
 def nomenclature_delete(request, catalog_type, pk):
-    if not is_admin(request.user): return redirect('budget:dashboard')
+    if not is_strict_admin(request.user): return redirect('budget:dashboard')
     
     config = _get_catalog_config(catalog_type)
     if not config: return redirect('budget:nomenclature_dashboard')
@@ -1300,6 +1303,7 @@ def classification_update(request, pk):
     return render(request, 'budget/form_base.html', {'form': form, 'title': f'Editar Clasificación: {c.name}'})
 
 def classification_delete(request, pk):
+    if not is_strict_admin(request.user): return redirect('budget:classification_list')
     c = get_object_or_404(BudgetClassification, pk=pk)
     if request.method == 'POST':
         c.delete()
