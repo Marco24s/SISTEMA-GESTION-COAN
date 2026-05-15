@@ -24,53 +24,90 @@
 <div class="row g-4 mb-4">
     <!-- Resumen de Crédito -->
     <div class="col-lg-8">
-        <div class="card card-stats p-4 mb-4">
-            <h5 class="fw-bold mb-4 border-bottom pb-2">Información de Nomenclador</h5>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">Ejercicio Económico</label>
-                    <span class="fw-bold">{{ credit.fiscal_year.year }}</span>
+        <!-- Información de Nomenclador Rediseñada -->
+        <div class="card border-0 shadow-lg rounded-4 overflow-hidden mb-4" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white;">
+            <div class="card-body p-4 position-relative">
+                <!-- Decoración de fondo -->
+                <div class="position-absolute top-50 translate-middle-y end-0 opacity-10 pe-4" style="pointer-events: none;">
+                    <i class="fa-solid fa-layer-group" style="font-size: 12rem;"></i>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">Fuente de Financiamiento (FF)</label>
-                    <span class="fw-bold">{{ credit.ff|default:"N/A" }}</span>
+
+                <div class="d-flex justify-content-between align-items-center mb-4 position-relative z-index-1">
+                    <div>
+                        <div class="d-flex align-items-center gap-3 mb-2">
+                            <span class="badge bg-white text-dark rounded-pill px-3 py-2 fw-bold shadow-sm">
+                                <i class="fa-regular fa-calendar me-2 text-primary"></i>Ejercicio {{ credit.fiscal_year.year }}
+                            </span>
+                            <span class="badge bg-white bg-opacity-20 text-white rounded-pill px-3 py-2 border border-white border-opacity-25" style="backdrop-filter: blur(5px);">
+                                {{ credit.credit_type.name|default:"Crédito Sin Tipo" }}
+                            </span>
+                        </div>
+                        <h4 class="fw-bolder mb-0 text-white" style="letter-spacing: -0.5px;">Estructura Presupuestaria</h4>
+                    </div>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">Programa</label>
-                    <span class="fw-bold">{{ credit.programa|default:"No especificado" }}</span>
+
+                <!-- Flow de Nomenclatura -->
+                <div class="d-flex flex-wrap gap-2 position-relative z-index-1">
+                    <!-- FF -->
+                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
+                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Fuente (FF)</div>
+                        <div class="fw-bolder fs-5">{{ credit.ff.code|default:"--" }}</div>
+                    </div>
+                    
+                    <!-- Programa -->
+                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" title="{{ credit.programa.name }}" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
+                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Programa</div>
+                        <div class="fw-bolder fs-5">{{ credit.programa.code|default:"--" }}</div>
+                    </div>
+                    
+                    <!-- Subprograma -->
+                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" title="{{ credit.subprog.name }}" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
+                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Subprog.</div>
+                        <div class="fw-bolder fs-5">{{ credit.subprog.code|default:"--" }}</div>
+                    </div>
+
+                    <div class="d-flex align-items-center text-white-50 px-1 opacity-50"><i class="fa-solid fa-angle-right"></i></div>
+
+                    <!-- Inciso -->
+                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center border border-white border-opacity-25" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
+                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Inciso</div>
+                        <div class="fw-bolder fs-5 text-warning">{{ credit.inc.code|default:"--" }}</div>
+                    </div>
+
+                    <!-- Ppal -->
+                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
+                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Ppal</div>
+                        <div class="fw-bolder fs-5">{{ credit.ppp_inc.code|default:"--" }}</div>
+                    </div>
+
+                    <!-- Parcial -->
+                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
+                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Parcial</div>
+                        <div class="fw-bolder fs-5">{{ credit.pp_inc.code|default:"--" }}</div>
+                    </div>
+
+                    <!-- Subparcial -->
+                    <div class="bg-info bg-opacity-25 rounded-3 p-3 flex-fill text-center border border-info border-opacity-50 shadow-sm" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(13, 202, 240, 0.35)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(13, 202, 240, 0.25)'">
+                        <div class="text-white small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">SUBPC</div>
+                        <div class="fw-bolder fs-5 text-white" style="text-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ credit.pre_inc.code|default:"--" }}</div>
+                    </div>
+
+                    <!-- Moneda -->
+                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
+                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Moneda</div>
+                        <div class="fw-bolder fs-5">{{ credit.incisos_agrupado.code|default:"--" }}</div>
+                    </div>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">Subprograma</label>
-                    <span class="small text-dark fw-bold">{{ credit.subprog|default:"N/A" }}</span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">INCISO (Nivel 1)</label>
-                    <span class="small text-dark fw-bold">{{ credit.inc|default:"N/A" }}</span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">PPAL (Nivel 2)</label>
-                    <span class="small text-dark fw-bold">{{ credit.ppp_inc|default:"N/A" }}</span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">PARCIAL (Nivel 3)</label>
-                    <span class="small text-dark fw-bold">{{ credit.pp_inc|default:"N/A" }}</span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">SUBPC (Nivel 4)</label>
-                    <span class="small text-dark fw-bold">{{ credit.pre_inc|default:"N/A" }}</span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="text-muted small d-block">MONEDA (Nivel 5)</label>
-                    <span class="small text-dark fw-bold">{{ credit.incisos_agrupado|default:"N/A" }}</span>
-                </div>
+
                 {% if credit.notes %}
-                <div class="col-12">
-                    <label class="text-muted small d-block">Observaciones</label>
-                    <p class="text-muted small mb-0 italic">{{ credit.notes }}</p>
+                <div class="mt-4 pt-3 border-top border-white border-opacity-10 position-relative z-index-1">
+                    <div class="text-white-50 small mb-1 fw-bold text-uppercase tracking-wider" style="font-size: 0.65rem;"><i class="fa-solid fa-circle-info me-1"></i> Observaciones</div>
+                    <p class="mb-0 text-white fw-light font-monospace small bg-black bg-opacity-25 p-2 rounded-3 border border-white border-opacity-10">{{ credit.notes }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
+
 
         <div class="card card-stats p-4 mt-4 border-start border-4 border-success bg-success bg-opacity-10">
             <h5 class="fw-bold mb-4 d-flex align-items-center">
@@ -247,9 +284,16 @@
                         </div>
                     </td>
                     <td class="text-end">
-                        <a href="{% url 'budget:execution_commitment' %}?allocation={{ alloc.id }}" class="btn btn-sm btn-outline-warning rounded-pill px-2" title="Registrar Gasto">
-                            <i class="fa-solid fa-file-invoice-dollar"></i>
-                        </a>
+                        <div class="btn-group">
+                            <a href="{% url 'budget:execution_commitment' %}?allocation={{ alloc.id }}" class="btn btn-sm btn-outline-warning" title="Registrar Gasto">
+                                <i class="fa-solid fa-file-invoice-dollar"></i>
+                            </a>
+                            {% if is_admin %}
+                            <a href="{% url 'budget:allocation_update' alloc.id %}" class="btn btn-sm btn-outline-info" title="Editar Distribución">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% empty %}

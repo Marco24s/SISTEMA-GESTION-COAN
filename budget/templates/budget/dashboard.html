@@ -495,6 +495,7 @@
                                                 <tr class="text-muted small">
                                                     <th style="width: 30px;"></th>
                                                     <th>SUBPC</th>
+                                                    <th class="text-center">Subprog</th>
                                                     <th class="text-center">Trimestre</th>
                                                     <th class="text-end">Monto Asignado</th>
                                                     <th class="text-end">Gastado</th>
@@ -521,6 +522,7 @@
                                                         </div>
                                                         {% endif %}
                                                     </td>
+                                                    <td class="text-center py-2 fw-bold text-muted small">{{ alloc.subprog }}</td>
                                                     <td class="text-center py-2">
                                                         <span class="badge bg-light text-dark border-0 shadow-sm" style="font-size: 0.7rem;">{{ alloc.quarters }}</span>
                                                     </td>
@@ -532,7 +534,7 @@
                                             </tbody>
                                              <tfoot>
                                                 <tr class="bg-success bg-opacity-10 d-none selection-summary-row">
-                                                    <td colspan="3" class="text-end py-2 small fw-bold">SUMA SELECCIONADA:</td>
+                                                    <td colspan="4" class="text-end py-2 small fw-bold">SUMA SELECCIONADA:</td>
                                                     <td class="text-end py-2 fw-bold text-primary selection-total-cell">$0,00</td>
                                                     <td class="text-end py-2 fw-bold text-danger selection-spent-cell">-$0,00</td>
                                                     <td class="text-end py-2 fw-bold text-success selection-available-cell" style="font-size: 1.1rem;">$0,00</td>

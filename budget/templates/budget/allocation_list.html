@@ -67,6 +67,9 @@
                                 <a href="{% url 'budget:execution_commitment' %}?allocation={{ alloc.id }}" class="btn btn-sm btn-outline-warning rounded-pill px-3 me-1" title="Registrar Gasto (Compromiso)">
                                     <i class="fa-solid fa-file-invoice-dollar me-1"></i> Ejecutar
                                 </a>
+                                <a href="{% url 'budget:allocation_update' alloc.id %}" class="btn btn-sm btn-outline-info rounded-pill px-2 me-1" title="Editar Distribución">
+                                    <i class="fa-solid fa-pen"></i>
+                                </a>
                                 {% if user.is_superuser %}
                                 <a href="{% url 'budget:allocation_delete' alloc.id %}" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Eliminar Distribución">
                                     <i class="fa-solid fa-trash"></i>

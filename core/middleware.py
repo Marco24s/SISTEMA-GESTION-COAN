@@ -28,8 +28,11 @@ class PINSecurityMiddleware:
             system = 'sgp'
         # Rutas de SGMG (core) que no son el portal, admin o seguridad
         elif not any(path.startswith(p) for p in ['/admin/', '/accounts/', '/security/', '/static/', '/media/', '/__debug__/']):
-            if path != '/' and path != reverse('portal'):
-                system = 'sgmg'
+            # Excluir archivos comunes que el navegador pide automáticamente en la raíz
+            ignored_extensions = ['.ico', '.png', '.jpg', '.jpeg', '.gif', '.json', '.txt', '.xml', '.webmanifest']
+            if not any(path.lower().endswith(ext) for ext in ignored_extensions):
+                if path != '/' and path != reverse('portal'):
+                    system = 'sgmg'
 
         # Si no es una ruta protegida por PIN, dejar pasar
         if not system:

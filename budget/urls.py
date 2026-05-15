@@ -26,6 +26,7 @@ urlpatterns = [
     # Distribución (UU.CC.)
     path('allocations/', views.allocation_list, name='allocation_list'),
     path('allocations/create/', views.allocation_create, name='allocation_create'),
+    path('allocations/<int:pk>/edit/', views.allocation_update, name='allocation_update'),
     path('allocations/<int:pk>/delete/', views.allocation_delete, name='allocation_delete'),
     path('allocations/bulk-delete/', views.allocation_bulk_delete, name='allocation_bulk_delete'),
     

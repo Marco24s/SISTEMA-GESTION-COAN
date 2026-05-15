@@ -52,7 +52,12 @@ def dashboard(request):
             full_report = services.get_unit_execution_report(fiscal_year)
             unit_report = [r for r in full_report if r['unit'] == request.user.unit]
 
-        stats['total_credit'] = credits.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        if is_admin_user:
+            stats['total_credit'] = credits.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        else:
+            # Para unidades, su "Crédito Total" es la suma de lo que tienen asignado (Techos)
+            stats['total_credit'] = allocations.aggregate(Sum('allocated_amount'))['allocated_amount__sum'] or 0
+            
         stats['total_allocated'] = allocations.aggregate(Sum('allocated_amount'))['allocated_amount__sum'] or 0
         stats['total_commitment'] = executions.aggregate(Sum('commitment_amount'))['commitment_amount__sum'] or 0
         stats['total_accrued'] = executions.aggregate(Sum('accrued_amount'))['accrued_amount__sum'] or 0
@@ -63,9 +68,14 @@ def dashboard(request):
         # Agregación por trimestre y tipo
         for q in ['q1', 'q2', 'q3', 'q4']:
             field = f'{q}_amount'
-            stats[f'{q}_total'] = credits.aggregate(Sum(field))[f'{field}__sum'] or 0
-            stats[f'{q}_asignacion'] = credits.filter(credit_type__code='ASIGNACION').aggregate(Sum(field))[f'{field}__sum'] or 0
-            stats[f'{q}_refuerzo'] = credits.filter(credit_type__code='REFUERZO').aggregate(Sum(field))[f'{field}__sum'] or 0
+            if is_admin_user:
+                stats[f'{q}_total'] = credits.aggregate(Sum(field))[f'{field}__sum'] or 0
+                stats[f'{q}_asignacion'] = credits.filter(credit_type__code='ASIGNACION').aggregate(Sum(field))[f'{field}__sum'] or 0
+                stats[f'{q}_refuerzo'] = credits.filter(credit_type__code='REFUERZO').aggregate(Sum(field))[f'{field}__sum'] or 0
+            else:
+                stats[f'{q}_total'] = allocations.aggregate(Sum(field))[f'{field}__sum'] or 0
+                stats[f'{q}_asignacion'] = allocations.filter(credit__credit_type__code='ASIGNACION').aggregate(Sum(field))[f'{field}__sum'] or 0
+                stats[f'{q}_refuerzo'] = allocations.filter(credit__credit_type__code='REFUERZO').aggregate(Sum(field))[f'{field}__sum'] or 0
 
         # Cálculo de anchos para la barra de progreso trimestral (basado en compromisos REALES por fecha)
         q1_t, q2_t, q3_t, q4_t = stats['q1_total'], stats['q2_total'], stats['q3_total'], stats['q4_total']
@@ -105,10 +115,18 @@ def dashboard(request):
         def get_q_tooltip(q_idx):
             import json as _json
             field_name = f'q{q_idx}_amount'
-            q_credits = credits.annotate(
-                q_total=F(field_name),
-                q_alloc=Coalesce(Sum(f'allocations__{field_name}'), 0, output_field=models.DecimalField())
-            ).filter(models.Q(q_total__gt=0) | models.Q(q_alloc__gt=0)).prefetch_related('allocations__unit')
+            if is_admin_user:
+                q_credits = credits.annotate(
+                    q_total=F(field_name),
+                    q_alloc=Coalesce(Sum(f'allocations__{field_name}'), 0, output_field=models.DecimalField())
+                ).filter(models.Q(q_total__gt=0) | models.Q(q_alloc__gt=0)).prefetch_related('allocations__unit')
+            else:
+                q_credits = credits.annotate(
+                    q_total=Coalesce(Sum(f'allocations__{field_name}', filter=models.Q(allocations__unit=request.user.unit)), 0, output_field=models.DecimalField()),
+                    q_alloc=models.Value(0, output_field=models.DecimalField())
+                ).filter(q_total__gt=0).prefetch_related(
+                    models.Prefetch('allocations', queryset=BudgetAllocation.objects.filter(unit=request.user.unit))
+                )
 
             table_rows = []
             for c in q_credits:
@@ -246,13 +264,25 @@ def budget_statistics(request):
     if is_admin_user:
         credit_by_type = BudgetCredit.objects.filter(fiscal_year=fiscal_year, credit_type__isnull=False).values('credit_type__name').annotate(total=Sum('total_amount'))
     else:
-        credit_by_type = BudgetCredit.objects.filter(fiscal_year=fiscal_year, credit_type__isnull=False, allocations__unit=request.user.unit).values('credit_type__name').annotate(total=Sum('allocations__allocated_amount'))
+        # Para unidades, usamos el monto asignado (Tech) con filtro explícito para evitar duplicados en el JOIN
+        credit_by_type = BudgetCredit.objects.filter(
+            fiscal_year=fiscal_year, 
+            credit_type__isnull=False, 
+            allocations__unit=request.user.unit
+        ).values('credit_type__name').annotate(
+            total=Sum('allocations__allocated_amount', filter=Q(allocations__unit=request.user.unit))
+        )
         
     # 2. Crédito por SUBPC
     if is_admin_user:
         credit_by_subpc = BudgetCredit.objects.filter(fiscal_year=fiscal_year).values('pre_inc__code').annotate(total=Sum('total_amount')).order_by('pre_inc__code')
     else:
-        credit_by_subpc = BudgetCredit.objects.filter(fiscal_year=fiscal_year, allocations__unit=request.user.unit).values('pre_inc__code').annotate(total=Sum('allocations__allocated_amount')).order_by('pre_inc__code')
+        credit_by_subpc = BudgetCredit.objects.filter(
+            fiscal_year=fiscal_year, 
+            allocations__unit=request.user.unit
+        ).values('pre_inc__code').annotate(
+            total=Sum('allocations__allocated_amount', filter=Q(allocations__unit=request.user.unit))
+        ).order_by('pre_inc__code')
 
     # 3. Estado de Ejecución (Etapas)
     if is_admin_user:
@@ -704,12 +734,22 @@ def credit_unassign_type(request, pk):
 
         notes = ' | '.join(details) if details else None
 
-        services.unassign_credit_type(
-            credit=credit,
-            unassign_amount=unassign_amount,
-            user=request.user,
-            notes=notes
-        )
+        try:
+            services.unassign_credit_type(
+                credit=credit,
+                unassign_amount=unassign_amount,
+                user=request.user,
+                notes=notes
+            )
+        except Exception as e:
+            error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+            messages.error(request, f"Error: {error_msg}")
+            return render(request, 'budget/credit_unassign_confirm.html', {
+                'credit': credit,
+                'current_amount': current_amount_txt,
+                'unassign_amount': unassign_amount_txt,
+                'notes': notes_txt
+            })
         
         success_msg = f"Tipo de crédito removido de {credit}."
         if unassign_amount and unassign_amount > 0:
@@ -777,6 +817,44 @@ def allocation_create(request):
         'form': form, 
         'title': 'Distribuir Crédito a Unidad',
         'fixed_credit': fixed_credit
+    })
+
+def allocation_update(request, pk):
+    if not is_admin(request.user): return redirect('budget:allocation_list')
+    allocation = get_object_or_404(BudgetAllocation, pk=pk)
+    
+    if request.method == 'POST':
+        form = BudgetAllocationForm(request.POST, instance=allocation)
+        # Permitimos la validación usando todos los créditos
+        form.fields['credit'].queryset = BudgetCredit.objects.all()
+        
+        if form.is_valid():
+            try:
+                services.update_allocation(
+                    allocation_id=allocation.pk,
+                    q1=form.cleaned_data['q1_amount'],
+                    q2=form.cleaned_data['q2_amount'],
+                    q3=form.cleaned_data['q3_amount'],
+                    q4=form.cleaned_data['q4_amount'],
+                    notes=form.cleaned_data['notes']
+                )
+                messages.success(request, f"Distribución para {allocation.unit.name} actualizada.")
+                return redirect('budget:credit_detail', pk=allocation.credit.pk)
+            except Exception as e:
+                error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+                messages.error(request, f"Error: {error_msg}")
+    else:
+        form = BudgetAllocationForm(instance=allocation)
+        # Aseguramos que el crédito actual esté en el queryset para que no de error
+        form.fields['credit'].queryset = BudgetCredit.objects.all()
+        
+    # Ocultamos el campo en el formulario y usamos el diseño estético de 'fixed_credit'
+    form.fields['credit'].widget = forms.HiddenInput()
+        
+    return render(request, 'budget/form_base.html', {
+        'form': form, 
+        'title': f'Editar Distribución: {allocation.unit.name}',
+        'fixed_credit': allocation.credit
     })
 
 def allocation_delete(request, pk):

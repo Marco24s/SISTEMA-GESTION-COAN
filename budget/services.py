@@ -236,6 +236,7 @@ def get_unit_execution_report(fiscal_year):
                 'spent': alloc.spent_amount,
                 'available': alloc.allocated_amount - alloc.spent_amount,
                 'ff': alloc.credit.ff.code if alloc.credit.ff else "--",
+                'subprog': alloc.credit.subprog.code if alloc.credit.subprog else "--",
                 'notes': alloc.notes
             })
 
@@ -257,26 +258,46 @@ def get_unit_execution_report(fiscal_year):
 def unassign_credit_type(credit, unassign_amount, user, notes=""):
     """
     Remueve el tipo de crédito y descuenta el monto de los trimestres (Q4 -> Q1).
-    Registra la acción en el historial.
+    Registra la acción en el historial. Valida que no se reduzca por debajo de lo distribuido.
     """
     if unassign_amount and unassign_amount > 0:
-        # Descontamos de los trimestres de atrás hacia adelante
+        # 1. Calcular potenciales nuevos montos
+        new_q = {
+            'q1_amount': credit.q1_amount, 'q2_amount': credit.q2_amount,
+            'q3_amount': credit.q3_amount, 'q4_amount': credit.q4_amount
+        }
         remaining = unassign_amount
         for q_attr in ['q4_amount', 'q3_amount', 'q2_amount', 'q1_amount']:
             if remaining <= 0: break
-            current_q = getattr(credit, q_attr)
-            if current_q >= remaining:
-                setattr(credit, q_attr, current_q - remaining)
+            current_val = new_q[q_attr]
+            if current_val >= remaining:
+                new_q[q_attr] = current_val - remaining
                 remaining = 0
             else:
-                remaining -= current_q
-                setattr(credit, q_attr, 0)
+                remaining -= current_val
+                new_q[q_attr] = 0
         
-        # El save() del modelo BudgetCredit recalculará el total_amount
+        if remaining > 0:
+            raise ValidationError(f"El monto a desasignar (${unassign_amount}) supera el crédito total disponible (${credit.total_amount}).")
+
+        # 2. Validar contra distribuciones existentes
+        allocs_q = credit.allocations.aggregate(
+            q1=Sum('q1_amount'), q2=Sum('q2_amount'), 
+            q3=Sum('q3_amount'), q4=Sum('q4_amount')
+        )
+        q1_a, q2_a, q3_a, q4_a = (allocs_q['q1'] or 0), (allocs_q['q2'] or 0), (allocs_q['q3'] or 0), (allocs_q['q4'] or 0)
+        
+        if new_q['q1_amount'] < q1_a: raise ValidationError(f"T1: La reducción supera el disponible no distribuido. Distribuido: ${q1_a}.")
+        if new_q['q2_amount'] < q2_a: raise ValidationError(f"T2: La reducción supera el disponible no distribuido. Distribuido: ${q2_a}.")
+        if new_q['q3_amount'] < q3_a: raise ValidationError(f"T3: La reducción supera el disponible no distribuido. Distribuido: ${q3_a}.")
+        if new_q['q4_amount'] < q4_a: raise ValidationError(f"T4: La reducción supera el disponible no distribuido. Distribuido: ${q4_a}.")
+
+        # 3. Aplicar si todo está ok
+        for q_attr, val in new_q.items():
+            setattr(credit, q_attr, val)
     
     # Mantenemos el tipo (No lo limpiamos para permitir múltiples desasignaciones parciales)
     previous_type = credit.credit_type
-    # credit.credit_type = None  <-- Se elimina esta línea
     credit.save()
     
     # Creamos el log de auditoría
@@ -431,3 +452,54 @@ def adjust_credit(credit_id, q1_new, q2_new, q3_new, q4_new, reason, user):
     
     adj.save()
     return credit, adj
+
+@transaction.atomic
+def update_allocation(allocation_id, q1=None, q2=None, q3=None, q4=None, notes=None):
+    """
+    Actualiza una distribución existente validando contra el crédito y lo ya gastado.
+    """
+    allocation = BudgetAllocation.objects.select_for_update().get(pk=allocation_id)
+    credit = allocation.credit
+
+    if credit.fiscal_year.status == 'CLOSED':
+        raise ValidationError("No se puede modificar una distribución en un ejercicio cerrado.")
+
+    # Montos actuales si no se proveen nuevos
+    q1 = q1 if q1 is not None else allocation.q1_amount
+    q2 = q2 if q2 is not None else allocation.q2_amount
+    q3 = q3 if q3 is not None else allocation.q3_amount
+    q4 = q4 if q4 is not None else allocation.q4_amount
+    
+    new_total = q1 + q2 + q3 + q4
+
+    # 1. Validar piso: No puede ser menor a lo ya gastado (spent_amount)
+    if new_total < allocation.spent_amount:
+        raise ValidationError(f"El nuevo monto total (${new_total}) es inferior a lo ya comprometido (${allocation.spent_amount}).")
+
+    # 2. Validar techo: No puede superar el disponible en el crédito (contando otras distribuciones)
+    other_allocs = credit.allocations.exclude(pk=allocation.pk).aggregate(
+        q1_s=Sum('q1_amount'), q2_s=Sum('q2_amount'), 
+        q3_s=Sum('q3_amount'), q4_s=Sum('q4_amount')
+    )
+    
+    q1_o, q2_o, q3_o, q4_o = (other_allocs['q1_s'] or 0), (other_allocs['q2_s'] or 0), (other_allocs['q3_s'] or 0), (other_allocs['q4_s'] or 0)
+
+    if q1 + q1_o > credit.q1_amount:
+        raise ValidationError(f"T1: El monto (${q1}) supera el disponible del crédito (${credit.q1_amount - q1_o}).")
+    if q2 + q2_o > credit.q2_amount:
+        raise ValidationError(f"T2: El monto (${q2}) supera el disponible del crédito (${credit.q2_amount - q2_o}).")
+    if q3 + q3_o > credit.q3_amount:
+        raise ValidationError(f"T3: El monto (${q3}) supera el disponible del crédito (${credit.q3_amount - q3_o}).")
+    if q4 + q4_o > credit.q4_amount:
+        raise ValidationError(f"T4: El monto (${q4}) supera el disponible del crédito (${credit.q4_amount - q4_o}).")
+
+    # 3. Actualizar
+    allocation.q1_amount = q1
+    allocation.q2_amount = q2
+    allocation.q3_amount = q3
+    allocation.q4_amount = q4
+    if notes is not None:
+        allocation.notes = notes
+    allocation.save()
+    
+    return allocation

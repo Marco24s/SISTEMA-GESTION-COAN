@@ -20,98 +20,148 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body class="bg-light">
-
     {% block navbar %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-lg mb-4 position-relative z-index-1" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border-bottom: 3px solid rgba(255,255,255,0.15);">
         <div class="container">
-            <a href="/" class="btn btn-sm text-white border-white me-3" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1);" title="Volver al Portal">
+            <!-- Botón Volver al Portal -->
+            <a href="/" class="btn btn-sm text-white border-0 shadow-sm me-3" style="border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.15); backdrop-filter: blur(5px); transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='scale(1.1)';" onmouseout="this.style.background='rgba(255,255,255,0.15)'; this.style.transform='scale(1)';">
                 <i class="fa-solid fa-arrow-left"></i>
             </a>
+            
+            <!-- Logo/Marca -->
             <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
-                <i class="fa-solid fa-plane-departure me-2"></i> <!-- Ejemplo Icono Institucional -->
-                <strong>SGMG-COAN</strong>
+                <div class="bg-white text-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm me-2" style="width: 40px; height: 40px;">
+                    <i class="fa-solid fa-plane-departure fs-5"></i>
+                </div>
+                <strong class="text-white fs-4" style="letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">SGMG-COAN</strong>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
+            
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <!-- Nav links here -->
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'home' %}">Inicio</a>
+                <ul class="navbar-nav me-auto ps-3">
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if request.resolver_match.url_name == 'home' %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'home' %}" {% if request.resolver_match.url_name != 'home' %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-house-chimney me-1 small opacity-75"></i> Inicio
+                            {% if request.resolver_match.url_name == 'home' %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
                     {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'unit' in request.resolver_match.url_name and 'measurementunit' not in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'unit_list' %}">Unidades</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if 'unit' in request.resolver_match.url_name and 'measurementunit' not in request.resolver_match.url_name %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'unit_list' %}" {% if 'unit' not in request.resolver_match.url_name or 'measurementunit' in request.resolver_match.url_name %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-shield-halved me-1 small opacity-75"></i> Unidades
+                            {% if 'unit' in request.resolver_match.url_name and 'measurementunit' not in request.resolver_match.url_name %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'aircraft' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'aircraft_list' %}">Aeronaves</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if 'aircraft' in request.resolver_match.url_name %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'aircraft_list' %}" {% if 'aircraft' not in request.resolver_match.url_name %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-plane me-1 small opacity-75"></i> Aeronaves
+                            {% if 'aircraft' not in request.resolver_match.url_name %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'grease' in request.resolver_match.url_name and 'batch' not in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'grease_list' %}">Catálogo Grasas</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if 'grease' in request.resolver_match.url_name and 'batch' not in request.resolver_match.url_name %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'grease_list' %}" {% if 'grease' not in request.resolver_match.url_name or 'batch' in request.resolver_match.url_name %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-oil-can me-1 small opacity-75"></i> Catálogo
+                            {% if 'grease' in request.resolver_match.url_name and 'batch' not in request.resolver_match.url_name %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'association' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'association_list' %}">Factores de Planeo</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if 'association' in request.resolver_match.url_name %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'association_list' %}" {% if 'association' not in request.resolver_match.url_name %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-chart-line me-1 small opacity-75"></i> Planeo
+                            {% if 'association' in request.resolver_match.url_name %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'flightplan' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'flightplan_list' %}">Planes de Empleo</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if 'flightplan' in request.resolver_match.url_name %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'flightplan_list' %}" {% if 'flightplan' not in request.resolver_match.url_name %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-calendar-days me-1 small opacity-75"></i> Empleo
+                            {% if 'flightplan' in request.resolver_match.url_name %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'batch' in request.resolver_match.url_name or 'consume_grease' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'batch_list' %}">Stock / Lotes</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if 'batch' in request.resolver_match.url_name or 'consume_grease' in request.resolver_match.url_name %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'batch_list' %}" {% if 'batch' not in request.resolver_match.url_name and 'consume_grease' not in request.resolver_match.url_name %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-boxes-stacked me-1 small opacity-75"></i> Stock/Lotes
+                            {% if 'batch' in request.resolver_match.url_name or 'consume_grease' in request.resolver_match.url_name %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'procurement_forecast' %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'procurement_forecast' %}">Abastecimiento</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if request.resolver_match.url_name == 'procurement_forecast' %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'procurement_forecast' %}" {% if request.resolver_match.url_name != 'procurement_forecast' %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-cart-flatbed me-1 small opacity-75"></i> Abastecimiento
+                            {% if request.resolver_match.url_name == 'procurement_forecast' %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'requirement' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'requirement_list' %}">Requerimientos de Compra</a>
+                    <li class="nav-item mx-1">
+                        <a class="nav-link transition-all position-relative {% if 'requirement' in request.resolver_match.url_name %}text-white fw-bolder active{% else %}text-white-50 hover-white{% endif %}" href="{% url 'requirement_list' %}" {% if 'requirement' not in request.resolver_match.url_name %}onmouseover="this.classList.remove('text-white-50'); this.classList.add('text-white')" onmouseout="this.classList.remove('text-white'); this.classList.add('text-white-50')"{% endif %}>
+                            <i class="fa-solid fa-file-invoice me-1 small opacity-75"></i> Compras
+                            {% if 'requirement' in request.resolver_match.url_name %}
+                            <span class="position-absolute bottom-0 start-50 translate-middle-x bg-white rounded-top" style="height: 3px; width: 100%; box-shadow: 0 -2px 5px rgba(255,255,255,0.5);"></span>
+                            {% endif %}
+                        </a>
                     </li>
                     {% endif %}
                 </ul>
-                <ul class="navbar-nav ms-auto">
+                
+                <ul class="navbar-nav ms-auto align-items-center">
                     {% if user.is_authenticated %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fa-solid fa-user me-1"></i> {{ user.username }}
+                        <li class="nav-item dropdown me-2">
+                            <a class="nav-link dropdown-toggle text-white d-flex align-items-center bg-white bg-opacity-10 rounded-pill px-3 py-2 shadow-sm transition-all" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" onmouseover="this.classList.remove('bg-opacity-10'); this.classList.add('bg-opacity-25')" onmouseout="this.classList.remove('bg-opacity-25'); this.classList.add('bg-opacity-10')">
+                                <i class="fa-solid fa-circle-user fs-5 me-2 text-light"></i> 
+                                <span class="fw-bold">{{ user.username }}</span>
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3" aria-labelledby="navbarDropdown">
                                 {% if user.is_staff %}
-                                    <li><a class="dropdown-item" href="/admin/">Administración</a></li>
+                                    <li><a class="dropdown-item py-2 fw-bold" href="/admin/"><i class="fa-solid fa-user-shield me-2 text-primary"></i> Administración</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                 {% endif %}
                                 <li>
                                     <form method="post" action="{% url 'logout' %}">
                                         {% csrf_token %}
-                                        <button type="submit" class="dropdown-item">Cerrar Sesión</button>
+                                        <button type="submit" class="dropdown-item py-2 text-danger fw-bold"><i class="fa-solid fa-right-from-bracket me-2"></i> Cerrar Sesión</button>
                                     </form>
                                 </li>
                             </ul>
                         </li>
                         {% if user.is_staff or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
-                        <li class="nav-item dropdown ms-2">
-                            <a class="nav-link dropdown-toggle" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Configuración del Sistema">
-                                <i class="fa-solid fa-gear"></i>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white bg-white bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center shadow-sm transition-all {% if 'measurementunit' in request.resolver_match.url_name or request.resolver_match.url_name == 'flight_hours_calculator' %}bg-white text-primary fw-bold{% endif %}" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown" style="width: 40px; height: 40px; padding: 0;" onmouseover="this.classList.remove('bg-opacity-10'); this.classList.add('bg-opacity-25'); this.querySelector('i').classList.add('fa-spin')" onmouseout="this.classList.remove('bg-opacity-25'); this.classList.add('bg-opacity-10'); this.querySelector('i').classList.remove('fa-spin')">
+                                <i class="fa-solid fa-gear fs-5"></i>
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="configDropdown">
-                                <li><h6 class="dropdown-header">Diccionarios del Sistema</h6></li>
-                                <li><a class="dropdown-item" href="{% url 'measurementunit_list' %}"><i class="fa-solid fa-scale-balanced me-2"></i>Unidades de Medida</a></li>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3" aria-labelledby="configDropdown">
+                                <li><h6 class="dropdown-header text-primary fw-bold text-uppercase small">Configuración</h6></li>
+                                <li><a class="dropdown-item py-2" href="{% url 'measurementunit_list' %}"><i class="fa-solid fa-scale-balanced me-2 text-secondary"></i>Unidades de Medida</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><h6 class="dropdown-header">Herramientas</h6></li>
-                                <li><a class="dropdown-item {% if request.resolver_match.url_name == 'flight_hours_calculator' %}active{% endif %}" href="{% url 'flight_hours_calculator' %}"><i class="fa-solid fa-calculator me-2"></i>Calculadora de Horas de Vuelo</a></li>
+                                <li><h6 class="dropdown-header text-primary fw-bold text-uppercase small">Herramientas</h6></li>
+                                <li><a class="dropdown-item py-2" href="{% url 'flight_hours_calculator' %}"><i class="fa-solid fa-calculator me-2 text-secondary"></i>Calculadora de Horas</a></li>
                             </ul>
                         </li>
                         {% endif %}
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a>
+                            <a class="nav-link text-white fw-bold bg-white bg-opacity-20 rounded-pill px-4 py-2 transition-all" href="{% url 'login' %}" onmouseover="this.classList.remove('bg-opacity-20'); this.classList.add('bg-opacity-30')" onmouseout="this.classList.remove('bg-opacity-30'); this.classList.add('bg-opacity-20')">Iniciar Sesión</a>
                         </li>
                     {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
-
     {% endblock navbar %}
-
     <div class="container mt-2">
         {% if messages %}
             {% for message in messages %}
