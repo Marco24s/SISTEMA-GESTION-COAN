@@ -220,6 +220,15 @@
 
     <div class="portal-container mt-5">
         <div class="container">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                        <i class="fa-solid fa-circle-exclamation me-2"></i> {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
             <div class="text-center mb-5 animate__animated animate__fadeInDown">
                 <h1 class="display-5 fw-bold text-dark mb-2">Sistemas de Gestión</h1>
                 <p class="lead text-muted">Seleccione el sistema al que desea ingresar</p>
