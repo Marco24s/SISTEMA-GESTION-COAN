@@ -69,12 +69,13 @@ class BudgetInc(models.Model):
 
 
 class BudgetClassification(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la Clasificación")
+    name = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Proyecto / Plan")
+    target_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Meta / Presupuesto Estimado", help_text="Monto total proyectado para este objetivo.")
     notes = models.TextField(blank=True, null=True, verbose_name="Descripción / Notas")
     
     class Meta:
-        verbose_name = "Clasificación Personalizada"
-        verbose_name_plural = "Clasificaciones Personalizadas"
+        verbose_name = "Proyecto / Plan de Gasto"
+        verbose_name_plural = "Proyectos / Planes de Gasto"
         
     def __str__(self):
         return self.name

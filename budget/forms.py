@@ -112,11 +112,12 @@ class BudgetAllocationForm(forms.ModelForm):
     class Meta:
         model = BudgetAllocation
         fields = [
-            'credit', 'unit', 
+            'credit', 'unit', 'custom_classes',
             'q1_amount', 'q2_amount', 'q3_amount', 'q4_amount',
             'notes'
         ]
         labels = {
+            'custom_classes': 'Vincular a Proyecto / Plan de Gasto',
             'q1_amount': 'Monto 1er Trimestre (T1)',
             'q2_amount': 'Monto 2do Trimestre (T2)',
             'q3_amount': 'Monto 3er Trimestre (T3)',
@@ -139,6 +140,9 @@ class BudgetAllocationForm(forms.ModelForm):
         ).annotate(
             available_amount=F('total_amount') - F('allocated_total')
         ).order_by('-fiscal_year__year', 'ff__code')
+        
+        self.fields['custom_classes'].widget.attrs.update({'class': 'select2-multi'})
+        self.fields['custom_classes'].help_text = "Seleccione uno o más proyectos para agrupar esta distribución."
 
 class AllocationChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
@@ -246,11 +250,16 @@ class BudgetCreditTypeForm(forms.ModelForm):
 class BudgetClassificationForm(forms.ModelForm):
     class Meta:
         model = BudgetClassification
-        fields = ['name', 'notes']
+        fields = ['name', 'target_amount', 'notes']
         labels = {
-            'name': 'Nombre de la Clasificación',
+            'name': 'Nombre del Proyecto / Plan',
+            'target_amount': 'Meta Presupuestaria (Estimado)',
             'notes': 'Notas / Descripción'
         }
+        widgets = {
+            'target_amount': forms.TextInput(attrs={'class': 'form-control currency-input', 'placeholder': '0,00'}),
+        }
+        localized_fields = ('target_amount',)
 
 class BudgetAllocationMultipleChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):

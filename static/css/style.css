@@ -139,6 +139,66 @@ body {
     box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
 }
 
+/* =====================================================
+   NAVBAR: Responsividad y compactación
+   ===================================================== */
+
+/* Botón "Iniciar Sesión" - pill visible en todos los navegadores */
+.btn-login-pill {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.18) !important;
+    border: 2px solid rgba(255, 255, 255, 0.65) !important;
+    border-radius: 50rem !important;
+    font-weight: 700;
+    padding: 0.35rem 1.1rem;
+    font-size: 0.875rem;
+    text-decoration: none !important;
+    white-space: nowrap;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    display: inline-block;
+}
+
+.btn-login-pill:hover,
+.btn-login-pill:focus {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.35) !important;
+    border-color: rgba(255, 255, 255, 0.9) !important;
+    text-decoration: none !important;
+}
+
+/* Links del navbar más compactos para evitar overflow */
+.navbar-nav .nav-link {
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+/* En pantallas XL (1200px) y menores: ocultar íconos de los links del menú */
+@media (max-width: 1400px) {
+    .navbar-nav-icons-responsive {
+        display: none !important;
+    }
+}
+
+/* En pantallas muy grandes: mostrar íconos */
+@media (min-width: 1401px) {
+    .navbar-nav-icons-responsive {
+        display: inline !important;
+    }
+}
+
+/* Prevenir overflow horizontal en el body */
+body {
+    overflow-x: hidden;
+}
+
+/* Navbar collapse: en móviles centrar los items */
+@media (max-width: 1199px) {
+    .navbar-collapse .navbar-nav .nav-link {
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+}
+
 /* --- Compact Table Styles --- */
 .table-compact {
     font-size: 0.85rem;

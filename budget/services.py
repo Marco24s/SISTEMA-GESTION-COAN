@@ -37,7 +37,7 @@ def create_credit(fiscal_year, ff, programa, subprog, inc, ppp_inc, pp_inc, pre_
 
 
 @transaction.atomic
-def allocate_credit(credit, unit, q1=0, q2=0, q3=0, q4=0, notes=""):
+def allocate_credit(credit, unit, q1=0, q2=0, q3=0, q4=0, notes="", classifications=None):
     amount = q1 + q2 + q3 + q4
     if amount <= 0:
         raise ValidationError("El monto total a distribuir debe ser mayor a cero.")
@@ -57,11 +57,14 @@ def allocate_credit(credit, unit, q1=0, q2=0, q3=0, q4=0, notes=""):
     if allocated_q4 + q4 > credit.q4_amount:
         raise ValidationError(f"La distribución en T4 (${q4}) supera el disponible del crédito (${credit.q4_amount - allocated_q4}).")
     
-    return BudgetAllocation.objects.create(
+    allocation = BudgetAllocation.objects.create(
         credit=credit, unit=unit, 
         q1_amount=q1, q2_amount=q2, q3_amount=q3, q4_amount=q4,
         notes=notes
     )
+    if classifications:
+        allocation.custom_classes.set(classifications)
+    return allocation
 
 
 @transaction.atomic
@@ -454,7 +457,7 @@ def adjust_credit(credit_id, q1_new, q2_new, q3_new, q4_new, reason, user):
     return credit, adj
 
 @transaction.atomic
-def update_allocation(allocation_id, q1=None, q2=None, q3=None, q4=None, notes=None):
+def update_allocation(allocation_id, q1=None, q2=None, q3=None, q4=None, notes=None, classifications=None):
     """
     Actualiza una distribución existente validando contra el crédito y lo ya gastado.
     """
@@ -500,6 +503,8 @@ def update_allocation(allocation_id, q1=None, q2=None, q3=None, q4=None, notes=N
     allocation.q4_amount = q4
     if notes is not None:
         allocation.notes = notes
+    if classifications is not None:
+        allocation.custom_classes.set(classifications)
     allocation.save()
     
     return allocation

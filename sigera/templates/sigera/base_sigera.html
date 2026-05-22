@@ -4,7 +4,7 @@
 {% block title %}SIGERA - Sistema de Gestión de Ropa Aeronaval{% endblock %}
 
 {% block navbar %}
-<nav class="navbar navbar-expand-lg navbar-dark shadow-sm mb-4" style="background-color: #6f42c1;">
+<nav class="navbar navbar-expand-xl navbar-dark shadow-sm mb-4" style="background-color: #6f42c1;">
     <div class="container">
         <!-- Botón volver al portal general -->
         <a href="/" class="btn btn-sm text-white border-white me-3" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1);" title="Volver al Portal">
@@ -24,7 +24,11 @@
                 </li>
                 {% if user.is_authenticated %}
                 <li class="nav-item">
-                    <a class="nav-link {% if 'stock' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:stock_list' %}">Inventario</a>
+                    {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
+                        <a class="nav-link {% if 'stock' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:stock_list' %}">Inventario</a>
+                    {% else %}
+                        <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true" style="opacity: 0.6; cursor: not-allowed;" title="Acceso exclusivo para administradores">Inventario</a>
+                    {% endif %}
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if 'personnel' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:personnel_list' %}">Personal</a>
@@ -59,7 +63,9 @@
                     </li>
                 {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a>
+                        <a class="btn-login-pill" href="{% url 'login' %}">
+                            <i class="fa-solid fa-right-to-bracket me-1"></i> Iniciar Sesión
+                        </a>
                     </li>
                 {% endif %}
             </ul>

@@ -802,7 +802,8 @@ def allocation_create(request):
                     q2=form.cleaned_data['q2_amount'], 
                     q3=form.cleaned_data['q3_amount'], 
                     q4=form.cleaned_data['q4_amount'], 
-                    notes=form.cleaned_data['notes']
+                    notes=form.cleaned_data['notes'],
+                    classifications=form.cleaned_data.get('custom_classes')
                 )
                 if fixed_credit:
                     return redirect('budget:credit_detail', pk=fixed_credit.pk)
@@ -839,7 +840,8 @@ def allocation_update(request, pk):
                     q2=form.cleaned_data['q2_amount'],
                     q3=form.cleaned_data['q3_amount'],
                     q4=form.cleaned_data['q4_amount'],
-                    notes=form.cleaned_data['notes']
+                    notes=form.cleaned_data['notes'],
+                    classifications=form.cleaned_data.get('custom_classes')
                 )
                 messages.success(request, f"Distribución para {allocation.unit.name} actualizada.")
                 return redirect('budget:credit_detail', pk=allocation.credit.pk)

@@ -22,6 +22,7 @@
                             </div>
                         </th>
                         <th>Unidad Destinataria</th>
+                        <th>Proyecto / Objetivo</th>
                         <th>Nomenclatura (SUBPC - PARCIAL - PPAL)</th>
                         <th>Ref. Crédito (FF - S.PROG)</th>
                         <th class="text-end">Monto Asignado</th>
@@ -44,6 +45,15 @@
                             <td>
                                 <div class="fw-bold fs-6">{{ alloc.unit.name }}</div>
                                 <small class="text-muted">{{ alloc.unit.code|default:"" }}</small>
+                            </td>
+                            <td>
+                                {% for project in alloc.custom_classes.all %}
+                                    <span class="badge bg-outline-primary text-primary border border-primary rounded-pill mb-1" style="font-size: 0.7rem;">
+                                        <i class="fa-solid fa-tag me-1"></i> {{ project.name }}
+                                    </span>
+                                {% empty %}
+                                    <span class="text-muted small">Sin Proyecto</span>
+                                {% endfor %}
                             </td>
                             <td>
                                 <span class="small text-dark fw-bold">{{ alloc.credit.pre_inc.code|default:"00" }}</span>

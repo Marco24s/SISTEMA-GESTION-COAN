@@ -62,7 +62,11 @@
                     <span class="text-muted small">Prendas Modelos</span>
                     <span class="stats-badge">{{ total_stock|default:"-" }}</span>
                 </div>
-                <a href="{% url 'sigera:stock_list' %}" class="btn btn-outline-primary w-100" style="border-color: #6f42c1; color: #6f42c1;">Ir a Inventario</a>
+                {% if is_admin %}
+                    <a href="{% url 'sigera:stock_list' %}" class="btn btn-outline-primary w-100" style="border-color: #6f42c1; color: #6f42c1;">Ir a Inventario</a>
+                {% else %}
+                    <button class="btn btn-outline-secondary w-100 disabled" disabled style="cursor: not-allowed;" title="Acceso exclusivo para administradores">Ir a Inventario</button>
+                {% endif %}
             </div>
         </div>
     </div>

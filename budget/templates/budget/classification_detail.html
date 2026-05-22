@@ -4,8 +4,8 @@
 {% block budget_content %}
 <div class="row align-items-center mb-4">
     <div class="col">
-        <h2 class="fw-bold"><i class="fa-solid fa-chart-pie text-success me-2"></i>Clasificación: {{ classification.name }}</h2>
-        <p class="text-muted mb-0">{{ classification.notes|default:"Esta vista muestra los totales agregados de todos los créditos bajo este grupo." }}</p>
+        <h2 class="fw-bold"><i class="fa-solid fa-chart-pie text-success me-2"></i>Proyecto: {{ classification.name }}</h2>
+        <p class="text-muted mb-0">{{ classification.notes|default:"Esta vista muestra los totales agregados de todos los créditos vinculados a este objetivo." }}</p>
     </div>
     <div class="col-auto">
         <a href="{% url 'budget:classification_list' %}" class="btn btn-outline-secondary rounded-pill px-4 me-2">
@@ -18,25 +18,45 @@
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card card-stats p-3 border-start border-4 border-dark h-100 shadow-sm">
+            <div class="text-muted small text-uppercase mb-1">Meta del Proyecto</div>
+            <div class="h4 mb-0 fw-bold text-dark">${{ classification.target_amount|floatformat:2 }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card card-stats p-3 border-start border-4 border-primary h-100 shadow-sm">
-            <div class="text-muted small text-uppercase mb-1">Monto Total Distribuido</div>
+            <div class="text-muted small text-uppercase mb-1">Monto Distribuido</div>
             <div class="h4 mb-0 fw-bold text-primary">${{ stats.total_allocated|floatformat:2 }}</div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card card-stats p-3 border-start border-4 border-warning h-100 shadow-sm">
             <div class="text-muted small text-uppercase mb-1">Total Comprometido</div>
             <div class="h4 mb-0 fw-bold text-warning">${{ stats.total_spent|floatformat:2 }}</div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card card-stats p-3 border-start border-4 border-success h-100 shadow-sm">
             <div class="text-muted small text-uppercase mb-1">Total Pagado</div>
             <div class="h4 mb-0 fw-bold text-success">${{ stats.total_paid|floatformat:2 }}</div>
         </div>
     </div>
 </div>
+
+{% if classification.target_amount > 0 %}
+<div class="card card-stats p-4 mb-4 border-0">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold mb-0">Progreso del Fondeo (Distribuido vs Meta)</h6>
+        <span class="badge bg-primary">
+            {% widthratio stats.total_allocated classification.target_amount 100 %}% Fondeado
+        </span>
+    </div>
+    <div class="progress" style="height: 12px; border-radius: 6px;">
+        <div class="progress-bar bg-primary" role="progressbar" style="width: {% widthratio stats.total_allocated classification.target_amount 100 %}%"></div>
+    </div>
+</div>
+{% endif %}
 
 <div class="card card-stats p-4">
     <h5 class="fw-bold mb-4">Créditos Distribuidos Agrupados ({{ allocation_details|length }})</h5>

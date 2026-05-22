@@ -44,6 +44,7 @@ def home(request):
         'total_personnel': total_personnel,
         'active_assignments': active_assignments,
         'recent_assignments': recent_assignments,
+        'is_admin': is_admin,
     }
     return render(request, 'sigera/home.html', context)
 
@@ -52,6 +53,12 @@ def stock_list(request):
     """
     Vista de Inventario Detallado por Lotes
     """
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    if not is_admin:
+        messages.error(request, "Acceso denegado: No tienes permisos para acceder al inventario.")
+        return redirect('sigera:home')
+
     from django.db.models import Sum
     
     # Obtener las categorías configurables
@@ -119,6 +126,12 @@ def size_batch_detail(request, size_id):
     """
     Vista detallada de batches para un talle específico
     """
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    if not is_admin:
+        messages.error(request, "Acceso denegado: No tienes permisos para acceder al inventario.")
+        return redirect('sigera:home')
+
     size = get_object_or_404(ClothingSize, id=size_id)
     batches = ClothingBatch.objects.filter(
         clothing_size=size,
@@ -547,6 +560,12 @@ def batch_create(request):
     """
     Vista para registrar un nuevo Ingreso a Pañol (Stock).
     """
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    if not is_admin:
+        messages.error(request, "Acceso denegado: No tienes permisos para registrar ingresos de stock.")
+        return redirect('sigera:home')
+
     if request.method == 'POST':
         form = ClothingBatchForm(request.POST)
         if form.is_valid():
@@ -601,6 +620,12 @@ def batch_movements(request, pk):
     """
     Vista para ver el historial de movimientos (entregas y devoluciones) de un lote específico.
     """
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    if not is_admin:
+        messages.error(request, "Acceso denegado: No tienes permisos para ver movimientos de stock.")
+        return redirect('sigera:home')
+
     batch = get_object_or_404(ClothingBatch, pk=pk)
     assignments = batch.assignments.all().order_by('-assigned_date', '-id')
     

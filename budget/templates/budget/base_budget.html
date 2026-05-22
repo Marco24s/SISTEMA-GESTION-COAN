@@ -113,6 +113,9 @@
         <a href="{% url 'budget:allocation_list' %}" class="nav-link-sidebar {% if 'allocation' in request.resolver_match.url_name %}active{% endif %}">
             <i class="fa-solid fa-diagram-project"></i> Distribución
         </a>
+        <a href="{% url 'budget:classification_list' %}" class="nav-link-sidebar {% if 'classification' in request.resolver_match.url_name %}active{% endif %}">
+            <i class="fa-solid fa-chart-pie"></i> Proyectos / Planes
+        </a>
 
         {% if user.is_superuser or user.groups.all.0.name in 'Administrador,Logistica' %}
         <div class="mt-4 mb-3 px-4 text-muted small text-uppercase fw-bold d-none d-md-block">Configuración</div>
