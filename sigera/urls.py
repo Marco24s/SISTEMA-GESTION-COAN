@@ -17,9 +17,12 @@ urlpatterns = [
     path('assignments/<int:pk>/return/', views.assignment_return_view, name='assignment_return'),
     path('catalog/', views.catalog_list, name='catalog_list'),
     path('catalog/new/', views.catalog_create, name='catalog_create'),
+    path('catalog/<int:pk>/edit/', views.catalog_edit, name='catalog_edit'),
+    path('catalog/<int:pk>/delete/', views.catalog_delete, name='catalog_delete'),
     path('catalog/size/new/', views.catalog_size_create, name='catalog_size_create'),
     path('catalog/size/<int:pk>/edit/', views.catalog_size_edit, name='catalog_size_edit'),
     path('catalog/size/<int:pk>/delete/', views.catalog_size_delete, name='catalog_size_delete'),
     path('batch/new/', views.batch_create, name='batch_create'),
     path('batch/<int:pk>/movements/', views.batch_movements, name='batch_movements'),
+    path('batch/<int:pk>/delete/', views.batch_delete, name='batch_delete'),
 ]

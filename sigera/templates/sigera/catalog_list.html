@@ -34,6 +34,7 @@
                         <th scope="col" class="py-3 text-muted">Talles Existentes</th>
                         <th scope="col" class="py-3 text-muted text-center">Vida Útil (M)</th>
                         <th scope="col" class="py-3 text-muted text-center">Retornable</th>
+                        <th scope="col" class="py-3 text-muted text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="border-top-0">
@@ -58,6 +59,16 @@
                                     <span class="badge bg-success"><i class="fa-solid fa-arrow-rotate-left me-1"></i>Retornable</span>
                                 {% else %}
                                     <span class="badge bg-secondary"><i class="fa-solid fa-check me-1"></i>No retorna</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-center">
+                                <a href="{% url 'sigera:catalog_edit' item.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2 me-1" title="Editar">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                                {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
+                                <a href="{% url 'sigera:catalog_delete' item.pk %}" class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
                                 {% endif %}
                             </td>
                         </tr>

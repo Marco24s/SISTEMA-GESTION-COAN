@@ -508,6 +508,42 @@ def catalog_create(request):
         
     return render(request, 'sigera/catalog_form.html', {'form': form})
 
+@login_required
+def catalog_edit(request, pk):
+    item = get_object_or_404(ClothingType, pk=pk)
+    if request.method == 'POST':
+        form = ClothingTypeForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"¡Modelo de prenda '{item.name}' actualizado exitosamente!")
+            return redirect('sigera:catalog_list')
+    else:
+        form = ClothingTypeForm(instance=item)
+        
+    return render(request, 'sigera/catalog_form.html', {'form': form, 'edit_mode': True})
+
+@login_required
+def catalog_delete(request, pk):
+    if not (request.user.is_superuser or request.user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
+        messages.error(request, "Acceso denegado: No tienes permisos para eliminar modelos del catálogo.")
+        return redirect('sigera:catalog_list')
+        
+    item = get_object_or_404(ClothingType, pk=pk)
+    if request.method == 'POST':
+        try:
+            name = item.name
+            item.delete()
+            messages.success(request, f"El modelo de prenda '{name}' ha sido eliminado.")
+        except Exception as e:
+            messages.error(request, f"No se pudo eliminar el modelo porque está siendo usado en otros registros. Error: {str(e)}")
+        return redirect('sigera:catalog_list')
+        
+    return render(request, 'sigera/confirm_delete.html', {
+        'title': 'Eliminar Modelo del Catálogo',
+        'message': f"¿Está seguro que desea borrar el modelo '{item.name}'? Si existen lotes o cargos asociados, no se podrá eliminar.",
+        'cancel_url': reverse('sigera:catalog_list'),
+    })
+
 from .forms import ClothingSizeForm
 
 @login_required
@@ -634,3 +670,44 @@ def batch_movements(request, pk):
         'assignments': assignments,
     }
     return render(request, 'sigera/batch_movements.html', context)
+
+@login_required
+def batch_delete(request, pk):
+    """
+    Vista para eliminar completamente un lote de la base de datos.
+    """
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
+    if not is_admin:
+        messages.error(request, "Acceso denegado: No tienes permisos para eliminar lotes del inventario.")
+        return redirect('sigera:stock_list')
+
+    batch = get_object_or_404(ClothingBatch, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            name = str(batch)
+            # Como los cargos (ClothingAssignment) tienen on_delete=PROTECT,
+            # debemos eliminarlos manualmente primero si queremos forzar el borrado del lote.
+            assignments_count = batch.assignments.count()
+            if assignments_count > 0:
+                batch.assignments.all().delete()
+            
+            batch.delete()
+            messages.success(request, f"¡El lote '{name}' y sus {assignments_count} entregas asociadas se eliminaron de la base de datos correctamente!")
+        except Exception as e:
+            messages.error(request, f"No se pudo eliminar el lote. Error: {str(e)}")
+        return redirect('sigera:stock_list')
+        
+    assignments_count = batch.assignments.count()
+    warnings = []
+    if assignments_count > 0:
+        warnings.append(f"Este lote tiene {assignments_count} entregas (cargos) asociadas a personal. Si continuás, TODAS esas entregas también serán eliminadas irreversiblemente de la base de datos.")
+
+    return render(request, 'sigera/confirm_delete.html', {
+        'title': 'Eliminar Lote de Inventario',
+        'message': f"¿Está seguro que desea borrar de la base de datos el lote '{batch}'?",
+        'warnings': warnings,
+        'cancel_url': reverse('sigera:stock_list'),
+    })
+

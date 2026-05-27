@@ -83,8 +83,8 @@
                                         <span class="badge bg-primary rounded-pill px-3 py-2"><i class="fa-solid fa-box-open me-1"></i> {{ person_group.list|length }} Registro(s)</span>
                                     </td>
                                     <td class="py-3 text-end px-4">
-                                        <button class="btn btn-sm btn-outline-primary rounded-circle shadow-sm">
-                                            <i class="fa-solid fa-chevron-down"></i>
+                                        <button type="button" class="btn btn-sm btn-primary rounded-circle shadow-sm btn-toggle-details" data-target-id="collapse-person-{{ person_group.grouper.id }}">
+                                            <i class="fa-solid fa-chevron-down" style="pointer-events: none;"></i>
                                         </button>
                                     </td>
                                 </tr>
@@ -318,7 +318,34 @@
                     event.target.style.setProperty('border-color', '#ffc107', 'important'); // warning yellow
                 }
             })
-        })
+        });
+
+        // Handler robusto para el botón de detalles
+        const detailButtons = document.querySelectorAll('.btn-toggle-details');
+        detailButtons.forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation(); // Evita que la fila padre también intente hacer el toggle
+                const targetId = this.getAttribute('data-target-id');
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) {
+                    let bsCollapse = bootstrap.Collapse.getInstance(targetEl);
+                    if (!bsCollapse) {
+                        bsCollapse = new bootstrap.Collapse(targetEl, {toggle: false});
+                    }
+                    bsCollapse.toggle();
+                    
+                    // Rotar icono
+                    const icon = this.querySelector('i');
+                    if (targetEl.classList.contains('show')) {
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    } else {
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    }
+                }
+            });
+        });
     });
 </script>
 {% endblock %}

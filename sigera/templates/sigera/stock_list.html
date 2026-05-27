@@ -100,9 +100,9 @@
                                                         <i class="fa-solid fa-list"></i>
                                                     </a>
                                                     {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
-                                                    <form action="#" method="post" class="d-inline">
+                                                    <form action="{% url 'sigera:batch_delete' batch.pk %}" method="post" class="d-inline">
                                                         {% csrf_token %}
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="return confirm('¿Marcar el lote completo como consumido?');" title="Eliminar / Consumir">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="return confirm('¿Está seguro de querer borrar este lote de la base de datos de manera permanente?');" title="Eliminar de la Base de Datos">
                                                             <i class="fa-solid fa-trash"></i>
                                                         </button>
                                                     </form>
