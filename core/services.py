@@ -30,13 +30,29 @@ def update_batch_statuses():
 
 
 @transaction.atomic
-def consume_grease(grease_type, quantity_to_consume, user, reference="", reason="", location=None):
+def consume_grease(grease_type, quantity_to_consume, user, reference="", reason="", location=None, specific_batch=None):
     """
     Consume grasa aplicando lógica estricta de vencimiento.
     Retorna True si fue exitoso, lanza ValidationError si no hay stock o hay errores.
     """
     if quantity_to_consume <= 0:
         raise ValidationError("La cantidad a consumir debe ser mayor a cero.")
+
+    if specific_batch:
+        if specific_batch.available_quantity < quantity_to_consume:
+            raise ValidationError(f"El lote {specific_batch.batch_number} solo tiene {specific_batch.available_quantity} disponible, pero intentó consumir {quantity_to_consume}.")
+        
+        specific_batch.available_quantity -= quantity_to_consume
+        specific_batch.save()
+        StockMovement.objects.create(
+            batch=specific_batch,
+            movement_type='CONSUMPTION',
+            quantity_changed=-quantity_to_consume,
+            user=user,
+            reference=reference,
+            reason=reason
+        )
+        return True
 
     # Lotes disponibles: status SERVICEABLE o NEAR_EXPIRATION, ordenados por fecha de vencimiento más próxima
     batches_query = GreaseBatch.objects.available_with_stock().filter(grease_type=grease_type)
@@ -181,12 +197,19 @@ def process_retest_batch(batch, user, form_cleaned_data, old_quantity):
     Extraído de RetestBatchView para cumplir con SRP.
     """
     reason = form_cleaned_data['reason']
-    new_expiration = form_cleaned_data['new_expiration_date']
+    new_expiration = form_cleaned_data.get('new_expiration_date')
     can_be_retested = form_cleaned_data['can_be_retested']
+    retest_status = form_cleaned_data.get('retest_status')
     
-    batch.expiration_date = new_expiration
-    batch.can_be_retested = can_be_retested
-    batch.status = 'SERVICEABLE'
+    if retest_status == 'REJECTED':
+        batch.status = 'REJECTED'
+        batch.can_be_retested = False
+        movement_reason = f"Retesteo RECHAZADO por laboratorio. Lote inutilizable. {reason}"
+    else:
+        batch.expiration_date = new_expiration
+        batch.can_be_retested = can_be_retested
+        batch.status = 'SERVICEABLE'
+        movement_reason = f"Retesteo APROBADO. Nuevo vencimiento: {new_expiration.strftime('%d/%m/%Y')}. {reason}"
     
     new_quantity = form_cleaned_data.get('available_quantity', 0)
     diff = new_quantity - old_quantity
@@ -198,7 +221,7 @@ def process_retest_batch(batch, user, form_cleaned_data, old_quantity):
         movement_type='RETEST',
         quantity_changed=diff,
         user=user,
-        reason=f"Retesteo / Extensión de Vencimiento. Nuevo vencimiento: {new_expiration.strftime('%d/%m/%Y')}. {reason}"
+        reason=movement_reason
     )
     
     matching_batches = GreaseBatch.objects.filter(
@@ -208,9 +231,16 @@ def process_retest_batch(batch, user, form_cleaned_data, old_quantity):
     ).exclude(pk=batch.pk)
     
     for matched_batch in matching_batches:
-        matched_batch.expiration_date = new_expiration
-        matched_batch.can_be_retested = can_be_retested
-        matched_batch.status = 'SERVICEABLE'
+        if retest_status == 'REJECTED':
+            matched_batch.status = 'REJECTED'
+            matched_batch.can_be_retested = False
+            matched_reason = "Retesteo RECHAZADO sincronizado desde otra dependencia."
+        else:
+            matched_batch.expiration_date = new_expiration
+            matched_batch.can_be_retested = can_be_retested
+            matched_batch.status = 'SERVICEABLE'
+            matched_reason = f"Retesteo APROBADO sincronizado desde otra dependencia. Nuevo vencimiento: {new_expiration.strftime('%d/%m/%Y')}."
+            
         matched_batch.save()
         
         StockMovement.objects.create(
@@ -218,7 +248,7 @@ def process_retest_batch(batch, user, form_cleaned_data, old_quantity):
             movement_type='RETEST',
             quantity_changed=0, 
             user=user,
-            reason=f"Retesteo / Extensión sincronizada desde otra dependencia. Nuevo vencimiento: {new_expiration.strftime('%d/%m/%Y')}."
+            reason=matched_reason
         )
         
     return batch

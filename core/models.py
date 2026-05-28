@@ -222,6 +222,7 @@ class GreaseBatch(models.Model):
         ('NEAR_EXPIRATION', 'Próximo a Vencer'),
         ('EXPIRED', 'Vencido'),
         ('PENDING_RETEST', 'Retesteando...'),
+        ('REJECTED', 'Rechazado en Retesteo'),
     ]
 
     objects = GreaseBatchQuerySet.as_manager()

@@ -10,7 +10,11 @@
     <div>
         {% if batch.can_be_retested %}
             {% if batch.status == 'PENDING_RETEST' %}
-                <a href="{% url 'batch_retest' batch.id %}" class="btn btn-success shadow-sm"><i class="fa-solid fa-flask-vial me-2"></i> Cargar Resultados</a>
+                {% if retest_requested_by == user or user.is_superuser %}
+                    <a href="{% url 'batch_retest' batch.id %}" class="btn btn-success shadow-sm"><i class="fa-solid fa-flask-vial me-2"></i> Cargar Resultados</a>
+                {% else %}
+                    <span class="badge bg-info text-dark fs-6 shadow-sm"><i class="fa-solid fa-info-circle me-1"></i> Enviado a retestear por {{ retest_requested_by.username|default:"otro usuario" }}</span>
+                {% endif %}
             {% elif batch.status == 'EXPIRED' or batch.status == 'NEAR_EXPIRATION' %}
                 <form action="{% url 'batch_start_retest' batch.id %}" method="post" class="d-inline">
                     {% csrf_token %}

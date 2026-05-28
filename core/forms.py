@@ -172,6 +172,12 @@ class GreaseBatchForm(forms.ModelForm):
 
 class ConsumeGreaseForm(forms.Form):
     grease_type = forms.ModelChoiceField(queryset=GreaseType.objects.all(), label="Tipo de Grasa")
+    specific_batch = forms.ModelChoiceField(
+        queryset=GreaseBatch.objects.none(), 
+        required=False, 
+        label="Lote Específico (Opcional)",
+        help_text="Si lo deja en blanco, se consumirá automáticamente del lote con vencimiento más próximo."
+    )
     quantity = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01, label="Cantidad a Consumir")
     reference = forms.CharField(max_length=255, required=False, label="Referencia (e.g., Plan de Empleo, Nro Orden)")
     reason = forms.CharField(widget=forms.Textarea(attrs={'rows': 2}), required=False, label="Motivo o Notas")
@@ -179,6 +185,9 @@ class ConsumeGreaseForm(forms.Form):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        
+        batches_qs = GreaseBatch.objects.available_with_stock().order_by('expiration_date')
+        
         if user and not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
             if user.unit:
                 # Filtrar grasas que tengan lotes disponibles en esta unidad
@@ -187,6 +196,10 @@ class ConsumeGreaseForm(forms.Form):
                     batches__status__in=['SERVICEABLE', 'NEAR_EXPIRATION'],
                     batches__available_quantity__gt=0
                 ).distinct()
+                batches_qs = batches_qs.filter(storage_location=user.unit.name)
+                
+        self.fields['specific_batch'].queryset = batches_qs
+        self.fields['specific_batch'].label_from_instance = lambda obj: f"Lote: {obj.batch_number} - Vence: {obj.expiration_date.strftime('%d/%m/%Y')} - Disp: {obj.available_quantity:.2f} {obj.grease_type.unidad}"
 
 class GreaseReferencePriceForm(forms.ModelForm):
     class Meta:
@@ -205,11 +218,22 @@ class GreaseReferencePriceForm(forms.ModelForm):
             pass
 
 class RetestBatchForm(forms.ModelForm):
-    new_expiration_date = forms.DateField(
+    RETEST_STATUS_CHOICES = [
+        ('APPROVED', 'Aprobado (Pasó retesteo)'),
+        ('REJECTED', 'Rechazado (No pasó retesteo, lote inutilizable)'),
+    ]
+    retest_status = forms.ChoiceField(
+        choices=RETEST_STATUS_CHOICES,
         required=True,
+        label="Resultado del Laboratorio",
+        widget=forms.RadioSelect,
+        initial='APPROVED'
+    )
+    new_expiration_date = forms.DateField(
+        required=False,
         label="Nueva Fecha de Vencimiento",
         widget=forms.DateInput(attrs={'type': 'date'}),
-        help_text="Fecha de vencimiento otorgada por el laboratorio tras el retesteo."
+        help_text="Fecha de vencimiento otorgada por el laboratorio tras el retesteo (solo si fue aprobado)."
     )
     reason = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3}), 
@@ -220,7 +244,7 @@ class RetestBatchForm(forms.ModelForm):
     
     class Meta:
         model = GreaseBatch
-        fields = ['new_expiration_date', 'available_quantity', 'can_be_retested', 'reason']
+        fields = ['retest_status', 'new_expiration_date', 'available_quantity', 'can_be_retested', 'reason']
         labels = {
             'can_be_retested': 'Puede volver a retestearse',
         }
@@ -229,12 +253,20 @@ class RetestBatchForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['available_quantity'].help_text = "Ajustar si la muestra para laboratorio consumió material."
 
-    def clean_new_expiration_date(self):
-        from datetime import date
-        new_date = self.cleaned_data['new_expiration_date']
-        if new_date <= date.today():
-            raise forms.ValidationError("La nueva fecha de vencimiento debe ser posterior a hoy.")
-        return new_date
+    def clean(self):
+        cleaned_data = super().clean()
+        retest_status = cleaned_data.get('retest_status')
+        new_date = cleaned_data.get('new_expiration_date')
+        
+        if retest_status == 'APPROVED':
+            if not new_date:
+                self.add_error('new_expiration_date', 'Debe ingresar la nueva fecha de vencimiento si el retesteo fue aprobado.')
+            else:
+                from datetime import date
+                if new_date <= date.today():
+                    self.add_error('new_expiration_date', 'La nueva fecha de vencimiento debe ser posterior a hoy.')
+        
+        return cleaned_data
 
 class ProcurementRequirementForm(forms.ModelForm):
     class Meta:

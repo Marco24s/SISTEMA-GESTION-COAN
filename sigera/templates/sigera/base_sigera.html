@@ -48,8 +48,8 @@
                             <i class="fa-solid fa-user me-1"></i> {{ user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                            <li><a class="dropdown-item" href="/admin/sigera/stockthreshold/"><i class="fa-solid fa-sliders me-2"></i>Configurar Categorías</a></li>
-                            {% if user.is_staff %}
+                            {% if user.is_superuser %}
+                                <li><a class="dropdown-item" href="/admin/sigera/stockthreshold/"><i class="fa-solid fa-sliders me-2"></i>Configurar Categorías</a></li>
                                 <li><a class="dropdown-item" href="/admin/"><i class="fa-solid fa-gear me-2"></i>Administración</a></li>
                                 <li><hr class="dropdown-divider"></li>
                             {% endif %}

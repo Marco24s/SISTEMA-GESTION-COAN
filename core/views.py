@@ -532,8 +532,8 @@ class ArchiveBatchView(ActiveUserRequiredMixin, View):
                 messages.error(request, "No tienes permiso para modificar lotes que no pertenecen a tu unidad.")
                 return redirect('batch_list')
         
-        if batch.available_quantity > 0:
-            messages.error(request, "No se puede archivar un lote que todavía tiene stock disponible.")
+        if batch.available_quantity > 0 and batch.status != 'REJECTED':
+            messages.error(request, "No se puede archivar un lote que todavía tiene stock disponible, a menos que haya sido rechazado.")
             return redirect('batch_list')
             
         batch.is_archived = True
@@ -552,7 +552,12 @@ class GreaseBatchDetailView(LoginRequiredMixin, ListView):
         
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['batch'] = GreaseBatch.objects.get(pk=self.kwargs['pk'])
+        batch = GreaseBatch.objects.get(pk=self.kwargs['pk'])
+        context['batch'] = batch
+        if batch.status == 'PENDING_RETEST':
+            retest_movement = batch.movements.filter(movement_type='RETEST', reason__contains="enviada a laboratorio para retesteo").order_by('-movement_date').first()
+            if retest_movement:
+                context['retest_requested_by'] = retest_movement.user
         return context
 
 class GreaseBatchCreateView(ActiveUserRequiredMixin, SuccessMessageMixin, CreateView):
@@ -605,7 +610,7 @@ class GreaseBatchUpdateView(ActiveUserRequiredMixin, SuccessMessageMixin, Update
         return response
 
 class ConsumeGreaseView(ActiveUserRequiredMixin, FormView):
-    template_name = 'core/form_base.html'
+    template_name = 'core/consume_grease.html'
     form_class = ConsumeGreaseForm
     success_url = reverse_lazy('batch_list')
     extra_context = {'title': 'Registrar Consumo de Grasa'}
@@ -615,8 +620,17 @@ class ConsumeGreaseView(ActiveUserRequiredMixin, FormView):
         kwargs['user'] = self.request.user
         return kwargs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = context.get('form')
+        if form:
+            batches_data = {b.id: b.grease_type_id for b in form.fields['specific_batch'].queryset}
+            context['batches_json'] = batches_data
+        return context
+
     def form_valid(self, form):
         grease_type = form.cleaned_data['grease_type']
+        specific_batch = form.cleaned_data.get('specific_batch')
         quantity = form.cleaned_data['quantity']
         reference = form.cleaned_data['reference']
         reason = form.cleaned_data['reason']
@@ -637,7 +651,8 @@ class ConsumeGreaseView(ActiveUserRequiredMixin, FormView):
                 user=user,
                 reference=reference,
                 reason=reason,
-                location=location
+                location=location,
+                specific_batch=specific_batch
             )
             messages.success(self.request, f"Se consumieron {quantity} kg/uds de '{grease_type.nomenclatura}' exitosamente.")
             return super().form_valid(form)
@@ -712,6 +727,13 @@ class RetestBatchView(ActiveUserRequiredMixin, UpdateView):
     def dispatch(self, request, *args, **kwargs):
         batch = self.get_object()
         user = request.user
+        
+        if batch.status == 'PENDING_RETEST':
+            retest_movement = batch.movements.filter(movement_type='RETEST', reason__contains="enviada a laboratorio para retesteo").order_by('-movement_date').first()
+            if retest_movement and retest_movement.user != user and not user.is_superuser:
+                messages.error(request, f"Solo el usuario que envió este lote a retesteo ({retest_movement.user.username}) puede cargar los resultados.")
+                return redirect('batch_detail', pk=batch.pk)
+                
         if not (user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()):
             if user.unit and batch.storage_location != user.unit.name:
                 messages.error(request, "No tienes permiso para modificar lotes que no pertenecen a tu unidad.")

@@ -76,8 +76,8 @@
                     <td>{{ batch.storage_location }}</td>
                     <td class="text-end text-nowrap">
                         <a href="{% url 'batch_detail' batch.id %}" class="btn btn-sm btn-outline-info"><i class="fa-solid fa-list-ul"></i> Movimientos</a>
-                        {% if batch.available_quantity <= 0 %}
-                        <form action="{% url 'batch_archive' batch.id %}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas archivar esta casamata? Se moverá al historial de consumidos.');">
+                        {% if batch.available_quantity <= 0 or batch.status == 'REJECTED' %}
+                        <form action="{% url 'batch_archive' batch.id %}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas archivar esta casamata? Se moverá al historial.');">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-outline-secondary ms-1" title="Archivar al Historial">
                                 <i class="fa-solid fa-box-archive"></i> Archivar

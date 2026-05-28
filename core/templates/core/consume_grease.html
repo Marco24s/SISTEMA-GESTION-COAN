@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ title }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="mt-4 d-flex justify-content-between">
+                        <button type="button" class="btn btn-secondary" onclick="window.history.back();">Cancelar</button>
+                        <button type="submit" class="btn btn-success"><i class="fa-solid fa-save me-1"></i> Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ batches_json|json_script:"batches-data" }}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const greaseTypeSelect = document.getElementById('id_grease_type');
+        const specificBatchSelect = document.getElementById('id_specific_batch');
+        
+        if (greaseTypeSelect && specificBatchSelect) {
+            const batchesData = JSON.parse(document.getElementById('batches-data').textContent);
+            
+            // Save original options
+            const originalOptions = Array.from(specificBatchSelect.options);
+            
+            function filterBatches() {
+                const selectedGreaseTypeId = greaseTypeSelect.value;
+                
+                // Clear current options
+                specificBatchSelect.innerHTML = '';
+                
+                // Add default empty option
+                const emptyOption = originalOptions.find(opt => opt.value === '');
+                if (emptyOption) {
+                    specificBatchSelect.appendChild(emptyOption.cloneNode(true));
+                }
+                
+                if (selectedGreaseTypeId) {
+                    originalOptions.forEach(opt => {
+                        if (opt.value && batchesData[opt.value] == selectedGreaseTypeId) {
+                            specificBatchSelect.appendChild(opt.cloneNode(true));
+                        }
+                    });
+                }
+            }
+            
+            greaseTypeSelect.addEventListener('change', filterBatches);
+            
+            // Initial filter in case grease_type is already selected (e.g. after validation error)
+            filterBatches();
+            
+            // Restore selection if there was one
+            const selectedBatch = "{{ form.specific_batch.value|default:'' }}";
+            if (selectedBatch) {
+                specificBatchSelect.value = selectedBatch;
+            }
+        }
+    });
+</script>
+{% endblock %}
