@@ -32,6 +32,17 @@ def is_admin(user):
 def is_strict_admin(user):
     return user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica']).exists()
 
+def _get_fiscal_year_from_request(request):
+    """Obtiene el ejercicio económico del parámetro ?year= o el activo por defecto.
+    Limpia separadores de miles (ej: '2.026' -> '2026') que Django agrega con L10N."""
+    raw = request.GET.get('year', '').replace('.', '').replace(',', '').strip()
+    if raw:
+        try:
+            return BudgetFiscalYear.objects.filter(year=int(raw)).first()
+        except (ValueError, TypeError):
+            pass
+    return BudgetFiscalYear.objects.filter(status='OPEN').first()
+
 @login_required
 def dashboard(request):
     fiscal_year = BudgetFiscalYear.objects.filter(status='OPEN').first()
@@ -377,10 +388,16 @@ def fiscal_year_close(request, pk):
 def credit_list(request):
     from django.db.models import Sum, Q
     is_admin_user = is_admin(request.user)
-    fiscal_year = BudgetFiscalYear.objects.filter(status='ACTIVE').first()
+    
+    fiscal_year = _get_fiscal_year_from_request(request)
+    years = BudgetFiscalYear.objects.all().order_by('-year')
+
+    base_qs = BudgetCredit.objects.all()
+    if fiscal_year:
+        base_qs = base_qs.filter(fiscal_year=fiscal_year)
     
     if is_admin_user:
-        credits = BudgetCredit.objects.annotate(
+        credits = base_qs.annotate(
             distributed_amount=Sum('allocations__allocated_amount')
         ).order_by(
             'fiscal_year', 'ff', 'programa', 'subprog',
@@ -397,7 +414,7 @@ def credit_list(request):
         unassigned_total = credits.filter(credit_type__isnull=True).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
     else:
         # Para unidades, mostramos solo sus distribuciones
-        credits = BudgetCredit.objects.filter(allocations__unit=request.user.unit).annotate(
+        credits = base_qs.filter(allocations__unit=request.user.unit).annotate(
             distributed_amount=Sum('allocations__allocated_amount', filter=Q(allocations__unit=request.user.unit))
         ).distinct().order_by(
             'fiscal_year', 'ff', 'programa', 'subprog',
@@ -460,7 +477,9 @@ def credit_list(request):
         'credits': credits,
         'credit_by_type': credit_by_type,
         'unassigned_total': unassigned_total,
-        'is_admin': is_admin_user
+        'is_admin': is_admin_user,
+        'fiscal_year': fiscal_year,
+        'years': years
     })
 
 def credit_detail(request, pk):
@@ -776,9 +795,23 @@ def credit_type_log(request):
     return render(request, 'budget/credit_type_log.html', {'logs': logs})
 
 def allocation_list(request):
-    if is_admin(request.user): allocations = BudgetAllocation.objects.all()
-    else: allocations = BudgetAllocation.objects.filter(unit=request.user.unit)
-    return render(request, 'budget/allocation_list.html', {'allocations': allocations})
+    fiscal_year = _get_fiscal_year_from_request(request)
+    years = BudgetFiscalYear.objects.all().order_by('-year')
+    
+    base_qs = BudgetAllocation.objects.all()
+    if fiscal_year:
+        base_qs = base_qs.filter(credit__fiscal_year=fiscal_year)
+        
+    if is_admin(request.user): 
+        allocations = base_qs
+    else: 
+        allocations = base_qs.filter(unit=request.user.unit)
+        
+    return render(request, 'budget/allocation_list.html', {
+        'allocations': allocations,
+        'fiscal_year': fiscal_year,
+        'years': years
+    })
 
 def allocation_create(request):
     if not is_admin(request.user): return redirect('budget:allocation_list')
@@ -921,9 +954,23 @@ def allocation_bulk_delete(request):
     return redirect('budget:allocation_list')
 
 def execution_list(request):
-    if is_admin(request.user): executions = BudgetExecution.objects.all()
-    else: executions = BudgetExecution.objects.filter(allocation__unit=request.user.unit)
-    return render(request, 'budget/execution_list.html', {'executions': executions.order_by('-created_at')})
+    fiscal_year = _get_fiscal_year_from_request(request)
+    years = BudgetFiscalYear.objects.all().order_by('-year')
+    
+    base_qs = BudgetExecution.objects.all()
+    if fiscal_year:
+        base_qs = base_qs.filter(allocation__credit__fiscal_year=fiscal_year)
+        
+    if is_admin(request.user): 
+        executions = base_qs
+    else: 
+        executions = base_qs.filter(allocation__unit=request.user.unit)
+        
+    return render(request, 'budget/execution_list.html', {
+        'executions': executions.order_by('-created_at'),
+        'fiscal_year': fiscal_year,
+        'years': years
+    })
 
 def execution_detail(request, pk):
     execution = get_object_or_404(BudgetExecution, pk=pk)

@@ -3,8 +3,31 @@
 
 {% block budget_content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold"><i class="fa-solid fa-file-invoice-dollar text-success me-2"></i>Ejecución de Gastos</h2>
     <div>
+        <h2 class="fw-bold mb-0"><i class="fa-solid fa-file-invoice-dollar text-success me-2"></i>Ejecución de Gastos</h2>
+        <div class="mt-1">
+            {% if fiscal_year %}
+                <span class="badge {% if fiscal_year.status == 'OPEN' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill me-1">
+                    <i class="fa-solid fa-circle-dot me-1" style="font-size: 0.6rem;"></i>
+                    Ejercicio {{ fiscal_year.year }} — {{ fiscal_year.get_status_display }}
+                </span>
+            {% else %}
+                <span class="badge bg-warning text-dark rounded-pill">Sin ejercicio activo</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <!-- Selector de Ejercicio -->
+        <form method="get" class="d-flex align-items-center gap-2 me-2">
+            <label class="small text-muted mb-0 text-nowrap"><i class="fa-solid fa-calendar me-1"></i>Ver año:</label>
+            <select name="year" class="form-select form-select-sm rounded-pill" style="min-width: 100px;" onchange="this.form.submit()">
+                {% for y in years %}
+                <option value="{{ y.year|unlocalize }}" {% if fiscal_year and y.year == fiscal_year.year %}selected{% endif %}>
+                    {{ y.year }}{% if y.status == 'OPEN' %} ★{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
         <a href="{% url 'budget:export_rendicion_csv' %}" class="btn btn-outline-success rounded-pill px-4 me-2">
             <i class="fa-solid fa-file-export me-1"></i> Exportar Rendición
         </a>
