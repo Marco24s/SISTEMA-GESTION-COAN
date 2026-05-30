@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background: linear-gradient(135deg, #334155 0%, #0f766e 100%);">
+    <div class="container-fluid px-4">
+        <a href="/" class="btn btn-sm text-white border-white me-3" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1);" title="Volver al Portal">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'licitaciones:dashboard' %}">
+            <i class="fa-solid fa-file-contract me-2"></i>
+            <strong>Procesos Licitatorios</strong>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#licitacionesNavbar" aria-controls="licitacionesNavbar" aria-expanded="false" aria-label="Menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="licitacionesNavbar">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active fw-bold{% endif %}" href="{% url 'licitaciones:dashboard' %}">
+                        <i class="fa-solid fa-gauge-high me-1"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'process_list' %}active fw-bold{% endif %}" href="{% url 'licitaciones:process_list' %}">
+                        <i class="fa-solid fa-list-check me-1"></i> Procesos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'process_create' %}active fw-bold{% endif %}" href="{% url 'licitaciones:process_create' %}">
+                        <i class="fa-solid fa-plus me-1"></i> Nuevo proceso
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'process_import' %}active fw-bold{% endif %}" href="{% url 'licitaciones:process_import' %}">
+                        <i class="fa-solid fa-file-import me-1"></i> Importar Excel
+                    </a>
+                </li>
+            </ul>
+            <span class="navbar-text text-white-50">
+                <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}
+            </span>
+        </div>
+    </div>
+</nav>
+{% endblock %}

@@ -1,0 +1,61 @@
+from django import forms
+
+from core.models import Unit
+
+from .models import TenderProcess
+
+
+class TenderImportForm(forms.Form):
+    year = forms.IntegerField(label="Ejercicio / Anio", initial=2026, min_value=2000)
+    file = forms.FileField(label="Archivo Excel (.xlsx)")
+
+    def clean_file(self):
+        uploaded_file = self.cleaned_data["file"]
+        if not uploaded_file.name.lower().endswith(".xlsx"):
+            raise forms.ValidationError("El archivo debe ser un Excel con extension .xlsx.")
+        return uploaded_file
+
+
+class TenderProcessForm(forms.ModelForm):
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.filter().order_by("name"),
+        label="Destino requirente",
+        required=True,
+    )
+    opening_date = forms.DateTimeField(
+        required=False,
+        input_formats=["%Y-%m-%dT%H:%M"],
+        widget=forms.DateTimeInput(format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"}),
+        label="Fecha de apertura",
+    )
+    exchange_rate_date = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+        label="Fecha del tipo de cambio",
+    )
+
+    class Meta:
+        model = TenderProcess
+        fields = [
+            "year",
+            "unit",
+            "process_number",
+            "expediente",
+            "name",
+            "process_type",
+            "opening_date",
+            "status",
+            "amount_ars",
+            "currency",
+            "foreign_amount",
+            "exchange_rate",
+            "exchange_rate_date",
+            "has_oca",
+            "source",
+            "notes",
+            "is_active",
+        ]
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }

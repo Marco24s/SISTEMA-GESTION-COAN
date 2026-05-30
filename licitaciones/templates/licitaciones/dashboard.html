@@ -1,0 +1,270 @@
+{% extends "licitaciones/base_licitaciones.html" %}
+{% load humanize %}
+
+{% block title %}Dashboard Licitaciones{% endblock %}
+
+{% block content %}
+<style>
+    .kpi-card {
+        border: 0;
+        border-radius: 8px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        height: 100%;
+    }
+    .kpi-icon {
+        width: 42px;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        color: #fff;
+    }
+    .bar-track {
+        width: 100%;
+        height: 10px;
+        background: #e5e7eb;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+    .bar-fill {
+        height: 100%;
+        border-radius: 999px;
+    }
+    .summary-table td,
+    .summary-table th {
+        vertical-align: middle;
+    }
+</style>
+
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
+    <div>
+        <h2 class="mb-1"><i class="fa-solid fa-gauge-high me-2 text-success"></i> Dashboard de Licitaciones</h2>
+        <p class="text-muted mb-0">Resumen consolidado de procesos, estados y montos por destino.</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select" onchange="this.form.submit()">
+                {% for year in years %}
+                    <option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                {% empty %}
+                    <option value="">Sin datos</option>
+                {% endfor %}
+            </select>
+        </form>
+        <a href="{% url 'licitaciones:process_import' %}" class="btn btn-outline-success">
+            <i class="fa-solid fa-file-import me-1"></i> Importar
+        </a>
+        <a href="{% url 'licitaciones:process_list' %}{% if selected_year %}?year={{ selected_year }}{% endif %}" class="btn btn-success">
+            <i class="fa-solid fa-list-check me-1"></i> Ver procesos
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card kpi-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Procesos cargados</div>
+                        <div class="display-6 fw-bold">{{ total_count }}</div>
+                    </div>
+                    <span class="kpi-icon" style="background:#334155;"><i class="fa-solid fa-folder-open"></i></span>
+                </div>
+                <div class="text-muted small mt-2">$ {{ total_amount|floatformat:2|intcomma }} registrados</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card kpi-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Adjudicados</div>
+                        <div class="display-6 fw-bold">{{ adjudicated_count }}</div>
+                    </div>
+                    <span class="kpi-icon" style="background:#198754;"><i class="fa-solid fa-circle-check"></i></span>
+                </div>
+                <div class="bar-track mt-3"><div class="bar-fill bg-success" style="width: {{ adjudicated_percent|stringformat:'s' }}%;"></div></div>
+                <div class="text-muted small mt-2">{{ adjudicated_percent }}% · $ {{ adjudicated_amount|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card kpi-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">Disponibles</div>
+                        <div class="display-6 fw-bold">{{ available_count }}</div>
+                    </div>
+                    <span class="kpi-icon" style="background:#0dcaf0;"><i class="fa-solid fa-handshake-angle"></i></span>
+                </div>
+                <div class="bar-track mt-3"><div class="bar-fill bg-info" style="width: {{ available_percent|stringformat:'s' }}%;"></div></div>
+                <div class="text-muted small mt-2">{{ available_percent }}% · $ {{ available_amount|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card kpi-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small text-uppercase fw-bold">En proceso</div>
+                        <div class="display-6 fw-bold">{{ in_progress_count }}</div>
+                    </div>
+                    <span class="kpi-icon" style="background:#f59e0b;"><i class="fa-solid fa-clock"></i></span>
+                </div>
+                <div class="bar-track mt-3"><div class="bar-fill bg-warning" style="width: {{ in_progress_percent|stringformat:'s' }}%;"></div></div>
+                <div class="text-muted small mt-2">{{ in_progress_percent }}% · {{ cancelled_count }} sin efecto</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fa-solid fa-table me-2 text-success"></i> Resumen por destino</h5>
+                <span class="badge text-bg-light">{{ selected_year }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover summary-table mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Destino</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Adjudicados</th>
+                                <th class="text-end">Disponible</th>
+                                <th class="text-end">En proceso</th>
+                                <th class="text-end">Sin efecto</th>
+                                <th style="min-width: 160px;">Participacion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in destination_rows %}
+                            <tr>
+                                <td>
+                                    <a class="fw-bold text-decoration-none" href="{% url 'licitaciones:process_list' %}?year={{ selected_year }}&unit={{ row.unit.id }}">
+                                        {{ row.unit.name }}
+                                    </a>
+                                </td>
+                                <td class="text-end">{{ row.total }}</td>
+                                <td class="text-end">
+                                    {{ row.adjudicated_count }}
+                                    <br><small class="text-muted">$ {{ row.adjudicated_amount|floatformat:2|intcomma }}</small>
+                                </td>
+                                <td class="text-end">
+                                    {{ row.available_count }}
+                                    <br><small class="text-muted">$ {{ row.available_amount|floatformat:2|intcomma }}</small>
+                                </td>
+                                <td class="text-end">{{ row.in_progress_count }}</td>
+                                <td class="text-end">{{ row.cancelled_count }}</td>
+                                <td>
+                                    <div class="bar-track"><div class="bar-fill" style="width: {{ row.percent|stringformat:'s' }}%; background:#0f766e;"></div></div>
+                                    <small class="text-muted">{{ row.percent }}%</small>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">No hay destinos para mostrar.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fa-solid fa-chart-simple me-2 text-success"></i> Estados</h5>
+            </div>
+            <div class="card-body">
+                {% for row in status_rows %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>{{ row.label }}</span>
+                            <strong>{{ row.count }}</strong>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: {{ row.percent|stringformat:'s' }}%; background:#334155;"></div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-muted mb-0">No hay procesos cargados.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fa-solid fa-triangle-exclamation me-2 text-warning"></i> Control de carga</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                    <span>Sin monto en pesos</span>
+                    <strong>{{ missing_amount_count }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Con moneda extranjera</span>
+                    <strong>{{ foreign_count }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="fa-solid fa-clock-rotate-left me-2 text-success"></i> Ultimos procesos</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Proceso</th>
+                        <th>Destino</th>
+                        <th>Nombre</th>
+                        <th>Estado</th>
+                        <th class="text-end">Monto $</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for process in recent_processes %}
+                    <tr>
+                        <td><strong>{{ process.process_number }}</strong></td>
+                        <td>
+                            <span class="badge text-bg-secondary">
+                                {% if process.unit %}
+                                    {{ process.unit.name }}
+                                {% elif process.destination %}
+                                    {{ process.destination.code }}
+                                {% else %}
+                                    SIN UNIDAD
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>{{ process.name }}</td>
+                        <td>{{ process.get_status_display }}</td>
+                        <td class="text-end">
+                            {% if process.amount_ars is not None %}{{ process.amount_ars|floatformat:2|intcomma }}{% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">Todavia no hay procesos cargados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
