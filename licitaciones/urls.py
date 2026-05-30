@@ -8,6 +8,6 @@ urlpatterns = [
     path("", views.TenderDashboardView.as_view(), name="dashboard"),
     path("procesos/", views.TenderProcessListView.as_view(), name="process_list"),
     path("nuevo/", views.TenderProcessCreateView.as_view(), name="process_create"),
-    path("importar/", views.TenderImportView.as_view(), name="process_import"),
+    path("<int:pk>/", views.TenderProcessDetailView.as_view(), name="process_detail"),
     path("<int:pk>/editar/", views.TenderProcessUpdateView.as_view(), name="process_update"),
 ]

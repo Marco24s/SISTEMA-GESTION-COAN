@@ -30,11 +30,6 @@
                         <i class="fa-solid fa-plus me-1"></i> Nuevo proceso
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'process_import' %}active fw-bold{% endif %}" href="{% url 'licitaciones:process_import' %}">
-                        <i class="fa-solid fa-file-import me-1"></i> Importar Excel
-                    </a>
-                </li>
             </ul>
             <span class="navbar-text text-white-50">
                 <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}

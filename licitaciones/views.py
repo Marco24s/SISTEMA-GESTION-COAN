@@ -1,15 +1,20 @@
-from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db.models import Q
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, FormView, ListView, TemplateView, UpdateView
+from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 
 from core.models import Unit
 
-from .forms import TenderImportForm, TenderProcessForm
-from .importer import import_tender_processes_from_xlsx
+from .forms import TenderProcessForm
 from .models import ProcurementDestination, TenderProcess
+
+
+def _clean_int(value):
+    if value in (None, ""):
+        return None
+    text = str(value).strip().replace(".", "").replace(",", "")
+    return int(text) if text.isdigit() else None
 
 
 def _percent(part, total):
@@ -29,9 +34,9 @@ class TenderDashboardView(LoginRequiredMixin, TemplateView):
             .values_list("year", flat=True)
             .distinct()
         )
-        selected_year = self.request.GET.get("year")
+        selected_year = _clean_int(self.request.GET.get("year"))
         if not selected_year and years:
-            selected_year = str(years[0])
+            selected_year = years[0]
 
         processes = TenderProcess.objects.select_related("unit", "destination").filter(is_active=True)
         if selected_year:
@@ -121,9 +126,10 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
             .filter(is_active=True)
             .order_by("-year", "unit__name", "-opening_date", "process_number")
         )
-        year = self.request.GET.get("year")
-        unit = self.request.GET.get("unit")
+        year = _clean_int(self.request.GET.get("year"))
+        unit = _clean_int(self.request.GET.get("unit"))
         status = self.request.GET.get("status")
+        control = self.request.GET.get("control")
         q = self.request.GET.get("q")
 
         if year:
@@ -132,6 +138,10 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(unit_id=unit)
         if status:
             queryset = queryset.filter(status=status)
+        if control == "missing_amount":
+            queryset = queryset.filter(amount_ars__isnull=True)
+        elif control == "foreign_currency":
+            queryset = queryset.filter(currency__in=["USD", "EUR", "OTRA"])
         if q:
             queryset = queryset.filter(
                 Q(process_number__icontains=q)
@@ -144,9 +154,10 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["units"] = Unit.objects.filter().order_by("name")
         context["status_choices"] = TenderProcess.STATUS_CHOICES
-        context["selected_year"] = self.request.GET.get("year", "")
-        context["selected_unit"] = self.request.GET.get("unit", "")
+        context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
+        context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
         context["selected_status"] = self.request.GET.get("status", "")
+        context["selected_control"] = self.request.GET.get("control", "")
         context["search_query"] = self.request.GET.get("q", "")
         context["years"] = (
             TenderProcess.objects.order_by("-year")
@@ -168,31 +179,18 @@ class TenderProcessCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateVie
         return super().form_valid(form)
 
 
+class TenderProcessDetailView(LoginRequiredMixin, DetailView):
+    model = TenderProcess
+    template_name = "licitaciones/process_detail.html"
+    context_object_name = "process"
+
+    def get_queryset(self):
+        return TenderProcess.objects.select_related("unit", "destination", "created_by")
+
+
 class TenderProcessUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = TenderProcess
     form_class = TenderProcessForm
     template_name = "licitaciones/process_form.html"
     success_url = reverse_lazy("licitaciones:process_list")
     success_message = "Proceso licitatorio actualizado correctamente."
-
-
-class TenderImportView(LoginRequiredMixin, FormView):
-    form_class = TenderImportForm
-    template_name = "licitaciones/import_form.html"
-    success_url = reverse_lazy("licitaciones:process_list")
-
-    def form_valid(self, form):
-        stats = import_tender_processes_from_xlsx(
-            uploaded_file=form.cleaned_data["file"],
-            year=form.cleaned_data["year"],
-            user=self.request.user,
-        )
-        messages.success(
-            self.request,
-            (
-                "Importacion finalizada: "
-                f"{stats['created']} creados, {stats['updated']} actualizados, "
-                f"{stats['skipped']} omitidos."
-            ),
-        )
-        return super().form_valid(form)

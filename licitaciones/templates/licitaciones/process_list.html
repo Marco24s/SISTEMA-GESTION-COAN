@@ -1,5 +1,6 @@
 {% extends "licitaciones/base_licitaciones.html" %}
 {% load humanize %}
+{% load l10n %}
 
 {% block title %}Procesos Licitatorios{% endblock %}
 
@@ -10,9 +11,6 @@
         <p class="text-muted mb-0">Carga y seguimiento individual de procesos por destino requirente.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{% url 'licitaciones:process_import' %}" class="btn btn-outline-success">
-            <i class="fa-solid fa-file-import me-1"></i> Importar Excel
-        </a>
         <a href="{% url 'licitaciones:process_create' %}" class="btn btn-success">
             <i class="fa-solid fa-plus me-1"></i> Nuevo proceso
         </a>
@@ -23,11 +21,11 @@
     <div class="card-body">
         <form method="get" class="row g-2 align-items-end">
             <div class="col-md-2">
-                <label class="form-label small text-muted mb-1">Anio</label>
+                <label class="form-label small text-muted mb-1">Año</label>
                 <select name="year" class="form-select">
                     <option value="">Todos</option>
                     {% for year in years %}
-                        <option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+                        <option value="{{ year|unlocalize }}" {% if selected_year == year %}selected{% endif %}>{{ year|unlocalize }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -36,7 +34,7 @@
                 <select name="unit" class="form-select">
                     <option value="">Todos</option>
                     {% for unit in units %}
-                        <option value="{{ unit.id }}" {% if selected_unit == unit.id|stringformat:"s" %}selected{% endif %}>{{ unit.name }}</option>
+                        <option value="{{ unit.id|unlocalize }}" {% if selected_unit == unit.id %}selected{% endif %}>{{ unit.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -139,9 +137,14 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-sm btn-outline-primary">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </a>
+                            <div class="d-flex gap-1">
+                                <a href="{% url 'licitaciones:process_detail' process.id %}" class="btn btn-sm btn-outline-secondary" title="Ver detalle">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}

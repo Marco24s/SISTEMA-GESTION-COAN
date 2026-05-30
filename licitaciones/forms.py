@@ -5,17 +5,6 @@ from core.models import Unit
 from .models import TenderProcess
 
 
-class TenderImportForm(forms.Form):
-    year = forms.IntegerField(label="Ejercicio / Anio", initial=2026, min_value=2000)
-    file = forms.FileField(label="Archivo Excel (.xlsx)")
-
-    def clean_file(self):
-        uploaded_file = self.cleaned_data["file"]
-        if not uploaded_file.name.lower().endswith(".xlsx"):
-            raise forms.ValidationError("El archivo debe ser un Excel con extension .xlsx.")
-        return uploaded_file
-
-
 class TenderProcessForm(forms.ModelForm):
     unit = forms.ModelChoiceField(
         queryset=Unit.objects.filter().order_by("name"),
