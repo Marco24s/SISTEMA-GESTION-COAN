@@ -26,8 +26,10 @@ class PINSecurityMiddleware:
             system = 'sigera'
         elif path.startswith('/budget/'):
             system = 'sgp'
+        elif path.startswith('/licitaciones/') or path.startswith('/licitas/'):
+            system = 'licitaciones'
         # Rutas de SGMG (core) que no son el portal, admin o seguridad
-        elif not any(path.startswith(p) for p in ['/admin/', '/accounts/', '/security/', '/static/', '/media/', '/__debug__/', '/licitaciones/', '/licitas/']):
+        elif not any(path.startswith(p) for p in ['/admin/', '/accounts/', '/security/', '/static/', '/media/', '/__debug__/']):
             # Excluir archivos comunes que el navegador pide automáticamente en la raíz
             ignored_extensions = ['.ico', '.png', '.jpg', '.jpeg', '.gif', '.json', '.txt', '.xml', '.webmanifest']
             if not any(path.lower().endswith(ext) for ext in ignored_extensions):

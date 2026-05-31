@@ -794,6 +794,7 @@ def credit_type_log(request):
     logs = BudgetCreditTypeLog.objects.all().select_related('credit', 'previous_type', 'new_type', 'user').order_by('-timestamp')
     return render(request, 'budget/credit_type_log.html', {'logs': logs})
 
+@login_required
 def allocation_list(request):
     fiscal_year = _get_fiscal_year_from_request(request)
     years = BudgetFiscalYear.objects.all().order_by('-year')

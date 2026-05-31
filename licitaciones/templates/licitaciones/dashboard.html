@@ -36,6 +36,19 @@
     .summary-table th {
         vertical-align: middle;
     }
+    .kpi-link {
+        color: inherit;
+        display: block;
+        height: 100%;
+        text-decoration: none;
+    }
+    .kpi-link .kpi-card {
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-link:hover .kpi-card {
+        box-shadow: 0 12px 26px rgba(15, 23, 42, 0.11);
+        transform: translateY(-2px);
+    }
 </style>
 
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
@@ -75,6 +88,7 @@
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
+        <a class="kpi-link" href="{% url 'licitaciones:process_list' %}?year={{ selected_year|unlocalize }}&group=ADJUDICADO">
         <div class="card kpi-card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
@@ -88,8 +102,10 @@
                 <div class="text-muted small mt-2">{{ adjudicated_percent }}% · $ {{ adjudicated_amount|floatformat:2|intcomma }}</div>
             </div>
         </div>
+        </a>
     </div>
     <div class="col-md-6 col-xl-3">
+        <a class="kpi-link" href="{% url 'licitaciones:process_list' %}?year={{ selected_year|unlocalize }}&group=DISPONIBLE">
         <div class="card kpi-card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
@@ -103,8 +119,10 @@
                 <div class="text-muted small mt-2">{{ available_percent }}% · $ {{ available_amount|floatformat:2|intcomma }}</div>
             </div>
         </div>
+        </a>
     </div>
     <div class="col-md-6 col-xl-3">
+        <a class="kpi-link" href="{% url 'licitaciones:process_list' %}?year={{ selected_year|unlocalize }}&group=EN_PROCESO">
         <div class="card kpi-card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
@@ -118,6 +136,7 @@
                 <div class="text-muted small mt-2">{{ in_progress_percent }}% · {{ cancelled_count }} sin efecto</div>
             </div>
         </div>
+        </a>
     </div>
 </div>
 
@@ -220,24 +239,36 @@
 
 <div class="card shadow-sm border-0 mt-4">
     <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="fa-solid fa-clock-rotate-left me-2 text-success"></i> Ultimos procesos</h5>
+        <h5 class="mb-0"><i class="fa-solid fa-calendar-days me-2 text-success"></i> Alertas de apertura - próximos {{ opening_alert_days }} días</h5>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th>Apertura</th>
                         <th>Proceso</th>
                         <th>Destino</th>
                         <th>Nombre</th>
                         <th>Estado</th>
-                        <th class="text-end">Monto $</th>
+                        <th>Aviso</th>
+                        <th class="text-end">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for process in recent_processes %}
+                    {% for item in opening_alerts %}
+                    {% with process=item.process %}
                     <tr>
-                        <td><strong>{{ process.process_number }}</strong></td>
+                        <td>
+                            <strong>{{ process.opening_date|date:"d/m/Y" }}</strong>
+                            <br><small class="text-muted">{{ process.opening_date|date:"H:i" }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ process.process_number }}</strong>
+                            {% if process.expediente %}
+                                <br><small class="text-muted">{{ process.expediente }}</small>
+                            {% endif %}
+                        </td>
                         <td>
                             <span class="badge text-bg-secondary">
                                 {% if process.unit %}
@@ -251,13 +282,17 @@
                         </td>
                         <td>{{ process.name }}</td>
                         <td>{{ process.get_status_display }}</td>
+                        <td><span class="badge {{ item.alert_class }}">{{ item.alert_label }}</span></td>
                         <td class="text-end">
-                            {% if process.amount_ars is not None %}{{ process.amount_ars|floatformat:2|intcomma }}{% else %}<span class="text-muted">-</span>{% endif %}
+                            <a href="{% url 'licitaciones:process_detail' process.id %}" class="btn btn-sm btn-outline-secondary" title="Ver detalle">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
                         </td>
                     </tr>
+                    {% endwith %}
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">Todavia no hay procesos cargados.</td>
+                        <td colspan="7" class="text-center text-muted py-4">No hay aperturas vencidas, para hoy o dentro de los próximos {{ opening_alert_days }} días.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

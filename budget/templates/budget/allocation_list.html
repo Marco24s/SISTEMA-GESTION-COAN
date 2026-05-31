@@ -38,7 +38,7 @@
     <form id="bulk-action-form" method="POST" action="{% url 'budget:allocation_bulk_delete' %}">
         {% csrf_token %}
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle mb-0 allocation-compact-table">
                 <thead class="bg-light">
                     <tr class="small text-uppercase text-muted border-bottom-0">
                         <th class="ps-4" style="width: 40px;">
@@ -46,7 +46,7 @@
                                 <input class="form-check-input" type="checkbox" id="select-all">
                             </div>
                         </th>
-                        <th>Unidad Destinataria</th>
+                        <th>Distribución / Ejecución</th>
                         <th>Proyecto / Objetivo</th>
                         <th>Nomenclatura (SUBPC - PARCIAL - PPAL)</th>
                         <th>Ref. Crédito (FF - S.PROG)</th>
@@ -67,9 +67,56 @@
                                     <input class="form-check-input select-item" type="checkbox" name="selected_ids" value="{{ alloc.id }}">
                                 </div>
                             </td>
-                            <td>
+                            <td class="allocation-summary-cell">
+                                {% widthratio alloc.spent_amount alloc.allocated_amount 100 as spent_percent %}
                                 <div class="fw-bold fs-6">{{ alloc.unit.name }}</div>
                                 <small class="text-muted">{{ alloc.unit.code|default:"" }}</small>
+                                <div class="mt-2 d-flex flex-wrap gap-1">
+                                    {% for project in alloc.custom_classes.all %}
+                                        <span class="badge bg-outline-primary text-primary border border-primary rounded-pill allocation-project-badge">
+                                            <i class="fa-solid fa-tag me-1"></i> {{ project.name }}
+                                        </span>
+                                    {% empty %}
+                                        <span class="text-muted small">Sin Proyecto</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="mt-2 small">
+                                    <span class="fw-bold text-dark">FF{{ alloc.credit.ff.code }} - {{ alloc.credit.subprog.code }}</span>
+                                    <span class="text-muted">{{ alloc.credit.programa.code }}</span>
+                                    <span class="mx-2 text-muted">|</span>
+                                    <span class="fw-semibold">{{ alloc.credit.pre_inc.code|default:"00" }}</span>
+                                    <span class="text-muted">({{ alloc.credit.pp_inc.code|default:"0" }}-{{ alloc.credit.ppp_inc.code|default:"0" }})</span>
+                                </div>
+                                <div class="allocation-mobile-amounts mt-2">
+                                    <span class="amount-chip assigned-chip">
+                                        <span>Asignado</span>
+                                        <strong>${{ alloc.allocated_amount|localize }}</strong>
+                                    </span>
+                                    <span class="amount-chip available-chip">
+                                        <span>Disponible</span>
+                                        <strong>${{ alloc.available_amount|localize }}</strong>
+                                    </span>
+                                    <span class="amount-chip spent-chip">
+                                        <span>Gastado</span>
+                                        <strong>-${{ alloc.spent_amount|localize }}</strong>
+                                    </span>
+                                </div>
+                                <div class="allocation-execution mt-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="small text-muted">Ejecución del crédito</span>
+                                        <span class="execution-percent {% if spent_percent|add:'0' >= 90 %}text-danger{% elif spent_percent|add:'0' >= 70 %}text-warning{% else %}text-success{% endif %}">
+                                            {% if alloc.spent_amount > 0 and spent_percent|add:'0' == 0 %}<1%{% else %}{{ spent_percent }}%{% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="progress execution-progress" title="{% if alloc.spent_amount > 0 and spent_percent|add:'0' == 0 %}Menos del 1% ejecutado{% else %}{{ spent_percent }}% ejecutado{% endif %}">
+                                        <div class="progress-bar {% if spent_percent|add:'0' >= 90 %}bg-danger{% elif spent_percent|add:'0' >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                             role="progressbar"
+                                             style="width: {% if alloc.spent_amount > 0 and spent_percent|add:'0' == 0 %}1{% else %}{{ spent_percent }}{% endif %}%; min-width: {% if alloc.spent_amount > 0 %}8px{% else %}0{% endif %};"
+                                             aria-valuenow="{{ spent_percent }}"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100"></div>
+                                    </div>
+                                </div>
                             </td>
                             <td>
                                 {% for project in alloc.custom_classes.all %}
@@ -98,16 +145,16 @@
                                 ${{ alloc.available_amount|localize }}
                             </td>
                         <td class="text-end pe-4">
-                            <div class="btn-group">
-                                <a href="{% url 'budget:execution_commitment' %}?allocation={{ alloc.id }}" class="btn btn-sm btn-outline-warning rounded-pill px-3 me-1" title="Registrar Gasto (Compromiso)">
+                            <div class="d-flex allocation-actions">
+                                <a href="{% url 'budget:execution_commitment' %}?allocation={{ alloc.id }}" class="btn btn-sm btn-outline-warning rounded-pill px-2" title="Registrar Gasto (Compromiso)">
                                     <i class="fa-solid fa-file-invoice-dollar me-1"></i> Ejecutar
                                 </a>
-                                <a href="{% url 'budget:allocation_update' alloc.id %}" class="btn btn-sm btn-outline-info rounded-pill px-2 me-1" title="Editar Distribución">
-                                    <i class="fa-solid fa-pen"></i>
+                                <a href="{% url 'budget:allocation_update' alloc.id %}" class="btn btn-sm btn-outline-info rounded-pill px-2" title="Editar Distribución">
+                                    <i class="fa-solid fa-pen me-1"></i> Editar
                                 </a>
                                 {% if user.is_superuser %}
                                 <a href="{% url 'budget:allocation_delete' alloc.id %}" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Eliminar Distribución">
-                                    <i class="fa-solid fa-trash"></i>
+                                    <i class="fa-solid fa-trash me-1"></i> Eliminar
                                 </a>
                                 {% endif %}
                             </div>
@@ -115,7 +162,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-5">
+                        <td colspan="9" class="text-center py-5">
                             <div class="text-muted">
                                 <i class="fa-solid fa-share-nodes fa-3x mb-3 d-block opacity-25"></i>
                                 No hay distribuciones registradas para las unidades componentes.
@@ -160,7 +207,146 @@
 <style>
     .z-index-1000 { z-index: 1000; }
     .allocation-row.selected { background-color: rgba(25, 135, 84, 0.05); }
+    .allocation-compact-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+    .allocation-compact-table th:nth-child(3),
+    .allocation-compact-table th:nth-child(4),
+    .allocation-compact-table th:nth-child(5),
+    .allocation-compact-table th:nth-child(6),
+    .allocation-compact-table th:nth-child(7),
+    .allocation-compact-table th:nth-child(8),
+    .allocation-compact-table td:nth-child(3),
+    .allocation-compact-table td:nth-child(4),
+    .allocation-compact-table td:nth-child(5),
+    .allocation-compact-table td:nth-child(6),
+    .allocation-compact-table td:nth-child(7),
+    .allocation-compact-table td:nth-child(8) {
+        display: none;
+    }
+    .allocation-compact-table th:first-child,
+    .allocation-compact-table td:first-child {
+        width: 52px;
+    }
+    .allocation-compact-table th:nth-child(2),
+    .allocation-compact-table td:nth-child(2) {
+        width: auto;
+    }
+    .allocation-compact-table th:nth-child(9),
+    .allocation-compact-table td:nth-child(9) {
+        width: 132px;
+    }
+    .allocation-summary-cell {
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: anywhere;
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+    .allocation-project-badge {
+        font-size: 0.72rem;
+        max-width: 100%;
+        white-space: normal;
+        text-align: left;
+    }
+    .allocation-mobile-amounts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        font-size: 0.84rem;
+    }
+    .amount-chip {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fff;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.35rem;
+        padding: 0.25rem 0.5rem;
+        line-height: 1.2;
+        max-width: 100%;
+    }
+    .amount-chip span {
+        color: #64748b;
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .amount-chip strong {
+        white-space: nowrap;
+    }
+    .available-chip {
+        border-color: rgba(25, 135, 84, 0.22);
+        background: rgba(25, 135, 84, 0.06);
+        color: #0f7a43;
+    }
+    .assigned-chip {
+        border-color: rgba(13, 110, 253, 0.18);
+        background: rgba(13, 110, 253, 0.05);
+        color: #0d6efd;
+    }
+    .spent-chip {
+        border-color: rgba(220, 53, 69, 0.2);
+        background: rgba(220, 53, 69, 0.05);
+        color: #dc3545;
+    }
+    .allocation-execution {
+        max-width: 760px;
+    }
+    .execution-percent {
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+    .execution-progress {
+        height: 9px;
+        border-radius: 999px;
+        background-color: #e9ecef;
+        overflow: hidden;
+    }
+    .execution-progress .progress-bar {
+        border-radius: 999px;
+    }
+    .allocation-actions {
+        white-space: nowrap;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.35rem;
+    }
+    .allocation-actions .btn {
+        min-height: 31px;
+        width: 106px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    @media (max-width: 768px) {
+        .allocation-compact-table th:nth-child(9),
+        .allocation-compact-table td:nth-child(9) {
+            width: 126px;
+        }
+    }
     #bulk-actions-bar { transition: all 0.3s ease; }
+    #bulk-actions-bar .card > .d-flex {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    @media (max-width: 992px) {
+        #bulk-actions-bar {
+            width: calc(100% - 2rem);
+        }
+        #bulk-actions-bar .card {
+            border-radius: 16px !important;
+        }
+        #bulk-actions-bar .fs-6.d-flex {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.75rem !important;
+        }
+        #bulk-actions-bar .vr {
+            display: none;
+        }
+    }
 </style>
 
 <script>

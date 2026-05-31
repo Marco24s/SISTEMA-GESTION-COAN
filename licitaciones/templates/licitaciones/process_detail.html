@@ -47,7 +47,7 @@
 
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
     <div>
-        <a href="{% url 'licitaciones:process_list' %}" class="btn btn-sm btn-outline-secondary mb-3">
+        <a href="{% if process.is_active %}{% url 'licitaciones:process_list' %}{% else %}{% url 'licitaciones:process_history' %}{% endif %}" class="btn btn-sm btn-outline-secondary mb-3">
             <i class="fa-solid fa-arrow-left me-1"></i> Volver
         </a>
         <h2 class="mb-1"><i class="fa-solid fa-file-lines me-2 text-success"></i> {{ process.process_number }}</h2>
@@ -75,6 +75,9 @@
                 {% endif %}
                 <span class="badge text-bg-light border">{{ process.get_process_type_display }}</span>
                 <span class="badge text-bg-light border">{{ process.year }}</span>
+                {% if not process.is_active %}
+                    <span class="badge text-bg-secondary"><i class="fa-solid fa-box-archive me-1"></i> En historial</span>
+                {% endif %}
             </div>
             <div class="detail-label">Nombre del proceso</div>
             <div class="fs-5 fw-bold">{{ process.name }}</div>

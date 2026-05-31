@@ -54,7 +54,7 @@ class TenderProcess(models.Model):
         ("OTRA", "Otra"),
     ]
 
-    year = models.PositiveIntegerField(default=2026, verbose_name="Ejercicio / Anio")
+    year = models.PositiveIntegerField(default=2026, verbose_name="Ejercicio / Año")
     unit = models.ForeignKey(
         Unit,
         on_delete=models.PROTECT,

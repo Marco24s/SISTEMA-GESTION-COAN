@@ -23,6 +23,6 @@ urlpatterns = [
     path('sigera/', include('sigera.urls', namespace='sigera')),
     path('budget/', include('budget.urls', namespace='budget')),
     path('licitaciones/', include('licitaciones.urls', namespace='licitaciones')),
-    path('licitas/', include('licitaciones.urls')),
+    path('licitas/', include('licitaciones.urls', namespace='licitas')),
     path('accounts/', include('django.contrib.auth.urls')),
 ]

@@ -2,6 +2,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db.models import Q
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 
 from core.models import Unit
@@ -21,6 +22,18 @@ def _percent(part, total):
     if not total:
         return 0
     return round((part * 100) / total, 1)
+
+
+def _status_filter_for_group(group):
+    if group == "ADJUDICADO":
+        return ["ADJUDICADO"]
+    if group == "DISPONIBLE":
+        return ["PREADJUDICADO", "DISPONIBLE_ADJUDICAR"]
+    if group == "EN_PROCESO":
+        return ["PUBLICADO", "EN_EVALUACION"]
+    if group == "SIN_EFECTO":
+        return ["FRACASADO", "DESIERTO", "DEJADO_SIN_EFECTO"]
+    return []
 
 
 class TenderDashboardView(LoginRequiredMixin, TemplateView):
@@ -88,6 +101,46 @@ class TenderDashboardView(LoginRequiredMixin, TemplateView):
                     }
                 )
 
+        today = timezone.localdate()
+        upcoming_opening_alerts = []
+        overdue_opening_alerts = []
+        opening_processes = [
+            p
+            for p in process_list
+            if p.opening_date and p.operational_group in ["EN_PROCESO", "DISPONIBLE"]
+        ]
+        for process in sorted(opening_processes, key=lambda p: p.opening_date):
+            opening_date = timezone.localtime(process.opening_date).date()
+            days_until = (opening_date - today).days
+            if days_until > 7:
+                break
+            if days_until < 0:
+                days_late = abs(days_until)
+                alert_label = f"Vencida hace {days_late} dia" if days_late == 1 else f"Vencida hace {days_late} dias"
+                alert_class = "text-bg-danger"
+            elif days_until == 0:
+                alert_label = "Abre hoy"
+                alert_class = "text-bg-warning"
+            elif days_until <= 7:
+                alert_label = f"En {days_until} dia" if days_until == 1 else f"En {days_until} dias"
+                alert_class = "text-bg-info"
+            else:
+                alert_label = f"En {days_until} dia(s)"
+                alert_class = "text-bg-light border"
+            alert = {
+                "process": process,
+                "alert_label": alert_label,
+                "alert_class": alert_class,
+                "days_until": days_until,
+            }
+            if days_until < 0:
+                overdue_opening_alerts.append(alert)
+            else:
+                upcoming_opening_alerts.append(alert)
+
+        overdue_opening_alerts = sorted(overdue_opening_alerts, key=lambda item: item["days_until"], reverse=True)
+        opening_alerts = upcoming_opening_alerts + overdue_opening_alerts[:5]
+
         context.update(
             {
                 "years": years,
@@ -108,7 +161,8 @@ class TenderDashboardView(LoginRequiredMixin, TemplateView):
                 "missing_amount_count": len([p for p in process_list if p.amount_ars is None]),
                 "destination_rows": destination_rows,
                 "status_rows": status_rows,
-                "recent_processes": process_list[:8],
+                "opening_alerts": opening_alerts,
+                "opening_alert_days": 7,
             }
         )
         return context
@@ -129,6 +183,7 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         year = _clean_int(self.request.GET.get("year"))
         unit = _clean_int(self.request.GET.get("unit"))
         status = self.request.GET.get("status")
+        group = self.request.GET.get("group")
         control = self.request.GET.get("control")
         q = self.request.GET.get("q")
 
@@ -138,6 +193,10 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(unit_id=unit)
         if status:
             queryset = queryset.filter(status=status)
+        elif group:
+            group_statuses = _status_filter_for_group(group)
+            if group_statuses:
+                queryset = queryset.filter(status__in=group_statuses)
         if control == "missing_amount":
             queryset = queryset.filter(amount_ars__isnull=True)
         elif control == "foreign_currency":
@@ -157,10 +216,59 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
         context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
         context["selected_status"] = self.request.GET.get("status", "")
+        context["selected_group"] = self.request.GET.get("group", "")
         context["selected_control"] = self.request.GET.get("control", "")
         context["search_query"] = self.request.GET.get("q", "")
         context["years"] = (
             TenderProcess.objects.order_by("-year")
+            .values_list("year", flat=True)
+            .distinct()
+        )
+        return context
+
+
+class TenderProcessHistoryView(LoginRequiredMixin, ListView):
+    model = TenderProcess
+    template_name = "licitaciones/process_history.html"
+    context_object_name = "processes"
+    paginate_by = 25
+
+    def get_queryset(self):
+        queryset = (
+            TenderProcess.objects.select_related("unit", "destination", "created_by")
+            .filter(is_active=False)
+            .order_by("-year", "unit__name", "-opening_date", "process_number")
+        )
+        year = _clean_int(self.request.GET.get("year"))
+        unit = _clean_int(self.request.GET.get("unit"))
+        status = self.request.GET.get("status")
+        q = self.request.GET.get("q")
+
+        if year:
+            queryset = queryset.filter(year=year)
+        if unit:
+            queryset = queryset.filter(unit_id=unit)
+        if status:
+            queryset = queryset.filter(status=status)
+        if q:
+            queryset = queryset.filter(
+                Q(process_number__icontains=q)
+                | Q(expediente__icontains=q)
+                | Q(name__icontains=q)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["units"] = Unit.objects.filter().order_by("name")
+        context["status_choices"] = TenderProcess.STATUS_CHOICES
+        context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
+        context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
+        context["selected_status"] = self.request.GET.get("status", "")
+        context["search_query"] = self.request.GET.get("q", "")
+        context["years"] = (
+            TenderProcess.objects.filter(is_active=False)
+            .order_by("-year")
             .values_list("year", flat=True)
             .distinct()
         )
@@ -192,5 +300,9 @@ class TenderProcessUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
     model = TenderProcess
     form_class = TenderProcessForm
     template_name = "licitaciones/process_form.html"
-    success_url = reverse_lazy("licitaciones:process_list")
     success_message = "Proceso licitatorio actualizado correctamente."
+
+    def get_success_url(self):
+        if self.object.is_active:
+            return reverse_lazy("licitaciones:process_list")
+        return reverse_lazy("licitaciones:process_history")

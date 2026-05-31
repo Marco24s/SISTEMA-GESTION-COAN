@@ -6,6 +6,11 @@ from .models import TenderProcess
 
 
 class TenderProcessForm(forms.ModelForm):
+    is_active = forms.BooleanField(
+        label="Mostrar en procesos activos",
+        required=False,
+        help_text="Si se desmarca, queda guardado en el historial.",
+    )
     unit = forms.ModelChoiceField(
         queryset=Unit.objects.filter().order_by("name"),
         label="Destino requirente",

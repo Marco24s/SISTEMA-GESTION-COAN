@@ -2,32 +2,17 @@
 {% load humanize %}
 {% load l10n %}
 
-{% block title %}Procesos Licitatorios{% endblock %}
+{% block title %}Historial de Procesos Licitatorios{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
     <div>
-        <h2 class="mb-1"><i class="fa-solid fa-file-contract me-2 text-success"></i> Procesos Licitatorios</h2>
-        <p class="text-muted mb-0">Carga y seguimiento individual de procesos por destino requirente.</p>
-        {% if selected_group %}
-            <div class="mt-2">
-                <span class="badge text-bg-success">
-                    {% if selected_group == "ADJUDICADO" %}
-                        Adjudicados
-                    {% elif selected_group == "DISPONIBLE" %}
-                        Disponibles
-                    {% elif selected_group == "EN_PROCESO" %}
-                        En proceso
-                    {% else %}
-                        {{ selected_group }}
-                    {% endif %}
-                </span>
-            </div>
-        {% endif %}
+        <h2 class="mb-1"><i class="fa-solid fa-box-archive me-2 text-secondary"></i> Historial</h2>
+        <p class="text-muted mb-0">Procesos desactivados, separados por ejercicio para consulta y recuperacion.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{% url 'licitaciones:process_create' %}" class="btn btn-success">
-            <i class="fa-solid fa-plus me-1"></i> Nuevo proceso
+        <a href="{% url 'licitaciones:process_list' %}" class="btn btn-outline-success">
+            <i class="fa-solid fa-list-check me-1"></i> Ver activos
         </a>
     </div>
 </div>
@@ -35,9 +20,6 @@
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-body">
         <form method="get" class="row g-2 align-items-end">
-            {% if selected_group %}
-                <input type="hidden" name="group" value="{{ selected_group }}">
-            {% endif %}
             <div class="col-md-2">
                 <label class="form-label small text-muted mb-1">Año</label>
                 <select name="year" class="form-select">
@@ -70,7 +52,7 @@
                 <input type="search" name="q" value="{{ search_query }}" class="form-control" placeholder="Proceso, expediente o nombre">
             </div>
             <div class="col-md-1 d-grid">
-                <button type="submit" class="btn btn-outline-success">
+                <button type="submit" class="btn btn-outline-secondary">
                     <i class="fa-solid fa-filter"></i>
                 </button>
             </div>
@@ -84,13 +66,12 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th>Ejercicio</th>
                         <th>Proceso</th>
                         <th>Destino</th>
                         <th>Nombre</th>
-                        <th>Tipo</th>
                         <th>Apertura</th>
                         <th>Estado</th>
-                        <th>OCA</th>
                         <th class="text-end">Monto $</th>
                         <th>Moneda</th>
                         <th>Acciones</th>
@@ -99,6 +80,7 @@
                 <tbody>
                     {% for process in processes %}
                     <tr>
+                        <td><span class="badge text-bg-light border">{{ process.year|unlocalize }}</span></td>
                         <td>
                             <strong>{{ process.process_number }}</strong>
                             {% if process.expediente %}
@@ -117,29 +99,11 @@
                             </span>
                         </td>
                         <td style="min-width: 280px;">{{ process.name }}</td>
-                        <td>{{ process.get_process_type_display }}</td>
-                        <td data-sort="{{ process.opening_date|date:'Y-m-d H:i' }}">
+                        <td>
                             {% if process.opening_date %}{{ process.opening_date|date:"d/m/Y H:i" }}{% else %}<span class="text-muted">-</span>{% endif %}
                         </td>
                         <td>
-                            {% if process.operational_group == "ADJUDICADO" %}
-                                <span class="badge bg-success">{{ process.get_status_display }}</span>
-                            {% elif process.operational_group == "DISPONIBLE" %}
-                                <span class="badge bg-info text-dark">{{ process.get_status_display }}</span>
-                            {% elif process.operational_group == "SIN_EFECTO" %}
-                                <span class="badge bg-secondary">{{ process.get_status_display }}</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">{{ process.get_status_display }}</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if process.has_oca is True %}
-                                <span class="badge bg-primary">Si</span>
-                            {% elif process.has_oca is False %}
-                                <span class="badge bg-light text-dark border">No</span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
+                            <span class="badge bg-secondary">{{ process.get_status_display }}</span>
                         </td>
                         <td class="text-end">
                             {% if process.amount_ars is not None %}
@@ -159,7 +123,7 @@
                                 <a href="{% url 'licitaciones:process_detail' process.id %}" class="btn btn-sm btn-outline-secondary" title="Ver detalle">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
-                                <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-sm btn-outline-primary" title="Editar o reactivar">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
                             </div>
@@ -167,8 +131,8 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
-                            Todavia no hay procesos licitatorios cargados.
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No hay procesos en el historial para los filtros seleccionados.
                         </td>
                     </tr>
                     {% endfor %}

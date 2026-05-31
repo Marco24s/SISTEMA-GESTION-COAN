@@ -58,4 +58,29 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const projectSelect = document.getElementById('id_custom_classes');
+    if (!projectSelect) {
+        return;
+    }
+
+    projectSelect.required = false;
+
+    const clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.className = 'btn btn-sm btn-outline-secondary rounded-pill mt-2';
+    clearButton.innerHTML = '<i class="fa-solid fa-link-slash me-1"></i> Dejar sin proyecto / plan';
+
+    clearButton.addEventListener('click', function() {
+        Array.from(projectSelect.options).forEach(function(option) {
+            option.selected = false;
+        });
+        projectSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    projectSelect.insertAdjacentElement('afterend', clearButton);
+});
+</script>
 {% endblock %}

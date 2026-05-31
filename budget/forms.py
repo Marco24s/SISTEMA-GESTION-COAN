@@ -141,8 +141,9 @@ class BudgetAllocationForm(forms.ModelForm):
             available_amount=F('total_amount') - F('allocated_total')
         ).order_by('-fiscal_year__year', 'ff__code')
         
+        self.fields['custom_classes'].required = False
         self.fields['custom_classes'].widget.attrs.update({'class': 'select2-multi'})
-        self.fields['custom_classes'].help_text = "Seleccione uno o más proyectos para agrupar esta distribución."
+        self.fields['custom_classes'].help_text = "Opcional. Si todavia no tiene una asociacion, puede dejarlo sin seleccionar."
 
 class AllocationChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
