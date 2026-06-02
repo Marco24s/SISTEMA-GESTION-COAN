@@ -19,6 +19,7 @@ class UserSystemPIN(models.Model):
         ('sigera', 'Ropa de Trabajo (SIGERA)'),
         ('sgp', 'Presupuesto (SGP)'),
         ('licitaciones', 'Licitaciones'),
+        ('supervivencia', 'Supervivencia / Pirotecnia'),
     ]
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='system_access')

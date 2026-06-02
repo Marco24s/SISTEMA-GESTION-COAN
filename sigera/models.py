@@ -100,6 +100,55 @@ class Personnel(models.Model):
         if self.dni: self.dni = self.dni.upper()
         super().save(*args, **kwargs)
 
+
+class PersonnelClothingMeasure(models.Model):
+    personnel = models.ForeignKey(
+        Personnel,
+        on_delete=models.CASCADE,
+        related_name="clothing_measures",
+        verbose_name="Personal",
+    )
+    clothing_type = models.ForeignKey(
+        ClothingType,
+        on_delete=models.CASCADE,
+        related_name="personnel_measures",
+        verbose_name="Prenda",
+    )
+    clothing_size = models.ForeignKey(
+        ClothingSize,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="personnel_measures",
+        verbose_name="Talle / Medida",
+    )
+    custom_measure = models.CharField(
+        max_length=120,
+        blank=True,
+        null=True,
+        verbose_name="Medida manual",
+        help_text="Usar solo si la medida no existe aun como talle del catalogo.",
+    )
+    notes = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado")
+
+    class Meta:
+        verbose_name = "Medida de ropa del personal"
+        verbose_name_plural = "Medidas de ropa del personal"
+        unique_together = ("personnel", "clothing_type")
+        ordering = ["clothing_type__name"]
+
+    def __str__(self):
+        value = self.clothing_size.size if self.clothing_size else (self.custom_measure or "SIN MEDIDA")
+        return f"{self.personnel} - {self.clothing_type.name}: {value}"
+
+    def save(self, *args, **kwargs):
+        if self.custom_measure:
+            self.custom_measure = self.custom_measure.upper().strip()
+        if self.notes:
+            self.notes = self.notes.upper().strip()
+        super().save(*args, **kwargs)
+
 class ClothingAssignment(models.Model):
     personnel = models.ForeignKey(Personnel, on_delete=models.CASCADE, related_name="assignments", verbose_name="Personal")
     batch = models.ForeignKey(ClothingBatch, on_delete=models.PROTECT, related_name="assignments", verbose_name="Del Ingreso (Lote)")

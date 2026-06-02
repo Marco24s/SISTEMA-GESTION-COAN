@@ -1,0 +1,169 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 mt-2 gap-3">
+    <div>
+        <h2 class="fw-bold mb-1" style="color: #462880;">
+            <i class="fa-solid fa-ruler-combined me-2"></i>Planilla de Medidas
+        </h2>
+        <p class="text-muted mb-0">
+            {{ person.last_name }}, {{ person.first_name }} · {{ person.get_rank_display }} · {{ person.dni }}
+            {% if person.assigned_unit %} · {{ person.assigned_unit.name }}{% endif %}
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if edit_mode %}
+            <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="btn btn-outline-success rounded-pill px-3">
+                <i class="fa-solid fa-table-list me-2"></i>Ver resumen
+            </a>
+        {% else %}
+            <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}?edit=1" class="btn btn-success rounded-pill px-3">
+                <i class="fa-solid fa-pen-to-square me-2"></i>{% if completed_rows %}Modificar talles{% else %}Cargar talles{% endif %}
+            </a>
+        {% endif %}
+        <a href="{% url 'sigera:personnel_edit' person.pk %}" class="btn btn-outline-primary rounded-pill px-3" style="color: #6f42c1; border-color: #6f42c1;">
+            <i class="fa-solid fa-user-pen me-2"></i>Datos personales
+        </a>
+        <a href="{% url 'sigera:personnel_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+            <i class="fa-solid fa-arrow-left me-2"></i>Volver
+        </a>
+    </div>
+</div>
+
+{% if not edit_mode %}
+<div class="card border-0 shadow-sm mb-4" style="border-radius: 15px; overflow: hidden;">
+    <div class="card-header bg-white border-bottom py-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+            <div>
+                <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Resumen de talles cargados</h5>
+                <small class="text-muted">Vista rapida de las medidas registradas para esta persona.</small>
+            </div>
+            <span class="badge bg-light text-dark border align-self-md-center">{{ completed_rows|length }} medida(s)</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if completed_rows %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th class="py-3 px-4 text-muted">Prenda</th>
+                            <th class="py-3 text-muted">Talle / Medida</th>
+                            <th class="py-3 text-muted">Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in completed_rows %}
+                        <tr>
+                            <td class="px-4 py-3">
+                                <div class="fw-bold">{{ row.clothing_type.name }}</div>
+                                {% if row.clothing_type.nato_stock_number %}
+                                    <small class="text-muted font-monospace">{{ row.clothing_type.nato_stock_number }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="py-3">
+                                {% if row.measure.clothing_size %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
+                                        Talle {{ row.measure.clothing_size.size }}
+                                    </span>
+                                {% elif row.measure.custom_measure %}
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2">
+                                        {{ row.measure.custom_measure }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">Sin medida</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-muted">{{ row.measure.notes|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center text-muted py-5 px-3">
+                <i class="fa-solid fa-ruler-combined fa-3x mb-3" style="color: #e0cffc;"></i>
+                <h5>Todavia no hay talles cargados</h5>
+                <p class="mb-4">Cargue la planilla para ver aca el resumen de botas, camperas, guantes y demas prendas.</p>
+                <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}?edit=1" class="btn btn-success rounded-pill px-4">
+                    <i class="fa-solid fa-plus me-2"></i>Cargar talles
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm mb-4" style="border-radius: 15px; overflow: hidden;">
+    <div class="card-header bg-white border-bottom py-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+            <div>
+                <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Cargar o modificar talles</h5>
+                <small class="text-muted">Las prendas nuevas del catalogo apareceran automaticamente en esta planilla.</small>
+            </div>
+            <span class="badge bg-light text-dark border align-self-md-center">{{ rows|length }} prenda(s)</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th class="py-3 px-4 text-muted">Prenda</th>
+                            <th class="py-3 text-muted">Talle / Medida</th>
+                            <th class="py-3 text-muted">Medida manual</th>
+                            <th class="py-3 text-muted">Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr>
+                            <td class="px-4 py-3">
+                                <div class="fw-bold">{{ row.clothing_type.name }}</div>
+                                {% if row.clothing_type.nato_stock_number %}
+                                    <small class="text-muted font-monospace">{{ row.clothing_type.nato_stock_number }}</small>
+                                {% endif %}
+                                {% if row.sizes_count == 0 %}
+                                    <div><small class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>Sin talles cargados en catalogo</small></div>
+                                {% endif %}
+                            </td>
+                            <td class="py-3" style="min-width: 180px;">
+                                {{ row.form.clothing_size|as_crispy_field }}
+                            </td>
+                            <td class="py-3" style="min-width: 180px;">
+                                {{ row.form.custom_measure|as_crispy_field }}
+                            </td>
+                            <td class="py-3" style="min-width: 220px;">
+                                {{ row.form.notes|as_crispy_field }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-5">
+                                <i class="fa-solid fa-shirt fa-3x mb-3" style="color: #e0cffc;"></i>
+                                <h5>No hay prendas en el catalogo</h5>
+                                <p>Primero cargue prendas y talles para completar la planilla.</p>
+                                <a href="{% url 'sigera:catalog_create' %}" class="btn btn-primary rounded-pill px-4" style="background-color: #6f42c1; border-color: #6f42c1;">
+                                    <i class="fa-solid fa-plus me-2"></i>Cargar prenda
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if rows %}
+            <div class="d-flex justify-content-end gap-2 p-3 border-top bg-light">
+                <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="btn btn-light border px-4">Cancelar</a>
+                <button type="submit" class="btn btn-primary px-5" style="background-color: #6f42c1; border-color: #6f42c1;">
+                    <i class="fa-solid fa-save me-2"></i>Guardar Planilla
+                </button>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

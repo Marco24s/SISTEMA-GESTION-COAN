@@ -1,5 +1,5 @@
 from django import forms
-from .models import Personnel, ClothingAssignment, ClothingBatch, ClothingType, ClothingSize
+from .models import Personnel, ClothingAssignment, ClothingBatch, ClothingType, ClothingSize, PersonnelClothingMeasure
 from core.models import Unit
 
 class PersonnelForm(forms.ModelForm):
@@ -125,4 +125,31 @@ class ClothingBatchForm(forms.ModelForm):
             if clothing_size.clothing_type != clothing_type:
                 self.add_error('clothing_size', 'El talle seleccionado no corresponde a la prenda elegida.')
 
+        return cleaned_data
+
+
+class PersonnelClothingMeasureForm(forms.ModelForm):
+    class Meta:
+        model = PersonnelClothingMeasure
+        fields = ["clothing_size", "custom_measure", "notes"]
+        widgets = {
+            "custom_measure": forms.TextInput(attrs={"placeholder": "Medida manual", "style": "text-transform: uppercase;"}),
+            "notes": forms.TextInput(attrs={"placeholder": "Observaciones", "style": "text-transform: uppercase;"}),
+        }
+
+    def __init__(self, *args, clothing_type=None, **kwargs):
+        self.clothing_type = clothing_type
+        super().__init__(*args, **kwargs)
+        self.fields["clothing_size"].required = False
+        self.fields["custom_measure"].required = False
+        self.fields["notes"].required = False
+        if clothing_type:
+            self.fields["clothing_size"].queryset = ClothingSize.objects.filter(clothing_type=clothing_type).order_by("size")
+            self.fields["clothing_size"].empty_label = "Sin medida"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        clothing_size = cleaned_data.get("clothing_size")
+        if self.clothing_type and clothing_size and clothing_size.clothing_type_id != self.clothing_type.id:
+            self.add_error("clothing_size", "El talle seleccionado no corresponde a esta prenda.")
         return cleaned_data

@@ -1,0 +1,186 @@
+{% extends "supervivencia/base_supervivencia.html" %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
+    <div>
+        <h2 class="mb-1"><i class="fa-solid fa-clipboard-list me-2 text-danger"></i> Ficha del medio</h2>
+        <p class="text-muted mb-0">Pirotecnia actualmente asignada y vencimientos asociados.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'supervivencia:assignment_create' %}?medium={{ medium.id }}" class="btn btn-danger">
+            <i class="fa-solid fa-plus me-1"></i> Asignar material
+        </a>
+        <a href="{% url 'supervivencia:medium_update' medium.id %}" class="btn btn-outline-danger">
+            <i class="fa-solid fa-pen-to-square me-1"></i> Editar medio
+        </a>
+        <a href="{% url 'supervivencia:medium_list' %}" class="btn btn-outline-secondary">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-center">
+            <div class="col-lg-4">
+                <div class="small text-muted text-uppercase">Identificacion</div>
+                <div class="h3 mb-0">{{ medium.identifier }}</div>
+            </div>
+            <div class="col-lg-4">
+                <div class="small text-muted text-uppercase">Medio</div>
+                <div class="fw-bold">{{ medium.name }}</div>
+                <div class="text-muted">{{ medium.get_medium_type_display }}</div>
+            </div>
+            <div class="col-lg-4">
+                <div class="small text-muted text-uppercase">Modelo / unidad</div>
+                <div class="fw-bold">{{ medium.model|default:"Sin modelo" }}</div>
+                <div class="text-muted">{{ medium.unit.name|default:"Sin unidad" }}</div>
+            </div>
+        </div>
+        {% if medium.notes %}
+        <div class="border-top mt-3 pt-3">
+            <div class="small text-muted text-uppercase">Observaciones</div>
+            <div>{{ medium.notes }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase">Material montado</div>
+                <div class="h2 mb-0">{{ active_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase">Vencidos</div>
+                <div class="h2 mb-0 text-danger">{{ expired_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase">Vencen en 6 meses</div>
+                <div class="h2 mb-0 text-warning">{{ next_6_months_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-bold" style="color:#b91c1c;">
+            <i class="fa-solid fa-link me-2"></i>Pirotecnia montada
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Material</th>
+                        <th>Serie / Lote</th>
+                        <th>Posicion</th>
+                        <th>Ubicacion</th>
+                        <th>Vencimiento</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for assignment in active_assignments %}
+                    <tr>
+                        <td>
+                            <strong>{{ assignment.physical_item.catalog_item.nomenclature }}</strong>
+                            <br><small class="text-muted">{{ assignment.physical_item.catalog_item.system }}</small>
+                        </td>
+                        <td>
+                            {% if assignment.physical_item.serial_number %}<div>Serie: <strong>{{ assignment.physical_item.serial_number }}</strong></div>{% endif %}
+                            {% if assignment.physical_item.lot_number %}<div>Lote: <strong>{{ assignment.physical_item.lot_number }}</strong></div>{% endif %}
+                        </td>
+                        <td>{{ assignment.position|default:"-" }}</td>
+                        <td>
+                            {% if assignment.physical_item.current_storage_location %}
+                                <span class="badge bg-light text-dark border">{{ assignment.physical_item.current_storage_location.code }}</span>
+                                <br><small class="text-muted">{{ assignment.physical_item.current_storage_location.name }}</small>
+                            {% else %}
+                                {{ assignment.physical_item.current_location|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ assignment.physical_item.expiration_date|date:"d/m/Y" }}</strong>
+                            <br><span class="badge bg-{{ assignment.expiration_class }}">{{ assignment.expiration_state }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">Montado</span>
+                            <br><small class="text-muted">Desde {{ assignment.installed_at|date:"d/m/Y" }}</small>
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'supervivencia:assignment_update' assignment.id %}" class="btn btn-sm btn-outline-danger" title="Editar">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </a>
+                            <form method="post" action="{% url 'supervivencia:assignment_delete' assignment.id %}" class="d-inline" onsubmit="return confirm('Retirar esta asignacion?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Retirar">
+                                    <i class="fa-solid fa-ban"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Este medio no tiene pirotecnia montada.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if history_assignments %}
+<div class="card shadow-sm border-0 mb-5">
+    <div class="card-header bg-white border-bottom py-3">
+        <h5 class="mb-0 fw-bold" style="color:#495057;">
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>Asignaciones retiradas
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Material</th>
+                        <th>Serie / Lote</th>
+                        <th>Montado</th>
+                        <th>Retirado</th>
+                        <th>Estado de vencimiento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for assignment in history_assignments %}
+                    <tr>
+                        <td>
+                            <strong>{{ assignment.physical_item.catalog_item.nomenclature }}</strong>
+                            <br><small class="text-muted">{{ assignment.physical_item.catalog_item.system }}</small>
+                        </td>
+                        <td>
+                            {% if assignment.physical_item.serial_number %}<div>Serie: <strong>{{ assignment.physical_item.serial_number }}</strong></div>{% endif %}
+                            {% if assignment.physical_item.lot_number %}<div>Lote: <strong>{{ assignment.physical_item.lot_number }}</strong></div>{% endif %}
+                        </td>
+                        <td>{{ assignment.installed_at|date:"d/m/Y" }}</td>
+                        <td>{{ assignment.removed_at|date:"d/m/Y"|default:"-" }}</td>
+                        <td><span class="badge bg-{{ assignment.expiration_class }}">{{ assignment.expiration_state }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

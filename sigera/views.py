@@ -4,8 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q
 from django.db import transaction
 from django.contrib import messages
-from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, ClothingAssignment, StockThreshold
-from .forms import PersonnelForm, ClothingAssignmentForm
+from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, ClothingAssignment, PersonnelClothingMeasure, StockThreshold
+from .forms import PersonnelForm, ClothingAssignmentForm, PersonnelClothingMeasureForm
 import pandas as pd
 from core.models import Unit
 from core.decorators import pin_required
@@ -289,7 +289,7 @@ def personnel_create(request):
         if form.is_valid():
             person = form.save()
             messages.success(request, f"¡Legajo de {person.last_name}, {person.first_name} creado!")
-            return redirect('sigera:personnel_list')
+            return redirect(f"{reverse('sigera:personnel_measure_sheet', kwargs={'pk': person.pk})}?edit=1")
     else:
         form = PersonnelForm(user=request.user)
         
@@ -408,6 +408,199 @@ def personnel_edit(request, pk):
         form = PersonnelForm(instance=person, user=request.user)
         
     return render(request, 'sigera/personnel_form.html', {'form': form, 'edit_mode': True})
+
+
+@login_required
+def personnel_measure_sheet(request, pk):
+    person = get_object_or_404(Personnel.objects.select_related('assigned_unit'), pk=pk)
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+
+    if not is_admin and getattr(user, 'unit', None) and person.assigned_unit_id != user.unit_id:
+        messages.error(request, "Acceso denegado: No tienes permisos para modificar esta planilla.")
+        return redirect('sigera:personnel_list')
+    if not is_admin and not getattr(user, 'unit', None):
+        messages.error(request, "Acceso denegado: No tienes unidad asignada.")
+        return redirect('sigera:personnel_list')
+
+    clothing_types = ClothingType.objects.prefetch_related('sizes').order_by('name')
+    existing_measures = {
+        measure.clothing_type_id: measure
+        for measure in PersonnelClothingMeasure.objects.filter(personnel=person).select_related('clothing_type', 'clothing_size')
+    }
+    edit_mode = request.GET.get('edit') == '1' or request.method == 'POST'
+
+    if request.method == 'POST':
+        forms_by_type = []
+        is_valid = True
+        for clothing_type in clothing_types:
+            form = PersonnelClothingMeasureForm(
+                request.POST,
+                prefix=f"measure_{clothing_type.id}",
+                instance=existing_measures.get(clothing_type.id),
+                clothing_type=clothing_type,
+            )
+            forms_by_type.append((clothing_type, form))
+            if not form.is_valid():
+                is_valid = False
+
+        if is_valid:
+            with transaction.atomic():
+                for clothing_type, form in forms_by_type:
+                    clothing_size = form.cleaned_data.get('clothing_size')
+                    custom_measure = form.cleaned_data.get('custom_measure')
+                    notes = form.cleaned_data.get('notes')
+                    existing = existing_measures.get(clothing_type.id)
+
+                    if clothing_size or custom_measure or notes:
+                        measure = form.save(commit=False)
+                        measure.personnel = person
+                        measure.clothing_type = clothing_type
+                        measure.save()
+                    elif existing:
+                        existing.delete()
+
+            messages.success(request, "Planilla de medidas actualizada correctamente.")
+            return redirect('sigera:personnel_measure_sheet', pk=person.pk)
+    else:
+        forms_by_type = [
+            (
+                clothing_type,
+                PersonnelClothingMeasureForm(
+                    prefix=f"measure_{clothing_type.id}",
+                    instance=existing_measures.get(clothing_type.id),
+                    clothing_type=clothing_type,
+                ),
+            )
+            for clothing_type in clothing_types
+        ]
+
+    rows = [
+        {
+            'clothing_type': clothing_type,
+            'form': form,
+            'sizes_count': clothing_type.sizes.count(),
+            'measure': existing_measures.get(clothing_type.id),
+        }
+        for clothing_type, form in forms_by_type
+    ]
+    completed_rows = [row for row in rows if row['measure']]
+
+    return render(
+        request,
+        'sigera/personnel_measure_sheet.html',
+        {
+            'person': person,
+            'rows': rows,
+            'completed_rows': completed_rows,
+            'edit_mode': edit_mode,
+            'is_admin': is_admin,
+        },
+    )
+
+
+@login_required
+def size_curve(request):
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    selected_clothing_type = request.GET.get('clothing_type', '')
+    selected_unit = request.GET.get('unit', '')
+
+    measures = PersonnelClothingMeasure.objects.select_related(
+        'personnel__assigned_unit',
+        'clothing_type',
+        'clothing_size',
+    ).filter(
+        Q(clothing_size__isnull=False) | Q(custom_measure__isnull=False)
+    )
+
+    if not is_admin:
+        if getattr(user, 'unit', None):
+            measures = measures.filter(personnel__assigned_unit=user.unit)
+            selected_unit = str(user.unit_id)
+        else:
+            measures = measures.none()
+    elif selected_unit:
+        measures = measures.filter(personnel__assigned_unit_id=selected_unit)
+
+    if selected_clothing_type:
+        measures = measures.filter(clothing_type_id=selected_clothing_type)
+
+    stock_by_size = {
+        row['clothing_size_id']: row['total'] or 0
+        for row in ClothingBatch.objects.values('clothing_size_id').annotate(total=Sum('available_quantity'))
+    }
+
+    curve_map = {}
+    for measure in measures:
+        if measure.clothing_size:
+            size_label = measure.clothing_size.size
+            size_id = measure.clothing_size_id
+            stock_available = stock_by_size.get(size_id, 0)
+            sort_value = size_label
+        else:
+            size_label = measure.custom_measure
+            size_id = None
+            stock_available = None
+            sort_value = size_label or ''
+
+        if not size_label:
+            continue
+
+        key = (measure.clothing_type_id, size_id, size_label)
+        if key not in curve_map:
+            curve_map[key] = {
+                'clothing_type': measure.clothing_type,
+                'size_label': size_label,
+                'size_id': size_id,
+                'required_quantity': 0,
+                'stock_available': stock_available,
+                'sort_value': sort_value,
+            }
+        curve_map[key]['required_quantity'] += 1
+
+    curve_rows = []
+    for row in curve_map.values():
+        if row['stock_available'] is None:
+            row['missing_quantity'] = row['required_quantity']
+        else:
+            row['missing_quantity'] = max(row['required_quantity'] - row['stock_available'], 0)
+        curve_rows.append(row)
+
+    curve_rows.sort(key=lambda row: (row['clothing_type'].name, row['sort_value']))
+
+    grouped_curve = []
+    current_group = None
+    for row in curve_rows:
+        if current_group is None or current_group['clothing_type'] != row['clothing_type']:
+            if current_group:
+                grouped_curve.append(current_group)
+            current_group = {
+                'clothing_type': row['clothing_type'],
+                'rows': [],
+                'required_total': 0,
+                'stock_total': 0,
+                'missing_total': 0,
+            }
+        current_group['rows'].append(row)
+        current_group['required_total'] += row['required_quantity']
+        current_group['stock_total'] += row['stock_available'] or 0
+        current_group['missing_total'] += row['missing_quantity']
+    if current_group:
+        grouped_curve.append(current_group)
+
+    context = {
+        'grouped_curve': grouped_curve,
+        'clothing_types': ClothingType.objects.order_by('name'),
+        'units': Unit.objects.order_by('name') if is_admin else Unit.objects.filter(pk=getattr(user, 'unit_id', None)),
+        'selected_clothing_type': selected_clothing_type,
+        'selected_unit': selected_unit,
+        'is_admin': is_admin,
+        'total_required': sum(row['required_quantity'] for row in curve_rows),
+        'total_missing': sum(row['missing_quantity'] for row in curve_rows),
+        'measured_personnel_count': measures.values('personnel_id').distinct().count(),
+    }
+    return render(request, 'sigera/size_curve.html', context)
 
 @login_required
 def personnel_delete(request, pk):

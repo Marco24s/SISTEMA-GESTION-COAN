@@ -1,0 +1,242 @@
+{% extends "supervivencia/base_supervivencia.html" %}
+
+{% block title %}Supervivencia / Pirotecnia{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 gap-3">
+        <div>
+            <h2 class="mb-1">
+                <i class="fa-solid fa-parachute-box me-2 text-danger"></i>
+                Supervivencia / Pirotecnia
+            </h2>
+            <p class="text-muted mb-0">Control operativo de medios, material pirotecnico, asignaciones y vencimientos.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'supervivencia:medium_create' %}" class="btn btn-outline-danger">
+                <i class="fa-solid fa-helicopter me-1"></i> Nuevo medio
+            </a>
+            <a href="{% url 'supervivencia:physical_item_create' %}" class="btn btn-outline-danger">
+                <i class="fa-solid fa-barcode me-1"></i> Nuevo material
+            </a>
+            <a href="{% url 'supervivencia:assignment_create' %}" class="btn btn-danger">
+                <i class="fa-solid fa-link me-1"></i> Nueva asignacion
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'supervivencia:medium_list' %}" class="text-decoration-none text-dark">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small text-uppercase fw-bold">Medios activos</div>
+                                <div class="display-6 fw-bold">{{ medium_count }}</div>
+                            </div>
+                            <i class="fa-solid fa-helicopter text-danger fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'supervivencia:catalog_list' %}" class="text-decoration-none text-dark">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small text-uppercase fw-bold">Catalogo activo</div>
+                                <div class="display-6 fw-bold">{{ catalog_count }}</div>
+                            </div>
+                            <i class="fa-solid fa-boxes-stacked text-danger fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'supervivencia:physical_item_list' %}" class="text-decoration-none text-dark">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small text-uppercase fw-bold">Material activo</div>
+                                <div class="display-6 fw-bold">{{ total_active_material }}</div>
+                            </div>
+                            <i class="fa-solid fa-barcode text-danger fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'supervivencia:assignment_list' %}?active=1" class="text-decoration-none text-dark">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small text-uppercase fw-bold">Montados</div>
+                                <div class="display-6 fw-bold">{{ mounted_count }}</div>
+                            </div>
+                            <i class="fa-solid fa-link text-danger fs-3"></i>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <a href="{% url 'supervivencia:physical_item_list' %}?status=STOCK" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small text-uppercase fw-bold">En deposito / stock</div>
+                        <div class="h2 mb-0 text-primary">{{ stock_count }}</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'supervivencia:physical_item_list' %}?expiration=expired" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small text-uppercase fw-bold">Vencidos</div>
+                        <div class="h2 mb-0 text-danger">{{ expired_count }}</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'supervivencia:physical_item_list' %}?expiration=next_6_months" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small text-uppercase fw-bold">Vencen en 6 meses</div>
+                        <div class="h2 mb-0 text-warning">{{ next_6_months_count }}</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'supervivencia:physical_item_list' %}?expiration=next_1_year" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small text-uppercase fw-bold">Vencen 6 meses a 1 año</div>
+                        <div class="h2 mb-0 text-info">{{ next_1_year_count }}</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <a href="{% url 'supervivencia:physical_item_list' %}?expiration=next_2_years" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small text-uppercase fw-bold">Vencen 1 a 2 años</div>
+                        <div class="h2 mb-0 text-secondary">{{ next_2_years_count }}</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0"><i class="fa-solid fa-triangle-exclamation me-2 text-danger"></i> Alertas de vencimiento</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Material</th>
+                                    <th>Serie / Lote</th>
+                                    <th>Destino actual</th>
+                                    <th>Vencimiento</th>
+                                    <th>Alerta</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in expiration_alerts %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.catalog_item.nomenclature }}</strong>
+                                        <br><small class="text-muted">{{ item.catalog_item.system }}</small>
+                                    </td>
+                                    <td>
+                                        {% if item.serial_number %}<div>Serie: <strong>{{ item.serial_number }}</strong></div>{% endif %}
+                                        {% if item.lot_number %}<div>Lote: <strong>{{ item.lot_number }}</strong></div>{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.current_assignment %}
+                                            <strong>{{ item.current_assignment.medium.identifier }}</strong>
+                                            <br><small class="text-muted">{{ item.current_assignment.medium.name }}</small>
+                                        {% elif item.current_storage_location %}
+                                            <span class="badge bg-light text-dark border">{{ item.current_storage_location.code }}</span>
+                                            <br><small class="text-muted">{{ item.current_storage_location.name }}</small>
+                                        {% else %}
+                                            {{ item.current_location|default:"-" }}
+                                        {% endif %}
+                                    </td>
+                                    <td><strong>{{ item.expiration_date|date:"d/m/Y" }}</strong></td>
+                                    <td><span class="badge bg-{{ item.alert_class }}">{{ item.alert_label }}</span></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        No hay vencimientos dentro de los proximos 2 años.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white text-end">
+                    <a href="{% url 'supervivencia:physical_item_list' %}?expiration=next_2_years" class="btn btn-sm btn-outline-danger">
+                        Ver material con vencimiento
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0"><i class="fa-solid fa-clock-rotate-left me-2 text-danger"></i> Ultimos movimientos</h5>
+                </div>
+                <div class="card-body">
+                    {% for movement in latest_movements %}
+                    <div class="border-bottom pb-3 mb-3">
+                        <div class="d-flex justify-content-between gap-2">
+                            <strong>{{ movement.get_movement_type_display }}</strong>
+                            <small class="text-muted">{{ movement.movement_date|date:"d/m/Y" }}</small>
+                        </div>
+                        <div class="small">
+                            {{ movement.physical_item.catalog_item.nomenclature }}
+                            {% if movement.physical_item.serial_number %} - {{ movement.physical_item.serial_number }}{% endif %}
+                        </div>
+                        <div class="small text-muted">
+                            {% if movement.medium %}{{ movement.medium.identifier }}{% else %}Sin medio{% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-4">Todavia no hay movimientos registrados.</div>
+                    {% endfor %}
+                </div>
+                <div class="card-footer bg-white text-end">
+                    <a href="{% url 'supervivencia:movement_list' %}" class="btn btn-sm btn-outline-danger">
+                        Ver movimientos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

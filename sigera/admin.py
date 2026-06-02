@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, ClothingAssignment, StockThreshold
+from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, ClothingAssignment, PersonnelClothingMeasure, StockThreshold
 
 @admin.register(ClothingType)
 class ClothingTypeAdmin(admin.ModelAdmin):
@@ -23,6 +23,12 @@ class PersonnelAdmin(admin.ModelAdmin):
     list_display = ('last_name', 'first_name', 'dni', 'rank', 'assigned_unit')
     list_filter = ('rank', 'assigned_unit')
     search_fields = ('last_name', 'first_name', 'dni')
+
+@admin.register(PersonnelClothingMeasure)
+class PersonnelClothingMeasureAdmin(admin.ModelAdmin):
+    list_display = ('personnel', 'clothing_type', 'clothing_size', 'custom_measure', 'updated_at')
+    list_filter = ('clothing_type', 'updated_at')
+    search_fields = ('personnel__last_name', 'personnel__first_name', 'personnel__dni', 'clothing_type__name', 'custom_measure')
 
 @admin.register(ClothingAssignment)
 class ClothingAssignmentAdmin(admin.ModelAdmin):

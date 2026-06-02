@@ -34,6 +34,9 @@
                     <a class="nav-link {% if 'personnel' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:personnel_list' %}">Personal</a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'size_curve' %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:size_curve' %}">Curva de talles</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if 'assignment' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:assignment_list' %}">Entregas</a>
                 </li>
                 <li class="nav-item">

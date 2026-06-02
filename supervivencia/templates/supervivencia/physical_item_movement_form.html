@@ -1,0 +1,99 @@
+{% extends "supervivencia/base_supervivencia.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
+    <div>
+        <h2 class="mb-1">
+            <i class="fa-solid fa-arrows-rotate me-2 text-danger"></i>{{ title }}
+        </h2>
+        <p class="text-muted mb-0">Cambio controlado de estado, condicion o ubicacion con registro automatico en movimientos.</p>
+    </div>
+    <a href="{% url 'supervivencia:physical_item_list' %}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-1"></i> Volver
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-lg-4">
+                <div class="small text-muted text-uppercase">Material</div>
+                <div class="fw-bold">{{ item.catalog_item.nomenclature }}</div>
+                <div class="text-muted">{{ item.catalog_item.system }}</div>
+            </div>
+            <div class="col-lg-3">
+                <div class="small text-muted text-uppercase">Identificacion</div>
+                {% if item.serial_number %}<div>Serie: <strong>{{ item.serial_number }}</strong></div>{% endif %}
+                {% if item.lot_number %}<div>Lote: <strong>{{ item.lot_number }}</strong></div>{% endif %}
+            </div>
+            <div class="col-lg-3">
+                <div class="small text-muted text-uppercase">Vencimiento</div>
+                <div class="fw-bold {% if item.is_expired %}text-danger{% endif %}">{{ item.expiration_date|date:"d/m/Y" }}</div>
+            </div>
+            <div class="col-lg-2">
+                <div class="small text-muted text-uppercase">Estado actual</div>
+                <span class="badge bg-secondary">{{ item.get_operational_status_display }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger border-0 shadow-sm">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-bold" style="color:#b91c1c;">
+                <i class="fa-solid fa-clipboard-check me-2"></i>Estado y condicion
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.condition|as_crispy_field }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.operational_status|as_crispy_field }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-bold" style="color:#b91c1c;">
+                <i class="fa-solid fa-location-dot me-2"></i>Ubicacion
+            </h5>
+        </div>
+        <div class="card-body">
+            {{ form.current_storage_location|as_crispy_field }}
+            {{ form.current_location|as_crispy_field }}
+            <small class="text-muted">Si selecciona una ubicacion controlada, el sistema actualiza la referencia manual automaticamente.</small>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-bold" style="color:#b91c1c;">
+                <i class="fa-solid fa-note-sticky me-2"></i>Observaciones
+            </h5>
+        </div>
+        <div class="card-body">
+            {{ form.movement_notes|as_crispy_field }}
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between mb-5">
+        <a href="{% url 'supervivencia:physical_item_list' %}" class="btn btn-outline-secondary">
+            <i class="fa-solid fa-arrow-left me-1"></i> Cancelar
+        </a>
+        <button type="submit" class="btn btn-danger px-4">
+            <i class="fa-solid fa-save me-1"></i> Registrar movimiento
+        </button>
+    </div>
+</form>
+{% endblock %}

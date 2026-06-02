@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Supervivencia / Pirotecnia{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background: linear-gradient(135deg, #312e81 0%, #b91c1c 100%);">
+    <div class="container-fluid px-4">
+        <a href="/" class="btn btn-sm text-white border-white me-3" style="border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1);" title="Volver al Portal">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'supervivencia:dashboard' %}">
+            <i class="fa-solid fa-parachute-box me-2"></i>
+            <strong>Supervivencia / Pirotecnia</strong>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#supervivenciaNavbar" aria-controls="supervivenciaNavbar" aria-expanded="false" aria-label="Menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="supervivenciaNavbar">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active fw-bold{% endif %}" href="{% url 'supervivencia:dashboard' %}">
+                        <i class="fa-solid fa-gauge-high me-1"></i> Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'medium' in request.resolver_match.url_name %}active fw-bold{% endif %}" href="{% url 'supervivencia:medium_list' %}">
+                        <i class="fa-solid fa-helicopter me-1"></i> Medios
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'catalog' in request.resolver_match.url_name %}active fw-bold{% endif %}" href="{% url 'supervivencia:catalog_list' %}">
+                        <i class="fa-solid fa-boxes-stacked me-1"></i> Catalogo
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'physical_item' in request.resolver_match.url_name %}active fw-bold{% endif %}" href="{% url 'supervivencia:physical_item_list' %}">
+                        <i class="fa-solid fa-barcode me-1"></i> Material
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'assignment' in request.resolver_match.url_name %}active fw-bold{% endif %}" href="{% url 'supervivencia:assignment_list' %}">
+                        <i class="fa-solid fa-link me-1"></i> Asignaciones
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'movement' in request.resolver_match.url_name %}active fw-bold{% endif %}" href="{% url 'supervivencia:movement_list' %}">
+                        <i class="fa-solid fa-clock-rotate-left me-1"></i> Movimientos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if 'location' in request.resolver_match.url_name %}active fw-bold{% endif %}" href="{% url 'supervivencia:location_list' %}">
+                        <i class="fa-solid fa-warehouse me-1"></i> Ubicaciones
+                    </a>
+                </li>
+            </ul>
+            <span class="navbar-text text-white-50">
+                <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}
+            </span>
+        </div>
+    </div>
+</nav>
+{% endblock %}

@@ -28,6 +28,8 @@ class PINSecurityMiddleware:
             system = 'sgp'
         elif path.startswith('/licitaciones/') or path.startswith('/licitas/'):
             system = 'licitaciones'
+        elif path.startswith('/supervivencia/'):
+            system = 'supervivencia'
         # Rutas de SGMG (core) que no son el portal, admin o seguridad
         elif not any(path.startswith(p) for p in ['/admin/', '/accounts/', '/security/', '/static/', '/media/', '/__debug__/']):
             # Excluir archivos comunes que el navegador pide automáticamente en la raíz

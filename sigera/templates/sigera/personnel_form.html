@@ -14,6 +14,13 @@
                 <i class="fa-solid fa-arrow-left me-2"></i>Volver
             </a>
         </div>
+        {% if edit_mode and form.instance.pk %}
+        <div class="d-flex justify-content-end mb-3">
+            <a href="{% url 'sigera:personnel_measure_sheet' form.instance.pk %}" class="btn btn-outline-success rounded-pill px-3">
+                <i class="fa-solid fa-ruler-combined me-2"></i>Planilla de Medidas
+            </a>
+        </div>
+        {% endif %}
 
         <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
             <div class="card-header bg-white border-bottom py-3">

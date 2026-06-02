@@ -1,0 +1,183 @@
+{% extends "supervivencia/base_supervivencia.html" %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
+    <div>
+        <h2 class="mb-1"><i class="fa-solid fa-barcode me-2 text-danger"></i> Material Físico</h2>
+        <p class="text-muted mb-0">Componentes reales con serie/lote, vencimiento y ubicación actual.</p>
+    </div>
+    <a href="{% url 'supervivencia:physical_item_create' %}" class="btn btn-danger">
+        <i class="fa-solid fa-plus me-1"></i> Nuevo material
+    </a>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase">Activos</div>
+                <div class="h2 mb-0">{{ total_active }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase">Vencidos</div>
+                <div class="h2 mb-0 text-danger">{{ expired_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="small text-muted text-uppercase">Vencen en 6 meses</div>
+                <div class="h2 mb-0 text-warning">{{ next_6_months_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Buscar</label>
+                <input type="search" name="q" value="{{ search_query }}" class="form-control" placeholder="Serie, lote, material, ubicación">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Condición</label>
+                <select name="condition" class="form-select">
+                    <option value="">Todas</option>
+                    {% for value,label in condition_choices %}
+                        <option value="{{ value }}" {% if selected_condition == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Estado</label>
+                <select name="status" class="form-select">
+                    <option value="">Todos</option>
+                    {% for value,label in status_choices %}
+                        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Vencimiento</label>
+                <select name="expiration" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="expired" {% if selected_expiration == "expired" %}selected{% endif %}>Vencidos</option>
+                    <option value="next_6_months" {% if selected_expiration == "next_6_months" %}selected{% endif %}>Próx. 6 meses</option>
+                    <option value="next_1_year" {% if selected_expiration == "next_1_year" %}selected{% endif %}>6 meses a 1 año</option>
+                    <option value="next_2_years" {% if selected_expiration == "next_2_years" %}selected{% endif %}>1 a 2 años</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Ubicacion</label>
+                <select name="location" class="form-select">
+                    <option value="">Todas</option>
+                    {% for location in locations %}
+                        <option value="{{ location.id }}" {% if selected_location == location.id|stringformat:"s" %}selected{% endif %}>{{ location.code }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1 d-grid">
+                <button type="submit" class="btn btn-outline-danger"><i class="fa-solid fa-filter me-1"></i> Filtrar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Material</th>
+                        <th>Serie / Lote</th>
+                        <th>Fabricante</th>
+                        <th>Vencimiento</th>
+                        <th>Condición</th>
+                        <th>Estado</th>
+                        <th>Ubicación</th>
+                        <th>Activo</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>
+                            <strong>{{ item.catalog_item.nomenclature }}</strong>
+                            <br><small class="text-muted">{{ item.catalog_item.system }}</small>
+                        </td>
+                        <td>
+                            {% if item.serial_number %}<div>Serie: <strong>{{ item.serial_number }}</strong></div>{% endif %}
+                            {% if item.lot_number %}<div>Lote: <strong>{{ item.lot_number }}</strong></div>{% endif %}
+                            {% if not item.serial_number and not item.lot_number %}<span class="text-muted">Sin identificar</span>{% endif %}
+                        </td>
+                        <td>{{ item.manufacturer|default:"-" }}</td>
+                        <td>
+                            <strong class="{% if item.is_expired %}text-danger{% endif %}">{{ item.expiration_date|date:"d/m/Y" }}</strong>
+                            {% if item.is_expired %}<br><span class="badge bg-danger">Vencido</span>{% endif %}
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ item.get_condition_display }}</span></td>
+                        <td><span class="badge bg-secondary">{{ item.get_operational_status_display }}</span></td>
+                        <td>
+                            {% if item.current_storage_location %}
+                                <span class="badge bg-light text-dark border">{{ item.current_storage_location.code }}</span>
+                                <br><small class="text-muted">{{ item.current_storage_location.name }}</small>
+                            {% else %}
+                                {{ item.current_location }}
+                            {% endif %}
+                        </td>
+                        <td>{% if item.is_active %}<span class="badge bg-success">Si</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
+                        <td class="text-end">
+                            <a href="{% url 'supervivencia:physical_item_detail' item.id %}" class="btn btn-sm btn-outline-primary" title="Ver ficha">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
+                            <a href="{% url 'supervivencia:physical_item_movement' item.id %}" class="btn btn-sm btn-outline-primary" title="Movimiento">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </a>
+                            <a href="{% url 'supervivencia:physical_item_update' item.id %}" class="btn btn-sm btn-outline-danger" title="Editar">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </a>
+                            {% if item.is_active %}
+                            <form method="post" action="{% url 'supervivencia:physical_item_delete' item.id %}" class="d-inline" onsubmit="return confirm('¿Desactivar este material?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Desactivar">
+                                    <i class="fa-solid fa-ban"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="9" class="text-center text-muted py-4">Todavia no hay material físico cargado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if is_paginated %}
+<nav class="mt-3" aria-label="Paginacion de material">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a></li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_obj.next_page_number }}">Siguiente</a></li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends 'sigera/base_sigera.html' %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 mt-2 gap-3">
+    <div>
+        <h2 class="fw-bold mb-1" style="color: #462880;">
+            <i class="fa-solid fa-chart-column me-2"></i>Curva de Talles
+        </h2>
+        <p class="text-muted mb-0">Necesidad real calculada desde las planillas de medidas del personal.</p>
+    </div>
+    <a href="{% url 'sigera:personnel_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+        <i class="fa-solid fa-users me-2"></i>Personal
+    </a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Personal con medidas</div>
+                <div class="display-6 fw-bold" style="color: #462880;">{{ measured_personnel_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Necesidad total</div>
+                <div class="display-6 fw-bold text-primary">{{ total_required }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Faltante estimado</div>
+                <div class="display-6 fw-bold {% if total_missing %}text-danger{% else %}text-success{% endif %}">{{ total_missing }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label small text-muted mb-1">Prenda</label>
+                <select name="clothing_type" class="form-select">
+                    <option value="">Todas</option>
+                    {% for item in clothing_types %}
+                        <option value="{{ item.id }}" {% if selected_clothing_type == item.id|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small text-muted mb-1">Unidad</label>
+                <select name="unit" class="form-select" {% if not is_admin %}disabled{% endif %}>
+                    <option value="">Todas</option>
+                    {% for unit in units %}
+                        <option value="{{ unit.id }}" {% if selected_unit == unit.id|stringformat:"s" %}selected{% endif %}>{{ unit.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary" style="background-color: #6f42c1; border-color: #6f42c1;">
+                    <i class="fa-solid fa-filter me-2"></i>Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% for group in grouped_curve %}
+<div class="card border-0 shadow-sm mb-4" style="border-radius: 15px; overflow: hidden;">
+    <div class="card-header bg-white border-bottom py-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+            <div>
+                <h5 class="mb-0 fw-bold" style="color: #6f42c1;">{{ group.clothing_type.name }}</h5>
+                {% if group.clothing_type.nato_stock_number %}
+                    <small class="text-muted font-monospace">{{ group.clothing_type.nato_stock_number }}</small>
+                {% endif %}
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Necesario {{ group.required_total }}</span>
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Stock {{ group.stock_total }}</span>
+                <span class="badge {% if group.missing_total %}bg-danger-subtle text-danger border-danger-subtle{% else %}bg-success-subtle text-success border-success-subtle{% endif %} border">
+                    Faltante {{ group.missing_total }}
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead style="background-color: #f8f9fa;">
+                    <tr>
+                        <th class="py-3 px-4 text-muted">Talle / Medida</th>
+                        <th class="py-3 text-center text-muted">Necesario real</th>
+                        <th class="py-3 text-center text-muted">Stock disponible</th>
+                        <th class="py-3 text-center text-muted">Faltante</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in group.rows %}
+                    <tr>
+                        <td class="px-4 py-3 fw-bold">
+                            {{ row.size_label }}
+                            {% if not row.size_id %}<small class="text-muted ms-2">manual</small>{% endif %}
+                        </td>
+                        <td class="py-3 text-center">
+                            <span class="badge bg-primary rounded-pill px-3">{{ row.required_quantity }}</span>
+                        </td>
+                        <td class="py-3 text-center">
+                            {% if row.stock_available is None %}
+                                <span class="text-muted">Sin talle de catálogo</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border rounded-pill px-3">{{ row.stock_available }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-center">
+                            {% if row.missing_quantity %}
+                                <span class="badge bg-danger rounded-pill px-3">{{ row.missing_quantity }}</span>
+                            {% else %}
+                                <span class="badge bg-success rounded-pill px-3">0</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="card border-0 shadow-sm" style="border-radius: 15px;">
+    <div class="card-body text-center text-muted py-5">
+        <i class="fa-solid fa-chart-column fa-3x mb-3" style="color: #e0cffc;"></i>
+        <h5>No hay medidas cargadas</h5>
+        <p>Complete las planillas del personal para generar la curva de talles.</p>
+        <a href="{% url 'sigera:personnel_list' %}" class="btn btn-primary rounded-pill px-4" style="background-color: #6f42c1; border-color: #6f42c1;">
+            <i class="fa-solid fa-users me-2"></i>Ir a Personal
+        </a>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

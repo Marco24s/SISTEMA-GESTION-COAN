@@ -71,6 +71,9 @@
                             </td>
                             <td class="py-3 text-center">
                                 <div class="d-flex justify-content-center gap-1">
+                                    <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="btn btn-sm btn-outline-success shadow-sm" title="Planilla de Medidas">
+                                        <i class="fa-solid fa-ruler-combined"></i>
+                                    </a>
                                     <a href="{% url 'sigera:personnel_edit' person.pk %}" class="btn btn-sm btn-outline-primary shadow-sm" style="color: #6f42c1; border-color: #6f42c1;" title="Editar Datos">
                                         <i class="fa-solid fa-user-pen"></i>
                                     </a>

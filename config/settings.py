@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'sigera',
     'budget',
     'licitaciones',
+    'supervivencia',
 ]
 
 AUTH_USER_MODEL = 'core.CustomUser'
@@ -179,4 +180,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 PIN_EXPIRATION_MINUTES = 20
 PIN_MAX_ATTEMPTS = 5
 PIN_BLOCK_MINUTES = 5
-PIN_ALLOWED_SYSTEMS = ['sgmg', 'sigera', 'sgp', 'licitaciones']
+PIN_ALLOWED_SYSTEMS = ['sgmg', 'sigera', 'sgp', 'licitaciones', 'supervivencia']
+
+# --- Skills operativas internas ---
+SKILLS_DIR = BASE_DIR / "system" / "skills"

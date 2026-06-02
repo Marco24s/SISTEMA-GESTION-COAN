@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0",
+  "updated_at": "2026-06-01",
+  "defaults": {
+    "language": "es-ar",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "offline_first": true,
+    "external_lookup_policy": "consultar skills internas antes de buscar afuera",
+    "response_style": "lenguaje claro, no tecnico cuando el usuario no pida detalle tecnico"
+  },
+  "skills": [
+    {
+      "name": "internal_skill_resolution_flow",
+      "version": "1.0.0",
+      "enabled": true,
+      "priority": "critical",
+      "domain": "agent",
+      "tags": ["agent", "workflow", "deterministic", "offline"],
+      "description": "Flujo obligatorio antes de improvisar, buscar externamente o crear logica nueva.",
+      "rules": [
+        "Consultar primero el registro interno de skills.",
+        "Aplicar parametros y convenciones estandar del proyecto.",
+        "Verificar si existe una solucion conocida por nombre, tags o texto.",
+        "Recien despues crear logica nueva o buscar informacion externa.",
+        "Si una skill aplicable esta habilitada, priorizarla sobre decisiones improvisadas."
+      ],
+      "defaults": {
+        "lookup_order": ["skills", "project_code", "local_docs", "external_sources"],
+        "conflict_policy": "gana la skill habilitada con mayor prioridad; si empatan, gana la version mas nueva"
+      },
+      "examples": [
+        "Antes de modificar un modulo Django, buscar skills por tags: django, security, ui, offline."
+      ]
+    },
+    {
+      "name": "django_module_standard",
+      "version": "1.0.0",
+      "enabled": true,
+      "priority": "high",
+      "domain": "django",
+      "tags": ["django", "architecture", "modules", "crud"],
+      "description": "Convenciones para crear o modificar modulos Django en este sistema.",
+      "rules": [
+        "Mantener cada modulo como app Django independiente cuando represente un dominio funcional.",
+        "Usar vistas basadas en clases para CRUD simple y funciones decoradas para acciones puntuales POST.",
+        "Proteger vistas con login y respetar el sistema de PIN cuando el modulo sea una aplicacion de ingreso propio.",
+        "Preservar historial cuando un registro ya tiene dependencias operativas.",
+        "Evitar dependencias nuevas si el servidor objetivo funciona sin internet."
+      ],
+      "defaults": {
+        "templates_dir": "<app>/templates/<app>/",
+        "url_namespace": "usar app_name",
+        "delete_policy": "borrado real solo si no rompe historial; si hay dependencias activas, desactivar o bloquear con mensaje",
+        "form_style": "bootstrap5/crispy si ya esta disponible"
+      },
+      "tools": ["django", "psql local", "py_compile"],
+      "examples": [
+        "supervivencia usa app independiente, URLs con namespace y vistas LoginRequiredMixin."
+      ]
+    },
+    {
+      "name": "offline_asset_policy",
+      "version": "1.0.0",
+      "enabled": true,
+      "priority": "high",
+      "domain": "frontend",
+      "tags": ["offline", "static", "frontend", "assets"],
+      "description": "Politica para recursos visuales y librerias en servidor sin internet.",
+      "rules": [
+        "No depender de CDN para fuentes, iconos, CSS o JavaScript.",
+        "Todo recurso agregado debe quedar en el repositorio o en paquetes offline del proyecto.",
+        "Antes de agregar una libreria, verificar si ya existe una alternativa local.",
+        "Mantener estilos coherentes con Bootstrap y la estetica existente."
+      ],
+      "defaults": {
+        "static_root": "static/",
+        "icon_strategy": "usar lo ya disponible en el proyecto antes de agregar assets nuevos"
+      }
+    },
+    {
+      "name": "pin_access_standard",
+      "version": "1.0.0",
+      "enabled": true,
+      "priority": "high",
+      "domain": "security",
+      "tags": ["security", "pin", "access", "django"],
+      "description": "Estandar de acceso por PIN para modulos principales.",
+      "rules": [
+        "Cuando un modulo aparece como sistema de ingreso, registrarlo en PIN_ALLOWED_SYSTEMS.",
+        "Agregarlo a UserSystemPIN.SYSTEM_CHOICES.",
+        "Mapear la ruta base del modulo en el middleware de PIN.",
+        "No exponer pantallas internas sin login.",
+        "Mantener mensajes claros para acceso denegado o PIN faltante."
+      ],
+      "defaults": {
+        "pin_expiration_minutes": 20,
+        "pin_max_attempts": 5,
+        "pin_block_minutes": 5
+      }
+    },
+    {
+      "name": "api_request_standard",
+      "version": "1.0.0",
+      "enabled": true,
+      "priority": "medium",
+      "domain": "integration",
+      "tags": ["api", "networking", "http", "logging"],
+      "description": "Parametros seguros para llamadas HTTP cuando sean necesarias.",
+      "rules": [
+        "Usar timeout de 30 segundos.",
+        "Retry maximo 3 veces cuando la operacion sea idempotente.",
+        "Loggear errores HTTP con codigo y contexto minimo.",
+        "Validar JSON de respuesta antes de usarlo."
+      ],
+      "defaults": {
+        "timeout": 30,
+        "retries": 3,
+        "log_http_errors": true
+      }
+    },
+    {
+      "name": "budget_execution_standard",
+      "version": "1.0.0",
+      "enabled": true,
+      "priority": "high",
+      "domain": "budget",
+      "tags": ["sgp", "budget", "allocations", "execution"],
+      "description": "Reglas operativas para distribucion y ejecucion presupuestaria.",
+      "rules": [
+        "Mostrar montos en orden: asignado, disponible, gastado.",
+        "No ocultar informacion critica detras de scroll horizontal si puede compactarse.",
+        "La barra de ejecucion representa gasto sobre asignado.",
+        "Los vinculos a proyecto o plan pueden quedar vacios si aun no existe asociacion."
+      ],
+      "defaults": {
+        "amount_order": ["assigned", "available", "spent"],
+        "project_link_required": false
+      }
+    },
+    {
+      "name": "survival_pyrotechnics_standard",
+      "version": "1.0.0",
+      "enabled": true,
+      "priority": "high",
+      "domain": "supervivencia",
+      "tags": ["supervivencia", "pirotecnia", "aircraft", "requirements"],
+      "description": "Convenciones del modulo Supervivencia / Pirotecnia.",
+      "rules": [
+        "El modulo es independiente de Licitaciones, aunque puede vincular necesidades a procesos licitatorios.",
+        "Usar 'Modelo' en lugar de variantes o grupos.",
+        "En seleccionables mostrar nombres operativos, no codigos internos aislados.",
+        "La linea de tiempo se organiza por aeronave, modelo, elemento y mes.",
+        "Los elementos tecnicos usan NOMENCLATURA, SISTEMA, N° / PARTE, N.S.N y NUMERO DE PARTE ALTERNATIVO."
+      ],
+      "defaults": {
+        "module_path": "supervivencia/",
+        "requirement_active_filter": true,
+        "item_fields": ["nomenclatura", "sistema", "numero_parte", "nsn", "numero_parte_alternativo"]
+      }
+    }
+  ]
+}
