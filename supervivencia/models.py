@@ -53,8 +53,8 @@ class SurvivalMedium(models.Model):
 
 
 class PyrotechnicCatalogItem(models.Model):
-    nomenclature = models.CharField(max_length=150, unique=True, verbose_name="Nomenclatura")
-    system = models.CharField(max_length=150, verbose_name="Sistema")
+    nomenclature = models.CharField(max_length=150, verbose_name="Nomenclatura")
+    system = models.CharField(max_length=150, unique=True, verbose_name="Sistema")
     part_number = models.CharField(max_length=80, blank=True, null=True, verbose_name="N° / Parte")
     nsn = models.CharField(max_length=80, blank=True, null=True, verbose_name="N.S.N")
     alternate_part_number = models.CharField(
