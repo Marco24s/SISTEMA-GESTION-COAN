@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="pyrotechniccatalogitem",
             name="system",
-            field=models.CharField(max_length=150, unique=True, verbose_name="Sistema"),
+            field=models.CharField(max_length=150, verbose_name="Sistema"),
         ),
     ]

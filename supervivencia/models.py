@@ -54,8 +54,8 @@ class SurvivalMedium(models.Model):
 
 class PyrotechnicCatalogItem(models.Model):
     nomenclature = models.CharField(max_length=150, verbose_name="Nomenclatura")
-    system = models.CharField(max_length=150, unique=True, verbose_name="Sistema")
-    part_number = models.CharField(max_length=80, blank=True, null=True, verbose_name="N° / Parte")
+    system = models.CharField(max_length=150, verbose_name="Sistema")
+    part_number = models.CharField(max_length=80, unique=True, blank=True, null=True, verbose_name="N° / Parte")
     nsn = models.CharField(max_length=80, blank=True, null=True, verbose_name="N.S.N")
     alternate_part_number = models.CharField(
         max_length=120,
@@ -81,6 +81,13 @@ class PyrotechnicCatalogItem(models.Model):
     def __str__(self):
         return f"{self.nomenclature} - {self.system}"
 
+    def clean(self):
+        super().clean()
+        if self.part_number:
+            self.part_number = self.part_number.upper().strip()
+        else:
+            self.part_number = None
+
     def save(self, *args, **kwargs):
         if self.nomenclature:
             self.nomenclature = self.nomenclature.upper().strip()
@@ -88,6 +95,8 @@ class PyrotechnicCatalogItem(models.Model):
             self.system = self.system.upper().strip()
         if self.part_number:
             self.part_number = self.part_number.upper().strip()
+        else:
+            self.part_number = None
         if self.nsn:
             self.nsn = self.nsn.upper().strip()
         if self.alternate_part_number:
