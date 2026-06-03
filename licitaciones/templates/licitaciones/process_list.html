@@ -5,6 +5,82 @@
 {% block title %}Procesos Licitatorios{% endblock %}
 
 {% block content %}
+<style>
+    .process-table {
+        table-layout: fixed;
+        width: 100%;
+        font-size: 0.9rem;
+    }
+    .process-table th,
+    .process-table td {
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: anywhere;
+        vertical-align: middle;
+    }
+    .process-table th:nth-child(1) { width: 14%; }
+    .process-table th:nth-child(2) { width: 9%; }
+    .process-table th:nth-child(3) { width: 26%; }
+    .process-table th:nth-child(4) { width: 11%; }
+    .process-table th:nth-child(5) { width: 8%; }
+    .process-table th:nth-child(6) { width: 12%; }
+    .process-table th:nth-child(7) { width: 12%; }
+    .process-table th:nth-child(8) { width: 8%; }
+    .process-table .actions-cell {
+        white-space: nowrap;
+        overflow-wrap: normal;
+    }
+    .process-actions {
+        display: grid;
+        grid-template-columns: 36px;
+        gap: 0.35rem;
+        justify-content: center;
+    }
+    .process-actions .btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .process-card-list {
+        display: none;
+    }
+    .process-mobile-card {
+        border-left: 8px solid #e5e7eb;
+        border-radius: 8px;
+    }
+    .process-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+    .process-meta-label {
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .process-meta-value {
+        font-weight: 650;
+    }
+    @media (max-width: 1199.98px) {
+        .process-table-wrap {
+            display: none;
+        }
+        .process-card-list {
+            display: grid;
+            gap: 0.85rem;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .process-meta-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
     <div>
         <h2 class="mb-1"><i class="fa-solid fa-file-contract me-2 text-success"></i> Procesos Licitatorios</h2>
@@ -89,20 +165,17 @@
 
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="process-table-wrap">
+            <table class="table table-hover align-middle mb-0 process-table">
                 <thead class="table-light">
                     <tr>
                         <th>Proceso</th>
                         <th>Destino</th>
                         <th>Nombre</th>
-                        <th>Tipo</th>
                         <th>Clasificacion</th>
                         <th>Apertura</th>
                         <th>Estado</th>
-                        <th>OCA</th>
-                        <th class="text-end">Monto $</th>
-                        <th>Moneda</th>
+                        <th class="text-end">Monto</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -126,8 +199,10 @@
                                 {% endif %}
                             </span>
                         </td>
-                        <td style="min-width: 280px;">{{ process.name }}</td>
-                        <td>{{ process.get_process_type_display }}</td>
+                        <td>
+                            <strong>{{ process.name }}</strong>
+                            <br><small class="text-muted">{{ process.get_process_type_display }}</small>
+                        </td>
                         <td>
                             {% if process.classification %}
                                 <span class="badge" style="background-color: {{ process.classification_color }}; color: {{ process.classification_text_color }};">
@@ -138,7 +213,12 @@
                             {% endif %}
                         </td>
                         <td data-sort="{{ process.opening_date|date:'Y-m-d H:i' }}">
-                            {% if process.opening_date %}{{ process.opening_date|date:"d/m/Y H:i" }}{% else %}<span class="text-muted">-</span>{% endif %}
+                            {% if process.opening_date %}
+                                <strong>{{ process.opening_date|date:"d/m/Y" }}</strong>
+                                <br><span class="text-muted">{{ process.opening_date|date:"H:i" }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if process.operational_group == "ADJUDICADO" %}
@@ -151,29 +231,20 @@
                                 <span class="badge bg-warning text-dark">{{ process.get_status_display }}</span>
                             {% endif %}
                         </td>
-                        <td>
-                            {% if process.has_oca is True %}
-                                <span class="badge bg-primary">Si</span>
-                            {% elif process.has_oca is False %}
-                                <span class="badge bg-light text-dark border">No</span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
                         <td class="text-end">
                             {% if process.amount_ars is not None %}
-                                {{ process.amount_ars|floatformat:2|intcomma }}
+                                <strong>{{ process.amount_ars|floatformat:2|intcomma }}</strong>
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}
-                        </td>
-                        <td>
-                            {{ process.currency }}
+                            <br><small class="text-muted">{{ process.currency }} · OCA:
+                                {% if process.has_oca is True %}Si{% elif process.has_oca is False %}No{% else %}-{% endif %}
+                            </small>
                             {% if process.foreign_amount %}
                                 <br><small class="text-muted">{{ process.foreign_amount|floatformat:2|intcomma }}</small>
                             {% endif %}
                         </td>
-                        <td>
+                        <td class="actions-cell">
                             <div class="d-flex gap-1">
                                 <a href="{% url 'licitaciones:process_detail' process.id %}" class="btn btn-sm btn-outline-secondary" title="Ver detalle">
                                     <i class="fa-solid fa-eye"></i>
@@ -186,13 +257,88 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="11" class="text-center text-muted py-4">
+                        <td colspan="8" class="text-center text-muted py-4">
                             Todavia no hay procesos licitatorios cargados.
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <div class="process-card-list p-3">
+            {% for process in processes %}
+                <div class="card border-0 shadow-sm process-mobile-card" {% if process.classification %}style="border-left-color: {{ process.classification_color }};"{% endif %}>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between gap-2 align-items-start mb-2">
+                            <div>
+                                <div class="fw-bold fs-5">{{ process.process_number }}</div>
+                                {% if process.expediente %}<div class="text-muted small">{{ process.expediente }}</div>{% endif %}
+                            </div>
+                            <div class="process-actions">
+                                <a href="{% url 'licitaciones:process_detail' process.id %}" class="btn btn-sm btn-outline-secondary" title="Ver detalle">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="fw-semibold mb-2">{{ process.name }}</div>
+
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <span class="badge text-bg-secondary">
+                                {% if process.unit %}
+                                    {{ process.unit.name }}
+                                {% elif process.destination %}
+                                    {{ process.destination.code }}
+                                {% else %}
+                                    SIN UNIDAD
+                                {% endif %}
+                            </span>
+                            {% if process.classification %}
+                                <span class="badge" style="background-color: {{ process.classification_color }}; color: {{ process.classification_text_color }};">
+                                    {{ process.get_classification_display }}
+                                </span>
+                            {% endif %}
+                            {% if process.operational_group == "ADJUDICADO" %}
+                                <span class="badge bg-success">{{ process.get_status_display }}</span>
+                            {% elif process.operational_group == "DISPONIBLE" %}
+                                <span class="badge bg-info text-dark">{{ process.get_status_display }}</span>
+                            {% elif process.operational_group == "SIN_EFECTO" %}
+                                <span class="badge bg-secondary">{{ process.get_status_display }}</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">{{ process.get_status_display }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="process-meta-grid">
+                            <div>
+                                <div class="process-meta-label">Tipo</div>
+                                <div class="process-meta-value">{{ process.get_process_type_display }}</div>
+                            </div>
+                            <div>
+                                <div class="process-meta-label">Apertura</div>
+                                <div class="process-meta-value">{% if process.opening_date %}{{ process.opening_date|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+                            </div>
+                            <div>
+                                <div class="process-meta-label">Monto</div>
+                                <div class="process-meta-value">
+                                    {% if process.amount_ars is not None %}{{ process.amount_ars|floatformat:2|intcomma }}{% else %}-{% endif %}
+                                    <span class="text-muted">{{ process.currency }}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="process-meta-label">OCA</div>
+                                <div class="process-meta-value">{% if process.has_oca is True %}Si{% elif process.has_oca is False %}No{% else %}-{% endif %}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="text-center text-muted py-4">Todavia no hay procesos licitatorios cargados.</div>
+            {% endfor %}
         </div>
     </div>
 </div>
