@@ -7,6 +7,12 @@ app_name = "supervivencia"
 
 urlpatterns = [
     path("", views.SupervivenciaDashboardView.as_view(), name="dashboard"),
+    path("administracion/borrado/", views.SupervivenciaAdminDeleteView.as_view(), name="admin_delete"),
+    path(
+        "administracion/borrado/<str:model_type>/<int:pk>/",
+        views.SupervivenciaAdminDeleteConfirmView.as_view(),
+        name="admin_delete_confirm",
+    ),
     path("medios/", views.SurvivalMediumListView.as_view(), name="medium_list"),
     path("medios/nuevo/", views.SurvivalMediumCreateView.as_view(), name="medium_create"),
     path("medios/<int:pk>/", views.SurvivalMediumDetailView.as_view(), name="medium_detail"),

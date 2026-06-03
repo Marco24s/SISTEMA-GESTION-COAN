@@ -47,7 +47,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small text-muted mb-1">Destino</label>
                 <select name="unit" class="form-select">
                     <option value="">Todos</option>
@@ -56,7 +56,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label small text-muted mb-1">Estado</label>
                 <select name="status" class="form-select">
                     <option value="">Todos</option>
@@ -65,7 +65,16 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Clasificacion</label>
+                <select name="classification" class="form-select">
+                    <option value="">Todas</option>
+                    {% for value,label in classification_choices %}
+                        <option value="{{ value }}" {% if selected_classification == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label class="form-label small text-muted mb-1">Buscar</label>
                 <input type="search" name="q" value="{{ search_query }}" class="form-control" placeholder="Proceso, expediente o nombre">
             </div>
@@ -88,6 +97,7 @@
                         <th>Destino</th>
                         <th>Nombre</th>
                         <th>Tipo</th>
+                        <th>Clasificacion</th>
                         <th>Apertura</th>
                         <th>Estado</th>
                         <th>OCA</th>
@@ -99,7 +109,7 @@
                 <tbody>
                     {% for process in processes %}
                     <tr>
-                        <td>
+                        <td {% if process.classification %}style="border-left: 8px solid {{ process.classification_color }};"{% endif %}>
                             <strong>{{ process.process_number }}</strong>
                             {% if process.expediente %}
                                 <br><small class="text-muted">{{ process.expediente }}</small>
@@ -118,6 +128,15 @@
                         </td>
                         <td style="min-width: 280px;">{{ process.name }}</td>
                         <td>{{ process.get_process_type_display }}</td>
+                        <td>
+                            {% if process.classification %}
+                                <span class="badge" style="background-color: {{ process.classification_color }}; color: {{ process.classification_text_color }};">
+                                    {{ process.get_classification_display }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td data-sort="{{ process.opening_date|date:'Y-m-d H:i' }}">
                             {% if process.opening_date %}{{ process.opening_date|date:"d/m/Y H:i" }}{% else %}<span class="text-muted">-</span>{% endif %}
                         </td>
@@ -167,7 +186,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
+                        <td colspan="11" class="text-center text-muted py-4">
                             Todavia no hay procesos licitatorios cargados.
                         </td>
                     </tr>

@@ -48,7 +48,7 @@
                         <td>{{ item.part_number|default:"-" }}</td>
                         <td>{{ item.nsn|default:"-" }}</td>
                         <td>{{ item.alternate_part_number|default:"-" }}</td>
-                        <td>{% if item.theoretical_life_months %}{{ item.theoretical_life_months }} meses{% else %}-{% endif %}</td>
+                        <td>{{ item.life_rules_summary }}</td>
                         <td>{% if item.is_active %}<span class="badge bg-success">Si</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</td>
                         <td class="text-end">
                             <a href="{% url 'supervivencia:catalog_update' item.id %}" class="btn btn-sm btn-outline-danger" title="Editar">

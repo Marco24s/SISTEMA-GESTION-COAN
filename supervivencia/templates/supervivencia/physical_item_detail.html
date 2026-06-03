@@ -31,6 +31,7 @@
                 <div class="small text-muted text-uppercase">Identificacion</div>
                 {% if item.serial_number %}<div>Serie: <strong>{{ item.serial_number }}</strong></div>{% endif %}
                 {% if item.lot_number %}<div>Lote: <strong>{{ item.lot_number }}</strong></div>{% endif %}
+                <div>Cantidad: <strong>{{ item.lot_quantity }}</strong></div>
                 {% if not item.serial_number and not item.lot_number %}<div class="text-muted">Sin identificar</div>{% endif %}
             </div>
             <div class="col-lg-3">

@@ -43,6 +43,15 @@
         align-items: center;
         gap: 0.4rem;
     }
+    .classification-pill {
+        border-radius: 999px;
+        padding: 0.45rem 0.75rem;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+    }
 </style>
 
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
@@ -75,6 +84,11 @@
                 {% endif %}
                 <span class="badge text-bg-light border">{{ process.get_process_type_display }}</span>
                 <span class="badge text-bg-light border">{{ process.year }}</span>
+                {% if process.classification %}
+                    <span class="classification-pill" style="background-color: {{ process.classification_color }}; color: {{ process.classification_text_color }};">
+                        <i class="fa-solid fa-tag"></i> {{ process.get_classification_display }}
+                    </span>
+                {% endif %}
                 {% if not process.is_active %}
                     <span class="badge text-bg-secondary"><i class="fa-solid fa-box-archive me-1"></i> En historial</span>
                 {% endif %}
@@ -136,6 +150,18 @@
                 <div class="detail-row">
                     <div class="detail-label">Fuente</div>
                     <div class="detail-value">{{ process.source|default:"-" }}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Clasificacion</div>
+                    <div class="detail-value">
+                        {% if process.classification %}
+                            <span class="classification-pill" style="background-color: {{ process.classification_color }}; color: {{ process.classification_text_color }};">
+                                {{ process.get_classification_display }}
+                            </span>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>

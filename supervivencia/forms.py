@@ -1,4 +1,5 @@
 from django import forms
+from django.forms import inlineformset_factory
 
 from licitaciones.models import TenderProcess
 
@@ -6,6 +7,7 @@ from .models import (
     Aircraft,
     AircraftVariant,
     PyrotechnicCatalogItem,
+    PyrotechnicCatalogLifeRule,
     PyrotechnicAssignment,
     PyrotechnicPhysicalItem,
     PyrotechnicStorageLocation,
@@ -60,7 +62,6 @@ class PyrotechnicCatalogItemForm(forms.ModelForm):
             "part_number",
             "nsn",
             "alternate_part_number",
-            "theoretical_life_months",
             "description",
             "is_active",
         ]
@@ -70,14 +71,66 @@ class PyrotechnicCatalogItemForm(forms.ModelForm):
             "part_number": "N° / Parte",
             "nsn": "N.S.N",
             "alternate_part_number": "Numero de parte alternativo",
-            "theoretical_life_months": "Vida util teorica (meses)",
             "description": "Descripcion",
             "is_active": "Activo",
         }
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
-            "theoretical_life_months": forms.NumberInput(attrs={"min": 1}),
         }
+
+
+class PyrotechnicCatalogLifeRuleForm(forms.ModelForm):
+    class Meta:
+        model = PyrotechnicCatalogLifeRule
+        fields = ["situation", "duration_value", "duration_unit", "notes"]
+        labels = {
+            "situation": "Situacion",
+            "duration_value": "Vida util",
+            "duration_unit": "Unidad",
+            "notes": "Observaciones",
+        }
+        widgets = {
+            "situation": forms.Select(attrs={"class": "form-select form-select-sm"}),
+            "duration_value": forms.NumberInput(attrs={"min": 1, "class": "form-control form-control-sm"}),
+            "duration_unit": forms.Select(attrs={"class": "form-select form-select-sm"}),
+            "notes": forms.TextInput(
+                attrs={"placeholder": "Referencia, certificado o criterio tecnico", "class": "form-control form-control-sm"}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["situation"].required = False
+        self.fields["duration_value"].required = False
+        self.fields["duration_unit"].required = False
+        self.fields["situation"].choices = [("", "Seleccione...")] + list(PyrotechnicCatalogLifeRule.SITUATION_CHOICES)
+        self.fields["duration_unit"].choices = [("", "Seleccione...")] + list(PyrotechnicCatalogLifeRule.UNIT_CHOICES)
+        if not self.instance.pk:
+            self.fields["duration_unit"].initial = ""
+
+    def clean(self):
+        cleaned_data = super().clean()
+        situation = cleaned_data.get("situation")
+        duration_value = cleaned_data.get("duration_value")
+        duration_unit = cleaned_data.get("duration_unit")
+        notes = cleaned_data.get("notes")
+
+        if cleaned_data.get("DELETE"):
+            return cleaned_data
+        if not situation and not duration_value and not duration_unit and not notes:
+            return cleaned_data
+        if not situation or not duration_value or not duration_unit:
+            raise forms.ValidationError("Complete situacion, vida util y unidad, o deje la fila vacia.")
+        return cleaned_data
+
+
+PyrotechnicCatalogLifeRuleFormSet = inlineformset_factory(
+    PyrotechnicCatalogItem,
+    PyrotechnicCatalogLifeRule,
+    form=PyrotechnicCatalogLifeRuleForm,
+    extra=4,
+    can_delete=True,
+)
 
 
 class PyrotechnicPhysicalItemForm(forms.ModelForm):
@@ -87,6 +140,7 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
             "catalog_item",
             "serial_number",
             "lot_number",
+            "lot_quantity",
             "manufacturer",
             "manufacture_date",
             "expiration_date",
@@ -102,6 +156,7 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
             "catalog_item": "Elemento de catalogo",
             "serial_number": "Numero de serie",
             "lot_number": "Lote / partida",
+            "lot_quantity": "Cantidad del lote",
             "manufacturer": "Fabricante",
             "manufacture_date": "Fecha de fabricacion",
             "expiration_date": "Fecha de vencimiento",
@@ -116,6 +171,7 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
         widgets = {
             "serial_number": forms.TextInput(attrs={"placeholder": "Ej: SN-12345", "style": "text-transform: uppercase;"}),
             "lot_number": forms.TextInput(attrs={"placeholder": "Ej: LOTE-2026-01", "style": "text-transform: uppercase;"}),
+            "lot_quantity": forms.NumberInput(attrs={"min": 1}),
             "manufacturer": forms.TextInput(attrs={"placeholder": "Fabricante", "style": "text-transform: uppercase;"}),
             "manufacture_date": forms.DateInput(attrs={"type": "date"}),
             "expiration_date": forms.DateInput(attrs={"type": "date"}),
@@ -130,6 +186,8 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
         self.fields["current_storage_location"].queryset = PyrotechnicStorageLocation.objects.filter(is_active=True).order_by("code")
         self.fields["serial_number"].required = False
         self.fields["lot_number"].required = False
+        self.fields["lot_quantity"].required = False
+        self.fields["lot_quantity"].help_text = "Si el material tiene numero de serie, la cantidad queda en 1. Si se identifica por lote, indique cuantas unidades contiene."
         self.fields["manufacturer"].required = False
         self.fields["manufacture_date"].required = False
         self.fields["current_storage_location"].required = False
@@ -141,10 +199,15 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
         cleaned_data = super().clean()
         serial_number = cleaned_data.get("serial_number")
         lot_number = cleaned_data.get("lot_number")
+        lot_quantity = cleaned_data.get("lot_quantity") or 1
         current_storage_location = cleaned_data.get("current_storage_location")
         current_location = cleaned_data.get("current_location")
         if not serial_number and not lot_number:
             raise forms.ValidationError("Debe cargar al menos un numero de serie o un lote / partida.")
+        if serial_number:
+            cleaned_data["lot_quantity"] = 1
+        elif lot_number and lot_quantity < 1:
+            raise forms.ValidationError("La cantidad del lote debe ser mayor o igual a 1.")
         if not current_storage_location and not current_location:
             raise forms.ValidationError("Debe indicar una ubicacion controlada o una ubicacion manual.")
         return cleaned_data
@@ -242,10 +305,11 @@ class PyrotechnicPhysicalItemChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
         identity = obj.serial_number or obj.lot_number or f"ID {obj.pk}"
         location = obj.current_storage_location or obj.current_location or "Sin ubicacion"
+        quantity = f" | Cantidad {obj.lot_quantity}" if obj.lot_quantity else ""
         return (
             f"{obj.catalog_item.nomenclature} - {identity} | "
             f"Vence {obj.expiration_date:%d/%m/%Y} | "
-            f"{obj.get_condition_display()} | {location}"
+            f"{obj.get_condition_display()} | {location}{quantity}"
         )
 
 

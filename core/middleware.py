@@ -28,6 +28,8 @@ class PINSecurityMiddleware:
             system = 'sgp'
         elif path.startswith('/licitaciones/') or path.startswith('/licitas/'):
             system = 'licitaciones'
+        elif path.startswith('/supervivencia/administracion/'):
+            system = 'supervivencia_admin'
         elif path.startswith('/supervivencia/'):
             system = 'supervivencia'
         # Rutas de SGMG (core) que no son el portal, admin o seguridad

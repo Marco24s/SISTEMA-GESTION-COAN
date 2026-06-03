@@ -60,11 +60,14 @@
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-4 mb-3">
                     {{ form.serial_number|as_crispy_field }}
                 </div>
-                <div class="col-md-6 mb-3">
+                <div class="col-md-4 mb-3">
                     {{ form.lot_number|as_crispy_field }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.lot_quantity|as_crispy_field }}
                 </div>
             </div>
             <div class="row">
@@ -76,7 +79,7 @@
                 </div>
             </div>
             <small class="text-muted">
-                Debe existir al menos serie o lote/partida. La serie no puede repetirse.
+                Debe existir al menos serie o lote/partida. Si tiene serie, la cantidad se guarda como 1; si es por lote, indique cuantas unidades contiene.
             </small>
         </div>
     </div>

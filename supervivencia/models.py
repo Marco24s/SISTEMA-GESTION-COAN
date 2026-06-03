@@ -96,6 +96,63 @@ class PyrotechnicCatalogItem(models.Model):
             self.description = self.description.upper().strip()
         super().save(*args, **kwargs)
 
+    @property
+    def life_rules_summary(self):
+        rules = list(self.life_rules.all())
+        if rules:
+            return " / ".join(
+                f"{rule.get_situation_display()}: {rule.duration_value} {rule.get_duration_unit_display().lower()}"
+                for rule in rules
+            )
+        if self.theoretical_life_months:
+            return f"General: {self.theoretical_life_months} meses"
+        return "-"
+
+
+class PyrotechnicCatalogLifeRule(models.Model):
+    SITUATION_CHOICES = [
+        ("GENERAL", "General / unica"),
+        ("ORIGINAL_PACKAGING", "Envase original"),
+        ("STORAGE", "En deposito"),
+        ("INSTALLED", "Instalado"),
+    ]
+
+    UNIT_CHOICES = [
+        ("MONTHS", "Meses"),
+        ("YEARS", "Años"),
+    ]
+
+    catalog_item = models.ForeignKey(
+        PyrotechnicCatalogItem,
+        on_delete=models.CASCADE,
+        related_name="life_rules",
+        verbose_name="Elemento de catalogo",
+    )
+    situation = models.CharField(max_length=30, choices=SITUATION_CHOICES, verbose_name="Situacion")
+    duration_value = models.PositiveIntegerField(verbose_name="Vida util")
+    duration_unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default="YEARS", verbose_name="Unidad")
+    notes = models.CharField(max_length=180, blank=True, null=True, verbose_name="Observaciones")
+
+    class Meta:
+        verbose_name = "Regla de vida util"
+        verbose_name_plural = "Reglas de vida util"
+        ordering = ["catalog_item__nomenclature", "situation"]
+        unique_together = ("catalog_item", "situation")
+
+    def __str__(self):
+        return f"{self.catalog_item.nomenclature} - {self.get_situation_display()}: {self.duration_value} {self.get_duration_unit_display()}"
+
+    @property
+    def duration_months(self):
+        if self.duration_unit == "YEARS":
+            return self.duration_value * 12
+        return self.duration_value
+
+    def save(self, *args, **kwargs):
+        if self.notes:
+            self.notes = self.notes.upper().strip()
+        super().save(*args, **kwargs)
+
 
 class PyrotechnicStorageLocation(models.Model):
     LOCATION_TYPE_CHOICES = [
@@ -169,6 +226,11 @@ class PyrotechnicPhysicalItem(models.Model):
         verbose_name="Numero de serie",
     )
     lot_number = models.CharField(max_length=120, blank=True, null=True, verbose_name="Lote / partida")
+    lot_quantity = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        verbose_name="Cantidad del lote",
+    )
     manufacturer = models.CharField(max_length=150, blank=True, null=True, verbose_name="Fabricante")
     manufacture_date = models.DateField(blank=True, null=True, verbose_name="Fecha de fabricacion")
     expiration_date = models.DateField(verbose_name="Fecha de vencimiento")
@@ -388,6 +450,29 @@ class PyrotechnicMovement(models.Model):
         if self.notes:
             self.notes = self.notes.upper().strip()
         super().save(*args, **kwargs)
+
+
+class SupervivenciaDeletionLog(models.Model):
+    object_type = models.CharField(max_length=80, verbose_name="Tipo de objeto")
+    object_id = models.CharField(max_length=80, verbose_name="ID eliminado")
+    object_repr = models.CharField(max_length=300, verbose_name="Registro eliminado")
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="supervivencia_deletion_logs",
+        verbose_name="Eliminado por",
+        blank=True,
+        null=True,
+    )
+    deleted_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de eliminacion")
+
+    class Meta:
+        verbose_name = "Registro de borrado"
+        verbose_name_plural = "Registros de borrado"
+        ordering = ["-deleted_at"]
+
+    def __str__(self):
+        return f"{self.object_type} - {self.object_repr}"
 
 
 class Aircraft(models.Model):

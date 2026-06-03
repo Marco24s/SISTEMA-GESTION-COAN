@@ -1118,7 +1118,10 @@ class VerifyPinView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['system'] = self.request.GET.get('system', '')
+        system = self.request.GET.get('system', '')
+        context['system'] = system
+        from .models import UserSystemPIN
+        context['system_label'] = dict(UserSystemPIN.SYSTEM_CHOICES).get(system, system.upper())
         context['next'] = self.request.GET.get('next', '')
         return context
 

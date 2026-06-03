@@ -4,6 +4,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
+from django.db import transaction
+from django.db.models.deletion import ProtectedError
+from django.http import HttpResponseForbidden
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -14,6 +17,7 @@ from django.views.generic import CreateView, DetailView, ListView, TemplateView,
 from .forms import (
     PyrotechnicAssignmentForm,
     PyrotechnicCatalogItemForm,
+    PyrotechnicCatalogLifeRuleFormSet,
     PyrotechnicPhysicalItemMovementForm,
     PyrotechnicPhysicalItemForm,
     PyrotechnicStorageLocationForm,
@@ -22,9 +26,11 @@ from .forms import (
 from .models import (
     PyrotechnicAssignment,
     PyrotechnicCatalogItem,
+    PyrotechnicCatalogLifeRule,
     PyrotechnicMovement,
     PyrotechnicPhysicalItem,
     PyrotechnicStorageLocation,
+    SupervivenciaDeletionLog,
     SurvivalMedium,
 )
 
@@ -70,6 +76,72 @@ def _item_location_reference(item):
     if item.current_storage_location:
         return str(item.current_storage_location)
     return item.current_location or ""
+
+
+ADMIN_DELETE_MODELS = {
+    "medium": {
+        "label": "Medios",
+        "model": SurvivalMedium,
+        "search": ("identifier", "name", "model", "unit__name"),
+        "order": ("identifier",),
+    },
+    "catalog": {
+        "label": "Catalogo",
+        "model": PyrotechnicCatalogItem,
+        "search": ("nomenclature", "system", "part_number", "nsn", "alternate_part_number"),
+        "order": ("nomenclature",),
+    },
+    "life_rule": {
+        "label": "Reglas de vida util",
+        "model": PyrotechnicCatalogLifeRule,
+        "search": ("catalog_item__nomenclature", "catalog_item__system", "notes"),
+        "order": ("catalog_item__nomenclature", "situation"),
+    },
+    "physical": {
+        "label": "Material fisico",
+        "model": PyrotechnicPhysicalItem,
+        "search": ("catalog_item__nomenclature", "catalog_item__system", "serial_number", "lot_number"),
+        "order": ("expiration_date", "catalog_item__nomenclature"),
+    },
+    "location": {
+        "label": "Ubicaciones",
+        "model": PyrotechnicStorageLocation,
+        "search": ("code", "name", "unit__name", "notes"),
+        "order": ("code",),
+    },
+    "assignment": {
+        "label": "Asignaciones",
+        "model": PyrotechnicAssignment,
+        "search": (
+            "medium__identifier",
+            "medium__name",
+            "physical_item__catalog_item__nomenclature",
+            "physical_item__serial_number",
+            "physical_item__lot_number",
+        ),
+        "order": ("-installed_at",),
+    },
+    "movement": {
+        "label": "Movimientos",
+        "model": PyrotechnicMovement,
+        "search": (
+            "physical_item__catalog_item__nomenclature",
+            "physical_item__serial_number",
+            "physical_item__lot_number",
+            "medium__identifier",
+            "from_reference",
+            "to_reference",
+            "notes",
+        ),
+        "order": ("-movement_date", "-created_at"),
+    },
+}
+
+
+def _superuser_required(request):
+    if not request.user.is_authenticated or not request.user.is_superuser:
+        return HttpResponseForbidden("Solo un superusuario puede acceder a esta administracion.")
+    return None
 
 
 class SupervivenciaDashboardView(LoginRequiredMixin, TemplateView):
@@ -140,6 +212,95 @@ class SupervivenciaDashboardView(LoginRequiredMixin, TemplateView):
             }
         )
         return context
+
+
+class SupervivenciaAdminDeleteView(LoginRequiredMixin, TemplateView):
+    template_name = "supervivencia/admin_delete_list.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        forbidden = _superuser_required(request)
+        if forbidden:
+            return forbidden
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        selected_type = self.request.GET.get("type", "medium")
+        if selected_type not in ADMIN_DELETE_MODELS:
+            selected_type = "medium"
+        config = ADMIN_DELETE_MODELS[selected_type]
+        queryset = config["model"].objects.all().order_by(*config["order"])
+        q = self.request.GET.get("q", "").strip()
+        if q:
+            query = Q()
+            for field in config["search"]:
+                query |= Q(**{f"{field}__icontains": q})
+            queryset = queryset.filter(query)
+
+        context.update(
+            {
+                "model_options": ADMIN_DELETE_MODELS,
+                "selected_type": selected_type,
+                "selected_label": config["label"],
+                "search_query": q,
+                "objects": queryset[:100],
+            }
+        )
+        return context
+
+
+class SupervivenciaAdminDeleteConfirmView(LoginRequiredMixin, TemplateView):
+    template_name = "supervivencia/admin_delete_confirm.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        forbidden = _superuser_required(request)
+        if forbidden:
+            return forbidden
+        self.model_type = kwargs.get("model_type")
+        if self.model_type not in ADMIN_DELETE_MODELS:
+            return HttpResponseForbidden("Tipo de registro no permitido.")
+        config = ADMIN_DELETE_MODELS[self.model_type]
+        self.config = config
+        self.object = get_object_or_404(config["model"], pk=kwargs.get("pk"))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "model_type": self.model_type,
+                "model_label": self.config["label"],
+                "object": self.object,
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        confirmation = request.POST.get("confirmation", "").strip().upper()
+        if confirmation != "BORRAR":
+            messages.error(request, "Debe escribir BORRAR para confirmar la eliminacion definitiva.")
+            return self.get(request, *args, **kwargs)
+
+        object_repr = str(self.object)
+        object_id = str(self.object.pk)
+        object_type = self.config["label"]
+        try:
+            self.object.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                "No se pudo borrar porque tiene datos relacionados protegidos. Borre primero esos registros vinculados.",
+            )
+            return self.get(request, *args, **kwargs)
+
+        SupervivenciaDeletionLog.objects.create(
+            object_type=object_type,
+            object_id=object_id,
+            object_repr=object_repr[:300],
+            deleted_by=request.user,
+        )
+        messages.success(request, f"Registro eliminado definitivamente: {object_repr}")
+        return redirect(f"{reverse_lazy('supervivencia:admin_delete')}?type={self.model_type}")
 
 
 class SurvivalMediumListView(LoginRequiredMixin, ListView):
@@ -258,7 +419,7 @@ class PyrotechnicCatalogListView(LoginRequiredMixin, ListView):
     context_object_name = "items"
 
     def get_queryset(self):
-        queryset = PyrotechnicCatalogItem.objects.order_by("nomenclature")
+        queryset = PyrotechnicCatalogItem.objects.prefetch_related("life_rules").order_by("nomenclature")
         q = self.request.GET.get("q")
         if q:
             queryset = queryset.filter(
@@ -279,26 +440,66 @@ class PyrotechnicCatalogListView(LoginRequiredMixin, ListView):
 class PyrotechnicCatalogCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = PyrotechnicCatalogItem
     form_class = PyrotechnicCatalogItemForm
-    template_name = "supervivencia/form.html"
+    template_name = "supervivencia/catalog_form.html"
     success_url = reverse_lazy("supervivencia:catalog_list")
     success_message = "Elemento de pirotecnia cargado correctamente."
+
+    def _get_life_rule_formset(self, instance=None):
+        return PyrotechnicCatalogLifeRuleFormSet(
+            self.request.POST or None,
+            instance=instance,
+            prefix="life_rules",
+        )
+
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        life_rule_formset = self._get_life_rule_formset(self.object)
+        if life_rule_formset.is_valid():
+            with transaction.atomic():
+                self.object.save()
+                life_rule_formset.instance = self.object
+                life_rule_formset.save()
+            messages.success(self.request, self.success_message)
+            return redirect(self.success_url)
+        return self.render_to_response(self.get_context_data(form=form, life_rule_formset=life_rule_formset))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Nuevo elemento de pirotecnia"
+        context.setdefault("life_rule_formset", self._get_life_rule_formset(self.object if hasattr(self, "object") else None))
         return context
 
 
 class PyrotechnicCatalogUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = PyrotechnicCatalogItem
     form_class = PyrotechnicCatalogItemForm
-    template_name = "supervivencia/form.html"
+    template_name = "supervivencia/catalog_form.html"
     success_url = reverse_lazy("supervivencia:catalog_list")
     success_message = "Elemento de pirotecnia actualizado correctamente."
+
+    def _get_life_rule_formset(self, instance=None):
+        return PyrotechnicCatalogLifeRuleFormSet(
+            self.request.POST or None,
+            instance=instance or self.object,
+            prefix="life_rules",
+        )
+
+    def form_valid(self, form):
+        self.object = form.save(commit=False)
+        life_rule_formset = self._get_life_rule_formset(self.object)
+        if life_rule_formset.is_valid():
+            with transaction.atomic():
+                self.object.save()
+                life_rule_formset.instance = self.object
+                life_rule_formset.save()
+            messages.success(self.request, self.success_message)
+            return redirect(self.success_url)
+        return self.render_to_response(self.get_context_data(form=form, life_rule_formset=life_rule_formset))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Editar elemento de pirotecnia"
+        context.setdefault("life_rule_formset", self._get_life_rule_formset(self.object))
         return context
 
 
@@ -868,4 +1069,3 @@ def location_delete(request, pk):
     location.save(update_fields=["is_active"])
     messages.success(request, f"Ubicacion {name} desactivada correctamente.")
     return redirect("supervivencia:location_list")
-

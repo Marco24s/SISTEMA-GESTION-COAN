@@ -38,6 +38,7 @@ class TenderProcessForm(forms.ModelForm):
             "expediente",
             "name",
             "process_type",
+            "classification",
             "opening_date",
             "status",
             "amount_ars",

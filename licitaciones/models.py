@@ -54,6 +54,28 @@ class TenderProcess(models.Model):
         ("OTRA", "Otra"),
     ]
 
+    CLASSIFICATION_CHOICES = [
+        ("", "Sin clasificar"),
+        ("REPUESTO", "Repuesto"),
+        ("SUPERVIVENCIA", "Supervivencia"),
+        ("SIN_EFECTO", "Desiertos / Sin efecto / Fracasados"),
+        ("GRASAS_LUBRICANTES", "Grasas y Lubricantes"),
+        ("REPUESTOS_FONDEF", "Repuestos / FONDEF"),
+    ]
+
+    CLASSIFICATION_COLORS = {
+        "REPUESTO": "#bdd7ee",
+        "SUPERVIVENCIA": "#f8cbad",
+        "SIN_EFECTO": "#ff0000",
+        "GRASAS_LUBRICANTES": "#7030a0",
+        "REPUESTOS_FONDEF": "#ffc000",
+    }
+
+    CLASSIFICATION_TEXT_COLORS = {
+        "SIN_EFECTO": "#ffffff",
+        "GRASAS_LUBRICANTES": "#ffffff",
+    }
+
     year = models.PositiveIntegerField(default=2026, verbose_name="Ejercicio / Año")
     unit = models.ForeignKey(
         Unit,
@@ -79,6 +101,13 @@ class TenderProcess(models.Model):
         choices=PROCESS_TYPE_CHOICES,
         default="PRIVADA",
         verbose_name="Tipo de proceso",
+    )
+    classification = models.CharField(
+        max_length=30,
+        choices=CLASSIFICATION_CHOICES,
+        blank=True,
+        default="",
+        verbose_name="Clasificacion",
     )
     opening_date = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de apertura")
     status = models.CharField(
@@ -161,3 +190,11 @@ class TenderProcess(models.Model):
         if self.status in ["FRACASADO", "DESIERTO", "DEJADO_SIN_EFECTO"]:
             return "SIN_EFECTO"
         return "EN_PROCESO"
+
+    @property
+    def classification_color(self):
+        return self.CLASSIFICATION_COLORS.get(self.classification, "#e5e7eb")
+
+    @property
+    def classification_text_color(self):
+        return self.CLASSIFICATION_TEXT_COLORS.get(self.classification, "#111827")

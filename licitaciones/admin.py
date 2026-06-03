@@ -19,10 +19,11 @@ class TenderProcessAdmin(admin.ModelAdmin):
         "year",
         "status",
         "process_type",
+        "classification",
         "amount_ars",
         "has_oca",
         "opening_date",
     )
-    list_filter = ("year", "unit", "destination", "status", "process_type", "has_oca")
+    list_filter = ("year", "unit", "destination", "status", "process_type", "classification", "has_oca")
     search_fields = ("process_number", "expediente", "name")
     readonly_fields = ("created_at", "updated_at", "created_by")

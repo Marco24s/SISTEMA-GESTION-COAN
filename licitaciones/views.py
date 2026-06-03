@@ -183,6 +183,7 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         year = _clean_int(self.request.GET.get("year"))
         unit = _clean_int(self.request.GET.get("unit"))
         status = self.request.GET.get("status")
+        classification = self.request.GET.get("classification")
         group = self.request.GET.get("group")
         control = self.request.GET.get("control")
         q = self.request.GET.get("q")
@@ -197,6 +198,8 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
             group_statuses = _status_filter_for_group(group)
             if group_statuses:
                 queryset = queryset.filter(status__in=group_statuses)
+        if classification:
+            queryset = queryset.filter(classification=classification)
         if control == "missing_amount":
             queryset = queryset.filter(amount_ars__isnull=True)
         elif control == "foreign_currency":
@@ -213,9 +216,11 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["units"] = Unit.objects.filter().order_by("name")
         context["status_choices"] = TenderProcess.STATUS_CHOICES
+        context["classification_choices"] = [choice for choice in TenderProcess.CLASSIFICATION_CHOICES if choice[0]]
         context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
         context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
         context["selected_status"] = self.request.GET.get("status", "")
+        context["selected_classification"] = self.request.GET.get("classification", "")
         context["selected_group"] = self.request.GET.get("group", "")
         context["selected_control"] = self.request.GET.get("control", "")
         context["search_query"] = self.request.GET.get("q", "")
@@ -242,6 +247,7 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
         year = _clean_int(self.request.GET.get("year"))
         unit = _clean_int(self.request.GET.get("unit"))
         status = self.request.GET.get("status")
+        classification = self.request.GET.get("classification")
         q = self.request.GET.get("q")
 
         if year:
@@ -250,6 +256,8 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(unit_id=unit)
         if status:
             queryset = queryset.filter(status=status)
+        if classification:
+            queryset = queryset.filter(classification=classification)
         if q:
             queryset = queryset.filter(
                 Q(process_number__icontains=q)
@@ -262,9 +270,11 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["units"] = Unit.objects.filter().order_by("name")
         context["status_choices"] = TenderProcess.STATUS_CHOICES
+        context["classification_choices"] = [choice for choice in TenderProcess.CLASSIFICATION_CHOICES if choice[0]]
         context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
         context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
         context["selected_status"] = self.request.GET.get("status", "")
+        context["selected_classification"] = self.request.GET.get("classification", "")
         context["search_query"] = self.request.GET.get("q", "")
         context["years"] = (
             TenderProcess.objects.filter(is_active=False)
