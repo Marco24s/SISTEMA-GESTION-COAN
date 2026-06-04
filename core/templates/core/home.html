@@ -1,172 +1,568 @@
 {% extends 'base.html' %}
 {% load core_filters %}
 
-
-
 {% block content %}
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="p-5 mb-4 bg-light rounded-3 shadow-sm border">
-            <div class="container-fluid py-2">
-                <h1 class="display-5 fw-bold text-primary"><i class="fa-solid fa-shield-halved me-3"></i>SGMG-COAN</h1>
-                <p class="col-md-8 fs-4">Sistema de Gestión de Materias Grasas Aeronáuticas del Comando de la Aviación Naval.</p>
-                {% if not user.is_authenticated %}
-                <a class="btn btn-primary btn-lg mt-3" href="{% url 'login' %}">Ingresar al Sistema</a>
+<style>
+    .sgmg-dashboard {
+        --dash-blue: #1f5fbf;
+        --dash-ink: #25364d;
+        --dash-muted: #657184;
+        --dash-line: #dce3ed;
+    }
+    .sgmg-page-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin: 1.25rem 0 1rem;
+    }
+    .sgmg-title {
+        color: var(--dash-ink);
+        font-size: clamp(1.8rem, 3vw, 2.6rem);
+        font-weight: 800;
+        letter-spacing: 0;
+        margin: 0;
+    }
+    .sgmg-subtitle {
+        color: var(--dash-muted);
+        font-size: 1.05rem;
+        margin: .25rem 0 0;
+    }
+    .sgmg-scope {
+        border: 1px solid var(--dash-line);
+        border-radius: 8px;
+        padding: .55rem .8rem;
+        color: var(--dash-ink);
+        background: #fff;
+        white-space: nowrap;
+    }
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(150px, 1fr));
+        gap: .85rem;
+    }
+    .kpi-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        min-height: 112px;
+        padding: 1rem;
+        border: 1px solid var(--dash-line);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--dash-ink);
+        text-decoration: none;
+        box-shadow: 0 8px 22px rgba(33, 45, 68, .06);
+    }
+    .kpi-card:hover {
+        color: var(--dash-ink);
+        border-color: #b9c8dc;
+        transform: translateY(-1px);
+    }
+    .kpi-card.active {
+        border-color: #1266f1;
+        box-shadow: 0 0 0 3px rgba(18, 102, 241, .14), 0 10px 24px rgba(33, 45, 68, .08);
+    }
+    .kpi-label {
+        color: var(--dash-muted);
+        font-size: .86rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .kpi-value {
+        font-size: 2.25rem;
+        font-weight: 800;
+        line-height: 1;
+        margin: .35rem 0;
+    }
+    .kpi-detail {
+        color: var(--dash-muted);
+        font-size: .92rem;
+    }
+    .kpi-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border-radius: 8px;
+        color: #fff;
+        flex: 0 0 auto;
+    }
+    .kpi-icon.primary { background: #1266f1; }
+    .kpi-icon.danger { background: #dc3545; }
+    .kpi-icon.warning { background: #f2a900; }
+    .kpi-icon.info { background: #0bbbd3; }
+    .kpi-icon.success { background: #188754; }
+    .dashboard-panel {
+        border: 1px solid var(--dash-line);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 8px 22px rgba(33, 45, 68, .05);
+        overflow: hidden;
+    }
+    .dashboard-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .85rem 1rem;
+        border-bottom: 1px solid var(--dash-line);
+    }
+    .dashboard-panel-title {
+        color: var(--dash-ink);
+        font-size: 1.05rem;
+        font-weight: 800;
+        margin: 0;
+    }
+    .dashboard-table {
+        margin: 0;
+        vertical-align: middle;
+    }
+    .dashboard-table th {
+        color: var(--dash-muted);
+        font-size: .78rem;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+    .empty-state {
+        padding: 2rem 1rem;
+        color: var(--dash-muted);
+        text-align: center;
+    }
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        gap: .75rem;
+    }
+    .quick-action {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: .5rem;
+        min-height: 46px;
+        border-radius: 8px;
+        font-weight: 700;
+    }
+    @media (max-width: 1200px) {
+        .kpi-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+        .quick-actions { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+    }
+    @media (max-width: 768px) {
+        .sgmg-page-head { align-items: flex-start; flex-direction: column; }
+        .sgmg-scope { white-space: normal; }
+        .kpi-grid,
+        .quick-actions { grid-template-columns: 1fr; }
+        .dashboard-table th,
+        .dashboard-table td { white-space: normal; }
+    }
+</style>
+
+<div class="sgmg-dashboard">
+    <div class="sgmg-page-head">
+        <div>
+            <h1 class="sgmg-title"><i class="fa-solid fa-chart-line me-2"></i>Dashboard SGMG</h1>
+            <p class="sgmg-subtitle">Control de stock, vencimientos, abastecimiento y compras.</p>
+        </div>
+        <div class="sgmg-scope">
+            <i class="fa-solid fa-location-dot me-2 text-primary"></i>{{ dashboard_scope }}
+        </div>
+    </div>
+
+    <div class="kpi-grid mb-4">
+        {% for card in dashboard_cards %}
+        <a class="kpi-card {% if selected_panel == card.panel %}active{% endif %}" href="{{ card.url }}">
+            <div>
+                <div class="kpi-label">{{ card.title }}</div>
+                <div class="kpi-value">{{ card.value }}</div>
+                <div class="kpi-detail">{{ card.detail }}</div>
+            </div>
+            <span class="kpi-icon {{ card.style }}">
+                <i class="fa-solid {{ card.icon }}"></i>
+            </span>
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if selected_panel %}
+    <div class="dashboard-panel mb-3" id="dashboard-detail">
+        <div class="dashboard-panel-header">
+            <h2 class="dashboard-panel-title">
+                {% if selected_panel == 'active' %}
+                <i class="fa-solid fa-boxes-stacked text-primary me-2"></i>Lotes activos con stock disponible
+                {% elif selected_panel == 'expired' %}
+                <i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>Lotes vencidos
+                {% elif selected_panel == 'expiring' %}
+                <i class="fa-solid fa-calendar-days text-warning me-2"></i>Vencimientos proximos
+                {% elif selected_panel == 'shortfalls' %}
+                <i class="fa-solid fa-cart-arrow-down text-info me-2"></i>Faltantes segun plan de empleo
+                {% elif selected_panel == 'purchases' %}
+                <i class="fa-solid fa-file-invoice-dollar text-success me-2"></i>Compras abiertas
                 {% endif %}
-            </div>
+            </h2>
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-xmark me-1"></i>Cerrar detalle
+            </a>
         </div>
-    </div>
-</div>
 
-{% if user.is_authenticated %}
-
-<div class="row mt-2">
-    <!-- Fast Access Cards using generic info for now - will be replaced with dashboard logic later if needed -->
-    <div class="col-md-4 mb-4">
-        <div class="card shadow-sm h-100 border-start border-primary border-4">
-            <div class="card-body">
-                <h5 class="card-title text-primary"><i class="fa-solid fa-plane me-2"></i> Flota</h5>
-                <p class="card-text text-muted">Gestión de Unidades y Modelos de Aeronaves.</p>
-                <a href="{% url 'aircraft_list' %}" class="btn btn-outline-primary btn-sm">Ver Aeronaves</a>
-                <a href="{% url 'unit_list' %}" class="btn btn-outline-secondary btn-sm">Ver Unidades</a>
+        {% if selected_panel == 'expiring' %}
+        <div class="p-3 border-bottom">
+            <div class="fw-bold text-danger mb-2">Dentro de 30 dias: {{ upcoming_30_batches_detail|length }}</div>
+            {% if upcoming_30_batches_detail %}
+            <div class="table-responsive">
+                <table class="table table-hover dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Material</th>
+                            <th>Lote</th>
+                            <th>Ubicacion</th>
+                            <th>Vence</th>
+                            <th>Disponible</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in upcoming_30_batches_detail %}
+                        <tr>
+                            <td class="fw-bold">{{ batch.grease_type.nomenclatura }}</td>
+                            <td><a href="{% url 'batch_detail' batch.id %}">{{ batch.batch_number }}</a></td>
+                            <td>{{ batch.storage_location }}</td>
+                            <td><span class="badge bg-danger">{{ batch.expiration_date|date:'d/m/Y' }}</span></td>
+                            <td>{{ batch.available_quantity|smart_number }} {{ batch.grease_type.unidad }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+            {% else %}
+            <div class="empty-state py-3">No hay lotes que venzan dentro de 30 dias.</div>
+            {% endif %}
         </div>
-    </div>
-    
-    <div class="col-md-4 mb-4">
-        <div class="card shadow-sm h-100 border-start border-success border-4">
-            <div class="card-body">
-                <h5 class="card-title text-success"><i class="fa-solid fa-oil-can me-2"></i> Catálogo</h5>
-                <p class="card-text text-muted">Gestión de Tipos de Grasas y Especificaciones.</p>
-                <a href="{% url 'grease_list' %}" class="btn btn-outline-success btn-sm">Ver Catálogo</a>
+        <div class="p-3">
+            <div class="fw-bold text-warning mb-2">Restantes dentro de 6 meses: {{ upcoming_180_remaining_batches_detail|length }}</div>
+            {% if upcoming_180_remaining_batches_detail %}
+            <div class="table-responsive">
+                <table class="table table-hover dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Material</th>
+                            <th>Lote</th>
+                            <th>Ubicacion</th>
+                            <th>Vence</th>
+                            <th>Disponible</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in upcoming_180_remaining_batches_detail %}
+                        <tr>
+                            <td class="fw-bold">{{ batch.grease_type.nomenclatura }}</td>
+                            <td><a href="{% url 'batch_detail' batch.id %}">{{ batch.batch_number }}</a></td>
+                            <td>{{ batch.storage_location }}</td>
+                            <td><span class="badge bg-warning text-dark">{{ batch.expiration_date|date:'d/m/Y' }}</span></td>
+                            <td>{{ batch.available_quantity|smart_number }} {{ batch.grease_type.unidad }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
+            {% else %}
+            <div class="empty-state py-3">No hay otros lotes dentro de los proximos 6 meses.</div>
+            {% endif %}
         </div>
-    </div>
-    
-    <div class="col-md-4 mb-4">
-        <div class="card shadow-sm h-100 border-start border-warning border-4">
-            <div class="card-body">
-                <h5 class="card-title text-warning"><i class="fa-solid fa-boxes-stacked me-2"></i> Logística</h5>
-                <p class="card-text text-muted">Control de Stock, Consumos y Abastecimiento.</p>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'batch_list' %}" class="btn btn-outline-warning btn-sm">Gestionar Stock</a>
-                    <a href="{% url 'procurement_forecast' %}" class="btn btn-outline-info btn-sm">Análisis de Abastecimiento</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% if stock_alerts %}
-<div class="row mt-2 mb-4">
-    <div class="col-12">
-        <div class="card border-warning shadow-sm">
-            <div class="card-header bg-warning text-dark fw-bold">
-                <i class="fa-solid fa-cart-arrow-down me-2"></i> Alerta de Abastecimiento (Stock Insuficiente para Planes de Empleo)
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for alert in stock_alerts %}
-                    <div class="list-group-item list-group-item-warning d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>{{ alert.grease_type.nomenclatura }}</strong>
-                            <br>
-                            <small>Proyectado: {{ alert.projected|smart_number }} {{ alert.grease_type.unidad }} | Disponible: {{ alert.available|smart_number }} {{ alert.grease_type.unidad }}</small>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-danger rounded-pill fs-6 mb-1">
-                                Faltante: {{ alert.shortfall|smart_number }} {{ alert.grease_type.unidad }}
-                            </span>
-                            <br>
+        {% elif selected_panel == 'shortfalls' %}
+        {% if stock_alerts_detail %}
+        <div class="table-responsive">
+            <table class="table table-hover dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th class="text-end">Stock</th>
+                        <th class="text-end">Previsto</th>
+                        <th class="text-end">Faltante</th>
+                        <th>Compra</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in stock_alerts_detail %}
+                    <tr>
+                        <td class="fw-bold">{{ alert.grease_type.nomenclatura }}</td>
+                        <td class="text-end">{{ alert.total_available|smart_number }} {{ alert.grease_type.unidad }}</td>
+                        <td class="text-end">{{ alert.total_projected|smart_number }} {{ alert.grease_type.unidad }}</td>
+                        <td class="text-end fw-bold text-danger">{{ alert.shortfall|smart_number }} {{ alert.grease_type.unidad }}</td>
+                        <td>
                             {% if alert.active_requirement %}
-                                <span class="badge bg-secondary p-2"><i class="fa-solid fa-clock"></i> Cargado para compra</span>
+                            <span class="badge bg-secondary">Cargado</span>
                             {% else %}
-                                <a href="{% url 'procurement_forecast' %}" class="btn btn-sm btn-outline-danger">Adquirir</a>
+                            <span class="badge bg-danger">Pendiente</span>
                             {% endif %}
-                        </div>
-                    </div>
+                        </td>
+                    </tr>
                     {% endfor %}
-                </div>
-            </div>
+                </tbody>
+            </table>
         </div>
-    </div>
-</div>
-{% endif %}
-
-{% if critical_stock_alerts %}
-<div class="row mt-2 mb-4">
-    <div class="col-12">
-        <div class="card border-danger shadow-sm">
-            <div class="card-header bg-danger text-white fw-bold">
-                <i class="fa-solid fa-battery-quarter me-2"></i> Alerta de Stock Crítico (Punto de Pedido)
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for alert in critical_stock_alerts %}
-                    <div class="list-group-item list-group-item-danger d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>{{ alert.grease_type.nomenclatura }}</strong>
-                            <br>
-                            <small>Mínimo Requerido: {{ alert.minimum_stock|smart_number }} {{ alert.grease_type.unidad }} | Stock Actual: {{ alert.available|smart_number }} {{ alert.grease_type.unidad }}</small>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-danger rounded-pill fs-6 mb-1">
-                                Comprar: {{ alert.shortfall|abs_val|smart_number }} {{ alert.grease_type.unidad }}
-                            </span>
-                            <br>
-                            {% if alert.active_requirement %}
-                                <span class="badge bg-secondary p-2"><i class="fa-solid fa-clock"></i> Cargado para compra</span>
-                            {% else %}
-                                <a href="{% url 'procurement_forecast' %}" class="btn btn-sm btn-outline-danger">Adquirir</a>
-                            {% endif %}
-                        </div>
-                    </div>
+        {% else %}
+        <div class="empty-state">No hay faltantes para mostrar.</div>
+        {% endif %}
+        {% elif selected_panel == 'purchases' %}
+        {% if pending_requirements_detail %}
+        <div class="table-responsive">
+            <table class="table table-hover dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Material</th>
+                        <th>Cantidad</th>
+                        <th>Estado</th>
+                        <th>Solicitado por</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in pending_requirements_detail %}
+                    <tr>
+                        <td>{{ req.request_date|date:'d/m/Y' }}</td>
+                        <td class="fw-bold">{{ req.grease_type.nomenclatura }}</td>
+                        <td>{{ req.requested_quantity|smart_number }} {{ req.grease_type.unidad }}</td>
+                        <td><span class="badge bg-primary">{{ req.get_status_display }}</span></td>
+                        <td>{{ req.requested_by|default:'-' }}</td>
+                    </tr>
                     {% endfor %}
-                </div>
-            </div>
+                </tbody>
+            </table>
         </div>
-    </div>
-</div>
-{% endif %}
-
-{% if alerts %}
-<div class="row mt-2 mb-4">
-    <div class="col-12">
-        <div class="card border-danger shadow-sm">
-            <div class="card-header bg-danger text-white fw-bold">
-                <i class="fa-solid fa-triangle-exclamation me-2"></i> Alertas de Stock (Casamatas Vencidas / Próximas a Vencer)
+        {% else %}
+        <div class="empty-state">No hay compras abiertas para mostrar.</div>
+        {% endif %}
+        {% else %}
+        {% if selected_panel == 'active' %}
+            {% with detail_batches=active_batches_detail %}
+            <div class="table-responsive">
+                <table class="table table-hover dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Material</th>
+                            <th>Lote</th>
+                            <th>Ubicacion</th>
+                            <th>Estado</th>
+                            <th>Vence</th>
+                            <th>Disponible</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in detail_batches %}
+                        <tr>
+                            <td class="fw-bold">{{ batch.grease_type.nomenclatura }}</td>
+                            <td><a href="{% url 'batch_detail' batch.id %}">{{ batch.batch_number }}</a></td>
+                            <td>{{ batch.storage_location }}</td>
+                            <td><span class="badge bg-primary">{{ batch.get_status_display }}</span></td>
+                            <td>{{ batch.expiration_date|date:'d/m/Y' }}</td>
+                            <td>{{ batch.available_quantity|smart_number }} {{ batch.grease_type.unidad }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="empty-state">No hay lotes activos para mostrar.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <div class="card-body p-0">
+            {% endwith %}
+        {% elif selected_panel == 'expired' %}
+            {% with detail_batches=expired_batches_detail %}
+            <div class="table-responsive">
+                <table class="table table-hover dashboard-table">
+                    <thead>
+                        <tr>
+                            <th>Material</th>
+                            <th>Lote</th>
+                            <th>Ubicacion</th>
+                            <th>Vence</th>
+                            <th>Disponible</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in detail_batches %}
+                        <tr>
+                            <td class="fw-bold">{{ batch.grease_type.nomenclatura }}</td>
+                            <td><a href="{% url 'batch_detail' batch.id %}">{{ batch.batch_number }}</a></td>
+                            <td>{{ batch.storage_location }}</td>
+                            <td><span class="badge bg-danger">{{ batch.expiration_date|date:'d/m/Y' }}</span></td>
+                            <td>{{ batch.available_quantity|smart_number }} {{ batch.grease_type.unidad }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="empty-state">No hay lotes vencidos para mostrar.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endwith %}
+        {% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="row g-3 mb-3">
+        <div class="col-xl-7">
+            <div class="dashboard-panel h-100">
+                <div class="dashboard-panel-header">
+                    <h2 class="dashboard-panel-title">
+                        <i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>Alertas de vencimiento
+                    </h2>
+                    <a href="{% url 'batch_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Ver stock
+                    </a>
+                </div>
+                {% if alerts %}
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped mb-0">
-                        <thead class="table-light">
+                    <table class="table table-hover dashboard-table">
+                        <thead>
                             <tr>
-                                <th>Grasa</th>
-                                <th>Casamata</th>
-                                <th>Estado</th>
-                                <th>Vencimiento</th>
-                                <th>Ubicación</th>
+                                <th>Material</th>
+                                <th>Lote</th>
+                                <th>Ubicacion</th>
+                                <th>Vence</th>
                                 <th>Disponible</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for batch in alerts %}
-                            <tr class="{% if batch.status == 'EXPIRED' %}table-danger{% else %}table-warning{% endif %}">
-                                <td>{{ batch.grease_type.nomenclatura }}</td>
-                                <td><a href="{% url 'batch_detail' batch.id %}"><strong>{{ batch.batch_number }}</strong></a></td>
-                                <td><span class="badge {% if batch.status == 'EXPIRED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ batch.get_status_display }}</span></td>
-                                <td data-sort="{{ batch.expiration_date|date:'Y-m-d' }}">{{ batch.expiration_date|date:'d/m/Y' }}</td>
+                            <tr>
+                                <td class="fw-bold">{{ batch.grease_type.nomenclatura }}</td>
+                                <td><a href="{% url 'batch_detail' batch.id %}">{{ batch.batch_number }}</a></td>
                                 <td>{{ batch.storage_location }}</td>
-                                <td>{{ batch.available_quantity|smart_number }}</td>
+                                <td>
+                                    <span class="badge {% if batch.status == 'EXPIRED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                        {{ batch.expiration_date|date:'d/m/Y' }}
+                                    </span>
+                                </td>
+                                <td>{{ batch.available_quantity|smart_number }} {{ batch.grease_type.unidad }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-circle-check text-success me-2"></i>No hay vencimientos activos para mostrar.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="dashboard-panel h-100">
+                <div class="dashboard-panel-header">
+                    <h2 class="dashboard-panel-title">
+                        <i class="fa-solid fa-cart-arrow-down text-info me-2"></i>Abastecimiento critico
+                    </h2>
+                    <a href="{% url 'procurement_forecast' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Analizar
+                    </a>
+                </div>
+                {% if stock_alerts %}
+                <div class="table-responsive">
+                    <table class="table table-hover dashboard-table">
+                        <thead>
+                            <tr>
+                                <th>Material</th>
+                                <th class="text-end">Faltante</th>
+                                <th>Compra</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for alert in stock_alerts %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ alert.grease_type.nomenclatura }}</div>
+                                    <small class="text-muted">Stock {{ alert.total_available|smart_number }} / Previsto {{ alert.total_projected|smart_number }}</small>
+                                </td>
+                                <td class="text-end fw-bold text-danger">{{ alert.shortfall|smart_number }} {{ alert.grease_type.unidad }}</td>
+                                <td>
+                                    {% if alert.active_requirement %}
+                                    <span class="badge bg-secondary">Cargado</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Pendiente</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-circle-check text-success me-2"></i>No hay faltantes segun el plan de empleo.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-7">
+            <div class="dashboard-panel h-100">
+                <div class="dashboard-panel-header">
+                    <h2 class="dashboard-panel-title">
+                        <i class="fa-solid fa-file-invoice-dollar text-success me-2"></i>Requerimientos de compra
+                    </h2>
+                    <a href="{% url 'requirement_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fa-solid fa-list me-1"></i>Ver todos
+                    </a>
+                </div>
+                {% if pending_requirements %}
+                <div class="table-responsive">
+                    <table class="table table-hover dashboard-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Material</th>
+                                <th>Cantidad</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in pending_requirements %}
+                            <tr>
+                                <td>{{ req.request_date|date:'d/m/Y' }}</td>
+                                <td class="fw-bold">{{ req.grease_type.nomenclatura }}</td>
+                                <td>{{ req.requested_quantity|smart_number }} {{ req.grease_type.unidad }}</td>
+                                <td><span class="badge bg-primary">{{ req.get_status_display }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-circle-check text-success me-2"></i>No hay requerimientos abiertos.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="dashboard-panel h-100">
+                <div class="dashboard-panel-header">
+                    <h2 class="dashboard-panel-title">
+                        <i class="fa-solid fa-bolt text-warning me-2"></i>Accesos rapidos
+                    </h2>
+                </div>
+                <div class="p-3">
+                    <div class="quick-actions">
+                        <a href="{% url 'batch_create' %}" class="btn btn-primary quick-action">
+                            <i class="fa-solid fa-plus"></i>Nuevo lote
+                        </a>
+                        <a href="{% url 'consume_grease' %}" class="btn btn-outline-primary quick-action">
+                            <i class="fa-solid fa-oil-can"></i>Registrar consumo
+                        </a>
+                        <a href="{% url 'requirement_create' %}" class="btn btn-success quick-action">
+                            <i class="fa-solid fa-cart-plus"></i>Nueva compra
+                        </a>
+                        <a href="{% url 'flightplan_list' %}" class="btn btn-outline-secondary quick-action">
+                            <i class="fa-solid fa-calendar-days"></i>Plan de empleo
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-{% endif %}
-{% endif %}
 {% endblock %}

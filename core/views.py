@@ -20,8 +20,10 @@ from .decorators import pin_required
 
 import logging
 import time
+from datetime import timedelta
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils import timezone
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -60,106 +62,140 @@ def portal(request):
 # Home View
 @login_required
 def home(request):
-    expiration_alerts = []
-    stock_alerts = []
-    critical_stock_alerts = []
-    
-    if request.user.is_authenticated:
-        update_batch_statuses()
-        
-        user = request.user
-        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
-        user_unit_name = user.unit.name if getattr(user, 'unit', None) else None
-        
-        # Alertas de Vencimiento
-        expiration_qs = GreaseBatch.objects.filter(
-            status__in=['NEAR_EXPIRATION', 'EXPIRED'],
-            available_quantity__gt=0
-        )
-        if not is_admin:
-            if user_unit_name:
-                expiration_qs = expiration_qs.filter(storage_location=user_unit_name)
-            else:
-                expiration_qs = expiration_qs.none()
-            
-        expiration_alerts = expiration_qs.order_by('expiration_date')
-        
-        # Alertas de Stock Mínimo (Previsión de Abastecimiento)
-        grease_types = GreaseType.objects.all()
-        forecast_dict = {}
-        for gt in grease_types:
-            batches_qs = gt.batches.filter(status__in=['SERVICEABLE', 'NEAR_EXPIRATION'])
-            if not is_admin:
-                if user_unit_name:
-                    batches_qs = batches_qs.filter(storage_location=user_unit_name)
-                else:
-                    batches_qs = batches_qs.none() # User without a unit shouldn't see stock from anywhere unless admin
-                
-            total_available = sum(b.available_quantity for b in batches_qs)
-            
-            if gt.nomenclatura not in forecast_dict:
-                forecast_dict[gt.nomenclatura] = {
-                    'grease_type': gt,
-                    'available': 0,
-                    'minimum_stock': 0,
-                    'plan_details_map': {}
-                }
-                
-            forecast_dict[gt.nomenclatura]['available'] += total_available
-            forecast_dict[gt.nomenclatura]['minimum_stock'] += gt.minimum_stock
-            
-            for assoc in gt.aircraft_associations.all():
-                if not is_admin:
-                    if user_unit_name and assoc.aircraft_model.unit.name == user_unit_name:
-                        pass
-                    else:
-                        continue
-                        
-                for plan in assoc.aircraft_model.flight_plans.all():
-                    proj = assoc.hourly_consumption_rate * plan.planned_hours
-                    forecast_dict[gt.nomenclatura]['plan_details_map'][(assoc.aircraft_model.id, plan.id)] = proj
-                    
-        for nom, data in forecast_dict.items():
-            total_projected = sum(data['plan_details_map'].values())
-            
-            # Solo mostrar alerta si el usuario (o admin) al menos está proyectando un consumo o tiene stock de esta grasa
-            if not is_admin and user_unit_name:
-                has_involvement = total_projected > 0 or data['available'] > 0
-                if not has_involvement:
-                    continue
-                    
-            if total_projected > data['available']:
-                active_req = ProcurementRequirement.objects.filter(
-                    grease_type__nomenclatura=nom,
-                    status__in=['PENDING', 'ORDERED']
-                ).first()
-                stock_alerts.append({
-                    'grease_type': data['grease_type'],
-                    'shortfall': total_projected - data['available'],
-                    'available': data['available'],
-                    'projected': total_projected,
-                    'active_requirement': active_req,
-                })
-                
-            # Alertas de Stock Crítico (por debajo del Stock Mínimo)
-            if data['available'] < data['minimum_stock']:
-                active_req_critical = ProcurementRequirement.objects.filter(
-                    grease_type__nomenclatura=nom,
-                    status__in=['PENDING', 'ORDERED']
-                ).first()
-                critical_stock_alerts.append({
-                    'grease_type': data['grease_type'],
-                    'available': data['available'],
-                    'minimum_stock': data['minimum_stock'],
-                    'shortfall': data['minimum_stock'] - data['available'],
-                    'active_requirement': active_req_critical,
-                })
-                
+    from .services import get_procurement_forecast
+
+    update_batch_statuses()
+
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    user_unit_name = user.unit.name if getattr(user, 'unit', None) else None
+    scoped_location = None if is_admin else user_unit_name
+
+    today = timezone.localdate()
+    next_30 = today + timedelta(days=30)
+    next_180 = today + timedelta(days=180)
+    selected_panel = request.GET.get('panel', '')
+
+    batch_scope = GreaseBatch.objects.active().filter(available_quantity__gt=0).select_related('grease_type')
+    if scoped_location:
+        batch_scope = batch_scope.filter(storage_location=scoped_location)
+    elif not is_admin:
+        batch_scope = batch_scope.none()
+
+    expiration_alerts = batch_scope.filter(
+        status__in=['NEAR_EXPIRATION', 'EXPIRED']
+    ).order_by('expiration_date', 'grease_type__nomenclatura')[:8]
+
+    expired_count = batch_scope.filter(status='EXPIRED').count()
+    upcoming_30_count = batch_scope.filter(
+        expiration_date__gt=today,
+        expiration_date__lte=next_30,
+        status__in=['SERVICEABLE', 'NEAR_EXPIRATION']
+    ).count()
+    upcoming_180_count = batch_scope.filter(
+        expiration_date__gt=today,
+        expiration_date__lte=next_180,
+        status__in=['SERVICEABLE', 'NEAR_EXPIRATION']
+    ).count()
+
+    requirement_scope = ProcurementRequirement.objects.select_related('grease_type', 'requested_by')
+    if scoped_location:
+        requirement_scope = requirement_scope.filter(requested_by__unit__name=scoped_location)
+    elif not is_admin:
+        requirement_scope = requirement_scope.none()
+
+    pending_requirements = requirement_scope.filter(status__in=['PENDING', 'ORDERED']).order_by('-request_date')
+
+    forecast_data = get_procurement_forecast(location=scoped_location)
+    stock_alerts = [
+        item for item in forecast_data
+        if item.get('shortfall', 0) > 0 and (item.get('total_projected', 0) > 0 or item.get('total_available', 0) > 0)
+    ]
+    stock_alerts.sort(key=lambda item: item.get('shortfall', 0), reverse=True)
+
+    active_batches = batch_scope.filter(status__in=['SERVICEABLE', 'NEAR_EXPIRATION']).order_by(
+        'grease_type__nomenclatura',
+        'expiration_date'
+    )
+    expired_batches = batch_scope.filter(status='EXPIRED').order_by(
+        'expiration_date',
+        'grease_type__nomenclatura'
+    )
+    upcoming_30_batches = batch_scope.filter(
+        expiration_date__gt=today,
+        expiration_date__lte=next_30,
+        status__in=['SERVICEABLE', 'NEAR_EXPIRATION']
+    ).order_by('expiration_date', 'grease_type__nomenclatura')
+    upcoming_180_remaining_batches = batch_scope.filter(
+        expiration_date__gt=next_30,
+        expiration_date__lte=next_180,
+        status__in=['SERVICEABLE', 'NEAR_EXPIRATION']
+    ).order_by('expiration_date', 'grease_type__nomenclatura')
+
+    dashboard_cards = [
+        {
+            'title': 'Lotes activos',
+            'value': batch_scope.filter(status__in=['SERVICEABLE', 'NEAR_EXPIRATION']).count(),
+            'detail': 'Con stock disponible',
+            'icon': 'fa-boxes-stacked',
+            'style': 'primary',
+            'panel': 'active',
+            'url': f"{reverse_lazy('home')}?panel=active",
+        },
+        {
+            'title': 'Vencidos',
+            'value': expired_count,
+            'detail': 'Requieren accion',
+            'icon': 'fa-triangle-exclamation',
+            'style': 'danger',
+            'panel': 'expired',
+            'url': f"{reverse_lazy('home')}?panel=expired",
+        },
+        {
+            'title': 'Vencen en 30 dias',
+            'value': upcoming_30_count,
+            'detail': f'{upcoming_180_count} dentro de 6 meses',
+            'icon': 'fa-calendar-days',
+            'style': 'warning',
+            'panel': 'expiring',
+            'url': f"{reverse_lazy('home')}?panel=expiring",
+        },
+        {
+            'title': 'Faltantes',
+            'value': len(stock_alerts),
+            'detail': 'Segun plan de empleo',
+            'icon': 'fa-cart-arrow-down',
+            'style': 'info',
+            'panel': 'shortfalls',
+            'url': f"{reverse_lazy('home')}?panel=shortfalls",
+        },
+        {
+            'title': 'Compras abiertas',
+            'value': pending_requirements.count(),
+            'detail': 'Pendientes o en proceso',
+            'icon': 'fa-file-invoice-dollar',
+            'style': 'success',
+            'panel': 'purchases',
+            'url': f"{reverse_lazy('home')}?panel=purchases",
+        },
+    ]
+
     return render(request, 'core/home.html', {
         'alerts': expiration_alerts,
-        'stock_alerts': stock_alerts,
-        'critical_stock_alerts': critical_stock_alerts
+        'stock_alerts': stock_alerts[:8],
+        'pending_requirements': pending_requirements[:6],
+        'dashboard_cards': dashboard_cards,
+        'selected_panel': selected_panel,
+        'active_batches_detail': active_batches,
+        'expired_batches_detail': expired_batches,
+        'upcoming_30_batches_detail': upcoming_30_batches,
+        'upcoming_180_remaining_batches_detail': upcoming_180_remaining_batches,
+        'stock_alerts_detail': stock_alerts,
+        'pending_requirements_detail': pending_requirements,
+        'dashboard_scope': scoped_location or 'Todas las unidades',
+        'today': today,
     })
+
 
 # --- Units ---
 class UnitListView(LoginRequiredMixin, ListView):
