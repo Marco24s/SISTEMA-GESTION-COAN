@@ -129,14 +129,12 @@ def get_procurement_forecast(location=None):
                 loc = b.storage_location or "Sin Escuadrilla"
                 stock_by_location[loc] = stock_by_location.get(loc, 0.0) + qty
                 
-        stock_breakdown = [{'location': k, 'quantity': v} for k, v in stock_by_location.items()]
-        
         active_req = gt.requirements.filter(status__in=['PENDING', 'ORDERED']).first()
         
         fg = {
             'grease_type': gt,
             'total_available': total_available,
-            'stock_breakdown': stock_breakdown,
+            'stock_breakdown': [],
             'total_projected': 0.0,
             'shortfall': 0.0,
             'plan_details': [],
@@ -145,6 +143,7 @@ def get_procurement_forecast(location=None):
         
         # Gather all plans and daily rates
         plans_to_simulate = []
+        projected_by_location = {}
         for assoc in gt.aircraft_associations.all():
             if location and assoc.aircraft_model.unit.name != location:
                 continue
@@ -158,6 +157,8 @@ def get_procurement_forecast(location=None):
                 
                 total_consumption = float(assoc.hourly_consumption_rate * plan.planned_hours)
                 daily_consumption = total_consumption / total_days
+                plan_location = assoc.aircraft_model.unit.name
+                projected_by_location[plan_location] = projected_by_location.get(plan_location, 0.0) + total_consumption
                 
                 plans_to_simulate.append({
                     'start': plan.period_start_date,
@@ -172,6 +173,16 @@ def get_procurement_forecast(location=None):
                     'projected': total_consumption
                 })
                 fg['total_projected'] += total_consumption
+
+        stock_breakdown_locations = sorted(set(stock_by_location) | set(projected_by_location))
+        fg['stock_breakdown'] = [
+            {
+                'location': loc,
+                'quantity': stock_by_location.get(loc, 0.0),
+                'projected': projected_by_location.get(loc, 0.0),
+            }
+            for loc in stock_breakdown_locations
+        ]
         
         if not plans_to_simulate and total_available == 0:
             # If no plans and no stock, nothing to report or shortfall is 0

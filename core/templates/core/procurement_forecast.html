@@ -1,6 +1,38 @@
 {% extends 'base.html' %}
 {% load core_filters %}
 {% block content %}
+<style>
+    .stock-tooltip-table {
+        min-width: 260px;
+        font-size: 0.82rem;
+    }
+    .stock-tooltip-row {
+        display: grid;
+        grid-template-columns: minmax(70px, 1fr) 90px 90px;
+        gap: 0.6rem;
+        align-items: center;
+        padding: 0.2rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    .stock-tooltip-row:last-child {
+        border-bottom: 0;
+    }
+    .stock-tooltip-head {
+        color: #cbd5e1;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.68rem;
+    }
+    .stock-tooltip-num {
+        text-align: right;
+        white-space: nowrap;
+    }
+    .stock-forecast-tooltip .tooltip-inner {
+        max-width: 460px;
+        width: max-content;
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
     <div>
         <h2 class="mb-0"><i class="fa-solid fa-chart-line me-2"></i> Previsión de Consumo</h2>
@@ -39,7 +71,8 @@
                             data-bs-toggle="tooltip" 
                             data-bs-placement="top" 
                             data-bs-html="true"
-                            title="<div class='text-start'>{% for item in row.stock_breakdown %}• {{ item.location }}: <b>{{ item.quantity|smart_number }}</b>{% if not forloop.last %}<br>{% endif %}{% endfor %}</div>" 
+                            data-bs-custom-class="stock-forecast-tooltip"
+                            title="<div class='stock-tooltip-table'><div class='stock-tooltip-row stock-tooltip-head'><span>Destino</span><span class='stock-tooltip-num'>Existencia</span><span class='stock-tooltip-num'>Previsto</span></div>{% for item in row.stock_breakdown %}<div class='stock-tooltip-row'><span>{{ item.location }}</span><span class='stock-tooltip-num'><b>{{ item.quantity|smart_number }}</b> {{ row.grease_type.unidad }}</span><span class='stock-tooltip-num'><b>{{ item.projected|smart_number }}</b> {{ row.grease_type.unidad }}</span></div>{% endfor %}</div>" 
                             style="cursor: help; border-bottom: 1px dotted #6c757d;"
                             {% endif %}>
                             {{ row.total_available|smart_number }}
