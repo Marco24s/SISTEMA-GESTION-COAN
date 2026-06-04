@@ -67,6 +67,7 @@ urlpatterns = [
     
     # Procurement Requirements
     path('procurement/requirements/', views.ProcurementRequirementListView.as_view(), name='requirement_list'),
+    path('procurement/requirements/add/', views.ProcurementRequirementCreateView.as_view(), name='requirement_create'),
     path('procurement/requirements/add/<int:grease_type_id>/', views.CreateRequirementFromForecastView.as_view(), name='requirement_create_from_forecast'),
     path('procurement/requirements/<int:pk>/edit/', views.ProcurementRequirementUpdateView.as_view(), name='requirement_update'),
     path('procurement/requirements/<int:pk>/delete/', views.ProcurementRequirementDeleteView.as_view(), name='requirement_delete'),

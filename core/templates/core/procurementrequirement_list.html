@@ -19,6 +19,9 @@
         <p class="text-muted mb-0 mt-1">Listado de solicitudes generadas a partir del pronóstico de abastecimiento.</p>
     </div>
     <div class="d-flex gap-2 no-print">
+        <a href="{% url 'requirement_create' %}" class="btn btn-primary" title="Nuevo requerimiento manual">
+            <i class="fa-solid fa-plus me-1"></i> Nuevo Requerimiento
+        </a>
         <a href="{% url 'export_requirements_csv' %}" class="btn btn-success" title="Exportar a Excel (CSV)">
             <i class="fa-solid fa-file-excel me-1"></i> Exportar Excel
         </a>
@@ -66,7 +69,12 @@
                             {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
                             <a href="{% url 'requirement_update' req.id %}" class="btn btn-sm btn-outline-primary" title="Actualizar Estado o Notas"><i class="fa-solid fa-pen-to-square"></i> Editar</a>
                             {% endif %}
-                            {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+                            {% if can_delete_requirements %}
+                            <a href="{% url 'requirement_delete' req.id %}" class="btn btn-sm btn-outline-danger ms-1" title="Borrar con PIN">
+                                <i class="fa-solid fa-key me-1"></i> Borrar
+                            </a>
+                            {% endif %}
+                            {% if False %}
                             <form method="post" action="{% url 'requirement_delete' req.id %}" class="d-inline" onsubmit="return confirm('¿Eliminar el requerimiento #{{ req.id }} de {{ req.grease_type.nomenclatura }}?');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-danger ms-1" title="Eliminar Requerimiento"><i class="fa-solid fa-trash"></i></button>

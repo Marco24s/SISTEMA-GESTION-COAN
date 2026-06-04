@@ -273,3 +273,21 @@ class ProcurementRequirementForm(forms.ModelForm):
         model = ProcurementRequirement
         fields = ['status', 'requested_quantity', 'notes']
 
+
+class ProcurementRequirementCreateForm(forms.ModelForm):
+    class Meta:
+        model = ProcurementRequirement
+        fields = ['grease_type', 'requested_quantity', 'notes']
+        labels = {
+            'grease_type': 'Grasa / Aceite',
+            'requested_quantity': 'Cantidad solicitada',
+            'notes': 'Observaciones',
+        }
+        widgets = {
+            'notes': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['grease_type'].queryset = GreaseType.objects.order_by('nomenclatura', 'unidad')
+

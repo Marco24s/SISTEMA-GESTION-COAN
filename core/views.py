@@ -4,7 +4,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView, T
 from django.urls import reverse_lazy
 
 from django.contrib import messages
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django import forms
 from django.db import transaction
 from django.core.exceptions import ValidationError
@@ -12,8 +12,8 @@ from django.core.exceptions import ValidationError
 import csv
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from .models import Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGrease, FlightPlan, GreaseBatch, StockMovement, GreaseReferencePrice, ProcurementRequirement
-from .forms import UnitForm, MeasurementUnitForm, AircraftModelForm, GreaseTypeForm, AircraftGreaseForm, FlightPlanForm, GreaseBatchForm, ConsumeGreaseForm, GreaseReferencePriceForm, RetestBatchForm, ProcurementRequirementForm
+from .models import Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGrease, FlightPlan, GreaseBatch, StockMovement, GreaseReferencePrice, ProcurementRequirement, UserSystemPIN
+from .forms import UnitForm, MeasurementUnitForm, AircraftModelForm, GreaseTypeForm, AircraftGreaseForm, FlightPlanForm, GreaseBatchForm, ConsumeGreaseForm, GreaseReferencePriceForm, RetestBatchForm, ProcurementRequirementForm, ProcurementRequirementCreateForm
 from .services import update_batch_statuses, consume_grease
 from django.db.models import ProtectedError
 from .decorators import pin_required
@@ -1035,6 +1035,35 @@ class ProcurementRequirementListView(ActiveUserRequiredMixin, ListView):
         if not is_admin and getattr(user, 'unit', None):
             return qs.filter(requested_by__unit=user.unit)
         return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['can_delete_requirements'] = UserSystemPIN.objects.filter(
+            user=self.request.user,
+            system_code='procurement_delete',
+        ).exists()
+        return context
+
+class ProcurementRequirementCreateView(ActiveUserRequiredMixin, SuccessMessageMixin, CreateView):
+    model = ProcurementRequirement
+    form_class = ProcurementRequirementCreateForm
+    template_name = 'core/form_base.html'
+    success_url = reverse_lazy('requirement_list')
+    success_message = "Requerimiento de compra creado correctamente."
+    extra_context = {'title': 'Nuevo Requerimiento de Compra'}
+
+    def form_valid(self, form):
+        grease_type = form.cleaned_data['grease_type']
+        active_req = ProcurementRequirement.objects.filter(
+            grease_type=grease_type,
+            status__in=['PENDING', 'ORDERED'],
+        ).exists()
+        if active_req:
+            form.add_error('grease_type', f"Ya existe un requerimiento activo para {grease_type.nomenclatura}.")
+            return self.form_invalid(form)
+        form.instance.requested_by = self.request.user
+        form.instance.status = 'PENDING'
+        return super().form_valid(form)
     
 class CreateRequirementFromForecastView(ActiveUserRequiredMixin, View):
     def post(self, request, grease_type_id, *args, **kwargs):
@@ -1066,9 +1095,30 @@ class ProcurementRequirementUpdateView(ActiveUserRequiredMixin, SuccessMessageMi
     extra_context = {'title': 'Editar Requerimiento de Adquisición'}
 
 class ProcurementRequirementDeleteView(LogisticsOnlyRequiredMixin, View):
-    def post(self, request, pk, *args, **kwargs):
-        from django.shortcuts import get_object_or_404
+    pin_system = 'procurement_delete'
+    template_name = 'core/procurementrequirement_confirm_delete.html'
+
+    def get(self, request, pk, *args, **kwargs):
         req = get_object_or_404(ProcurementRequirement, pk=pk)
+        if not UserSystemPIN.objects.filter(user=request.user, system_code=self.pin_system).exists():
+            messages.error(request, "No tiene configurado el PIN de Borrado de Compras.")
+            return redirect('requirement_list')
+        return render(request, self.template_name, {'requirement': req})
+
+    def post(self, request, pk, *args, **kwargs):
+        req = get_object_or_404(ProcurementRequirement, pk=pk)
+        pin = request.POST.get('pin', '')
+
+        try:
+            access = UserSystemPIN.objects.get(user=request.user, system_code=self.pin_system)
+        except UserSystemPIN.DoesNotExist:
+            messages.error(request, "No tiene configurado el PIN de Borrado de Compras.")
+            return redirect('requirement_list')
+
+        if not check_password(pin, access.pin_hash):
+            messages.error(request, "PIN incorrecto. No se borro el requerimiento.")
+            return render(request, self.template_name, {'requirement': req})
+
         grease_name = req.grease_type.nomenclatura
         req.delete()
         messages.success(request, f"Requerimiento #{pk} de {grease_name} eliminado exitosamente.")

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+
+{% block title %}Borrar Requerimiento{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0"><i class="fa-solid fa-triangle-exclamation me-2"></i> Borrar requerimiento de compra</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    Esta accion elimina definitivamente el requerimiento. Para continuar ingrese el PIN de Borrado de Compras.
+                </div>
+
+                <dl class="row mb-4">
+                    <dt class="col-sm-4">ID</dt>
+                    <dd class="col-sm-8">#{{ requirement.id }}</dd>
+
+                    <dt class="col-sm-4">Grasa / Aceite</dt>
+                    <dd class="col-sm-8">{{ requirement.grease_type.nomenclatura }}</dd>
+
+                    <dt class="col-sm-4">Cantidad</dt>
+                    <dd class="col-sm-8">{{ requirement.requested_quantity|smart_number }} {{ requirement.grease_type.unidad }}</dd>
+
+                    <dt class="col-sm-4">Estado</dt>
+                    <dd class="col-sm-8">{{ requirement.get_status_display }}</dd>
+                </dl>
+
+                <form method="post" autocomplete="off">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="pin" class="form-label fw-bold">PIN de borrado</label>
+                        <input type="password" name="pin" id="pin" class="form-control form-control-lg text-center" maxlength="4" inputmode="numeric" pattern="[0-9]*" required autofocus>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'requirement_list' %}" class="btn btn-outline-secondary">
+                            <i class="fa-solid fa-arrow-left me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fa-solid fa-trash me-1"></i> Borrar definitivamente
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
