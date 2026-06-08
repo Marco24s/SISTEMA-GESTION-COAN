@@ -118,6 +118,8 @@
                                                                     {% if item.returned %}
                                                                         <span class="badge rounded-pill bg-secondary px-2 py-1"><i class="fa-solid fa-check me-1"></i>Devuelto</span>
                                                                         <div class="small text-muted mt-1">{{ item.return_date|date:"d/m/Y" }}</div>
+                                                                    {% elif item.reception_status == 'PENDING' %}
+                                                                        <span class="badge rounded-pill bg-warning text-dark px-2 py-1"><i class="fa-solid fa-clock me-1"></i>Pendiente recepción</span>
                                                                     {% else %}
                                                                         <span class="badge rounded-pill bg-success px-2 py-1"><i class="fa-solid fa-user-check me-1"></i>Provisto</span>
                                                                         {% if item.expiration_date %}
@@ -133,7 +135,26 @@
                                                                 </td>
                                                                 <td class="py-2 align-middle text-center">
                                                                     {% if not item.returned %}
-                                                                        {% if item.batch.clothing_size.clothing_type.must_be_returned %}
+                                                                        {% if item.reception_status == 'PENDING' %}
+                                                                            {% if user.unit and item.personnel.assigned_unit_id == user.unit.id %}
+                                                                            <a href="{% url 'sigera:assignment_reception_pdf' item.pk %}" class="btn btn-sm btn-outline-primary shadow-sm py-0 mb-1" title="Descargar formulario de recepción">
+                                                                                <i class="fa-solid fa-file-pdf"></i> PDF
+                                                                            </a>
+                                                                            <form method="post" action="{% url 'sigera:assignment_confirm_reception' item.pk %}" onsubmit="return confirm('¿Confirma la recepción de esta prenda en destino?');">
+                                                                                {% csrf_token %}
+                                                                                <button type="submit" class="btn btn-sm btn-outline-success shadow-sm py-0" title="Confirmar recepción">
+                                                                                    <i class="fa-solid fa-check"></i> Confirmar recepción
+                                                                                </button>
+                                                                            </form>
+                                                                            {% elif user.is_superuser %}
+                                                                            <a href="{% url 'sigera:assignment_reception_pdf' item.pk %}" class="btn btn-sm btn-outline-primary shadow-sm py-0 mb-1" title="Descargar formulario de recepción">
+                                                                                <i class="fa-solid fa-file-pdf"></i> PDF
+                                                                            </a>
+                                                                            <div><span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span></div>
+                                                                            {% else %}
+                                                                                <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span>
+                                                                            {% endif %}
+                                                                        {% elif item.batch.clothing_size.clothing_type.must_be_returned %}
                                                                             {% if is_admin %}
                                                                             <form method="post" action="{% url 'sigera:assignment_return' item.pk %}" onsubmit="return confirm('¿Confirma que el material fue devuelto? Esto restablecerá {{ item.quantity }} unidades al pañol.');">
                                                                                 {% csrf_token %}

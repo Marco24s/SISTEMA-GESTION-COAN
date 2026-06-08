@@ -173,10 +173,11 @@ class GreaseBatchForm(forms.ModelForm):
 class ConsumeGreaseForm(forms.Form):
     grease_type = forms.ModelChoiceField(queryset=GreaseType.objects.all(), label="Tipo de Grasa")
     specific_batch = forms.ModelChoiceField(
-        queryset=GreaseBatch.objects.none(), 
-        required=False, 
-        label="Lote Específico (Opcional)",
-        help_text="Si lo deja en blanco, se consumirá automáticamente del lote con vencimiento más próximo."
+        queryset=GreaseBatch.objects.none(),
+        required=True,
+        label="Lote Especifico",
+        empty_label="Seleccione el lote a consumir...",
+        help_text="Debe seleccionar explicitamente el lote desde el cual se va a consumir."
     )
     quantity = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01, label="Cantidad a Consumir")
     reference = forms.CharField(max_length=255, required=False, label="Referencia (e.g., Plan de Empleo, Nro Orden)")
@@ -200,6 +201,18 @@ class ConsumeGreaseForm(forms.Form):
                 
         self.fields['specific_batch'].queryset = batches_qs
         self.fields['specific_batch'].label_from_instance = lambda obj: f"Lote: {obj.batch_number} - Vence: {obj.expiration_date.strftime('%d/%m/%Y')} - Disp: {obj.available_quantity:.2f} {obj.grease_type.unidad}"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        grease_type = cleaned_data.get('grease_type')
+        specific_batch = cleaned_data.get('specific_batch')
+
+        if not specific_batch:
+            self.add_error('specific_batch', 'Debe seleccionar el lote especifico desde el cual se va a consumir.')
+        elif grease_type and specific_batch.grease_type_id != grease_type.id:
+            self.add_error('specific_batch', 'El lote seleccionado no corresponde al tipo de grasa elegido.')
+
+        return cleaned_data
 
 class GreaseReferencePriceForm(forms.ModelForm):
     class Meta:

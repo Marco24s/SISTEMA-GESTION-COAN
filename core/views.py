@@ -681,6 +681,8 @@ class ConsumeGreaseView(ActiveUserRequiredMixin, FormView):
         
         try:
             update_batch_statuses() # Always good to ensure accurate expiration states before consuming
+            if not specific_batch:
+                raise ValidationError("Debe seleccionar el lote especifico desde el cual se va a consumir.")
             consume_grease(
                 grease_type=grease_type,
                 quantity_to_consume=quantity,
@@ -925,7 +927,7 @@ def export_procurement_forecast_csv(request):
     # Add BOM for UTF-8
     response.write('\ufeff')
     writer = csv.writer(response, dialect='excel', delimiter=';')
-    writer.writerow(['Tipo de Grasa', 'Stock Disponible', 'Consumo Proyectado', 'Diferencia (Sobrante/Faltante)', 'Compra Recomendada'])
+    writer.writerow(['Tipo de Grasa', 'Stock Disponible', 'Plan Total', 'Consumido', 'Pendiente', 'Diferencia (Sobrante/Faltante)', 'Compra Recomendada'])
     
     from .services import get_procurement_forecast
     forecast_data = get_procurement_forecast(location=location)
@@ -937,6 +939,8 @@ def export_procurement_forecast_csv(request):
             row['grease_type'].nomenclatura,
             row['total_available'],
             row['total_projected'],
+            row['total_consumed_in_period'],
+            row['total_pending_projected'],
             row['shortfall'],
             recommended_purchase
         ])
@@ -1020,7 +1024,7 @@ def export_procurement_forecast_pdf(request):
     elements.append(Paragraph(title, styles['Title']))
     elements.append(Spacer(1, 12))
     
-    data = [['Tipo de Grasa', 'Stock\nDisponible', 'Consumo\nProyectado', 'Diferencia\n(Sobrante/Faltante)', 'Recomendación\nde Compra']]
+    data = [['Tipo de Grasa', 'Stock\nDisponible', 'Plan\nTotal', 'Consumido', 'Pendiente', 'Diferencia\n(Sobrante/Faltante)', 'Recomendación\nde Compra']]
     
     from .services import get_procurement_forecast
     forecast_data = get_procurement_forecast(location=location)
@@ -1034,6 +1038,8 @@ def export_procurement_forecast_pdf(request):
             row['grease_type'].nomenclatura,
             str(round(row['total_available'], 2)),
             str(round(total_projected, 2)),
+            str(round(row['total_consumed_in_period'], 2)),
+            str(round(row['total_pending_projected'], 2)),
             str(round(shortfall, 2)),
             str(round(recommended_purchase, 2))
         ])

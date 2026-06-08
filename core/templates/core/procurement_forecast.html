@@ -8,7 +8,7 @@
     }
     .stock-tooltip-row {
         display: grid;
-        grid-template-columns: minmax(70px, 1fr) 90px 90px;
+        grid-template-columns: minmax(70px, 1fr) 90px 90px 90px;
         gap: 0.6rem;
         align-items: center;
         padding: 0.2rem 0;
@@ -52,7 +52,9 @@
                     <th>Grasa (Nomenclatura)</th>
                     <th>Detalle</th>
                     <th class="text-end">Existencia Actual</th>
-                    <th class="text-end">Consumo Proyectado</th>
+                    <th class="text-end">Plan Total</th>
+                    <th class="text-end">Consumido</th>
+                    <th class="text-end">Pendiente</th>
                     <th class="text-end">Diferencia</th>
                     <th>Acción Sugerida</th>
                 </tr>
@@ -72,13 +74,15 @@
                             data-bs-placement="top" 
                             data-bs-html="true"
                             data-bs-custom-class="stock-forecast-tooltip"
-                            title="<div class='stock-tooltip-table'><div class='stock-tooltip-row stock-tooltip-head'><span>Destino</span><span class='stock-tooltip-num'>Existencia</span><span class='stock-tooltip-num'>Previsto</span></div>{% for item in row.stock_breakdown %}<div class='stock-tooltip-row'><span>{{ item.location }}</span><span class='stock-tooltip-num'><b>{{ item.quantity|smart_number }}</b> {{ row.grease_type.unidad }}</span><span class='stock-tooltip-num'><b>{{ item.projected|smart_number }}</b> {{ row.grease_type.unidad }}</span></div>{% endfor %}</div>" 
+                            title="<div class='stock-tooltip-table'><div class='stock-tooltip-row stock-tooltip-head'><span>Destino</span><span class='stock-tooltip-num'>Existencia</span><span class='stock-tooltip-num'>Consumido</span><span class='stock-tooltip-num'>Pendiente</span></div>{% for item in row.stock_breakdown %}<div class='stock-tooltip-row'><span>{{ item.location }}</span><span class='stock-tooltip-num'><b>{{ item.quantity|smart_number }}</b> {{ row.grease_type.unidad }}</span><span class='stock-tooltip-num'><b>{{ item.consumed|smart_number }}</b> {{ row.grease_type.unidad }}</span><span class='stock-tooltip-num'><b>{{ item.pending|smart_number }}</b> {{ row.grease_type.unidad }}</span></div>{% endfor %}</div>"
                             style="cursor: help; border-bottom: 1px dotted #6c757d;"
                             {% endif %}>
                             {{ row.total_available|smart_number }}
                         </span> <small class="text-muted">{{ row.grease_type.unidad }}</small>
                     </td>
                     <td class="text-end">{{ row.total_projected|smart_number }} <small class="text-muted">{{ row.grease_type.unidad }}</small></td>
+                    <td class="text-end">{{ row.total_consumed_in_period|smart_number }} <small class="text-muted">{{ row.grease_type.unidad }}</small></td>
+                    <td class="text-end fw-bold">{{ row.total_pending_projected|smart_number }} <small class="text-muted">{{ row.grease_type.unidad }}</small></td>
                     <td class="text-end">
                         <span class="badge {% if row.shortfall > 0 %}bg-danger{% else %}bg-success{% endif %} fs-6">
                             {{ row.shortfall|abs_val|smart_number }} <small>{{ row.grease_type.unidad }}</small>
@@ -105,7 +109,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center py-4 text-muted">No hay datos suficientes para proyectar consumos.</td>
+                    <td colspan="8" class="text-center py-4 text-muted">No hay datos suficientes para proyectar consumos.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -116,8 +120,10 @@
 <div class="alert alert-info mt-4 pb-0">
     <h5><i class="fa-solid fa-circle-info me-2"></i> Información de Previsión de Abastecimiento</h5>
     <ul>
-        <li>El <strong>Consumo Proyectado</strong> es la suma total del requerimiento de la grasa según los Factores de Planeo correspondientes para las horas de vuelo planificadas.</li>
-        <li>La <strong>Diferencia</strong> muestra la resta directa entre la Existencia Actual y el Consumo Proyectado. Si el valor es de color rojo, indica que la cantidad proyectada a consumir supera el stock actual y necesitará abastecimiento.</li>
+        <li>El <strong>Plan Total</strong> es la necesidad completa calculada para los planes de empleo registrados.</li>
+        <li>El <strong>Consumido</strong> toma los movimientos reales de consumo ya registrados dentro del periodo del plan.</li>
+        <li>El <strong>Pendiente</strong> es un dato de control: Plan Total menos Consumido.</li>
+        <li>La <strong>Diferencia</strong> operativa compara la Existencia Actual contra el Plan Total. Si el valor es rojo, indica que falta abastecimiento para cubrir el plan completo.</li>
     </ul>
 </div>
 
@@ -161,8 +167,47 @@
                                 <th colspan="4" class="text-end">Total Proyectado:</th>
                                 <th class="text-end text-primary fs-6"><strong>{{ row.total_projected|smart_number }} {{ row.grease_type.unidad }}</strong></th>
                             </tr>
+                            <tr>
+                                <th colspan="4" class="text-end">Consumido dentro del periodo:</th>
+                                <th class="text-end text-secondary fs-6"><strong>{{ row.total_consumed_in_period|smart_number }} {{ row.grease_type.unidad }}</strong></th>
+                            </tr>
+                            <tr>
+                                <th colspan="4" class="text-end">Pendiente del plan:</th>
+                                <th class="text-end text-success fs-6"><strong>{{ row.total_pending_projected|smart_number }} {{ row.grease_type.unidad }}</strong></th>
+                            </tr>
                         </tfoot>
                     </table>
+                </div>
+                <div class="mb-3">
+                    <h6 class="fw-bold text-muted mb-2">
+                        <i class="fa-solid fa-clipboard-check me-1"></i>Consumos reales descontados
+                    </h6>
+                    {% if row.consumption_details %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Destino</th>
+                                    <th>Periodo considerado</th>
+                                    <th class="text-end">Consumido</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for detail in row.consumption_details %}
+                                <tr>
+                                    <td>{{ detail.location }}</td>
+                                    <td>{{ detail.start|date:"d/m/Y" }} - {{ detail.end|date:"d/m/Y" }}</td>
+                                    <td class="text-end fw-bold">{{ detail.consumed|smart_number }} {{ row.grease_type.unidad }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-light border mb-0">
+                        No hay consumos reales registrados dentro del periodo vigente de estos planes.
+                    </div>
+                    {% endif %}
                 </div>
                 {% else %}
                 <div class="alert alert-warning">

@@ -8,6 +8,11 @@ class ClothingType(models.Model):
     nato_stock_number = models.CharField(max_length=100, verbose_name="N.N.E. / N.S.N.", blank=True, null=True)
     shelf_life_months = models.PositiveIntegerField(verbose_name="Vida Útil Teórica (Meses)", help_text="Tiempo estimado de uso antes de requerir reemplazo")
     must_be_returned = models.BooleanField(default=True, verbose_name="¿Debe ser devuelta?", help_text="Indica si esta prenda debe ser devuelta al pañol cuando el personal la cese de usar.")
+    show_in_measure_sheet = models.BooleanField(
+        default=True,
+        verbose_name="Mostrar en planilla de medidas",
+        help_text="Indica si esta prenda debe aparecer al cargar talles del personal.",
+    )
 
     class Meta:
         verbose_name = "Tipo de Prenda"
@@ -150,6 +155,11 @@ class PersonnelClothingMeasure(models.Model):
         super().save(*args, **kwargs)
 
 class ClothingAssignment(models.Model):
+    RECEPTION_STATUS_CHOICES = [
+        ("PENDING", "Pendiente de recepción"),
+        ("CONFIRMED", "Recepcionado"),
+    ]
+
     personnel = models.ForeignKey(Personnel, on_delete=models.CASCADE, related_name="assignments", verbose_name="Personal")
     batch = models.ForeignKey(ClothingBatch, on_delete=models.PROTECT, related_name="assignments", verbose_name="Del Ingreso (Lote)")
     assigned_date = models.DateField(auto_now_add=True, verbose_name="Fecha de Entrega")
@@ -158,6 +168,21 @@ class ClothingAssignment(models.Model):
     returned = models.BooleanField(default=False, verbose_name="¿Devuelto al Pañol?")
     return_date = models.DateField(null=True, blank=True, verbose_name="Fecha de Devolución")
     issued_by = models.ForeignKey(CustomUser, on_delete=models.PROTECT, verbose_name="Entregado Por")
+    reception_status = models.CharField(
+        max_length=20,
+        choices=RECEPTION_STATUS_CHOICES,
+        default="CONFIRMED",
+        verbose_name="Estado de recepción",
+    )
+    received_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="received_clothing_assignments",
+        verbose_name="Recepcionado por",
+    )
+    received_at = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de recepción")
 
     class Meta:
         verbose_name = "Entrega de Ropa"
@@ -176,11 +201,12 @@ class ClothingAssignment(models.Model):
         """
         Calcula la fecha de vencimiento basada en la vida útil teórica de la prenda.
         """
-        if not self.assigned_date:
+        base_date = self.received_at.date() if self.received_at else self.assigned_date
+        if not base_date:
             return None
         from dateutil.relativedelta import relativedelta
         months = self.batch.clothing_size.clothing_type.shelf_life_months
-        return self.assigned_date + relativedelta(months=months)
+        return base_date + relativedelta(months=months)
 
     @property
     def is_expired(self):

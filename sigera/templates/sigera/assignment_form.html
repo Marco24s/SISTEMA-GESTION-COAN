@@ -13,7 +13,7 @@
         </div>
 
         <div class="alert alert-warning border-warning shadow-sm mb-4">
-            <i class="fa-solid fa-triangle-exclamation me-2"></i><strong>Atención:</strong> Registrar esta entrega descontará automáticamente la cantidad elegida del inventario de pañol disponible.
+            <i class="fa-solid fa-triangle-exclamation me-2"></i><strong>Atención:</strong> Registrar esta entrega descontará automáticamente la cantidad elegida del inventario de pañol disponible y quedará pendiente de recepción por el destino.
         </div>
 
         <div class="card shadow-sm border-0" style="border-radius: 15px; overflow: hidden;">
@@ -50,7 +50,7 @@
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                         <a href="{% url 'sigera:assignment_list' %}" class="btn btn-light px-4 border">Cancelar</a>
                         <button type="submit" class="btn btn-warning px-5 fw-bold text-dark" style="background-color: #ffc107;">
-                            <i class="fa-solid fa-check-double me-2"></i>Confirmar Entrega
+                            <i class="fa-solid fa-check-double me-2"></i>Registrar Entrega
                         </button>
                     </div>
                 </form>

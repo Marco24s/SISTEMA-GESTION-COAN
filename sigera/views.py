@@ -4,9 +4,16 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q
 from django.db import transaction
 from django.contrib import messages
+from django.http import HttpResponse
 from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, ClothingAssignment, PersonnelClothingMeasure, StockThreshold
 from .forms import PersonnelForm, ClothingAssignmentForm, PersonnelClothingMeasureForm
 import pandas as pd
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from core.models import Unit
 from core.decorators import pin_required
 
@@ -241,7 +248,8 @@ def assignment_list(request):
     # 3. Renovaciones (Vencidos o próximos a vencer en <= 30 días)
     from datetime import date, timedelta
     active_assignments = ClothingAssignment.objects.filter(
-        returned=False
+        returned=False,
+        reception_status='CONFIRMED',
     ).select_related('personnel', 'batch__clothing_size__clothing_type')
     
     if not is_admin:
@@ -300,6 +308,10 @@ def personnel_import(request):
     """
     Vista para importar personal masivamente desde un archivo Excel.
     """
+    if not request.user.is_superuser:
+        messages.error(request, "Solo el superusuario puede importar personal desde Excel.")
+        return redirect('sigera:personnel_list')
+
     if request.method == 'POST' and request.FILES.get('excel_file'):
         excel_file = request.FILES['excel_file']
         
@@ -423,7 +435,7 @@ def personnel_measure_sheet(request, pk):
         messages.error(request, "Acceso denegado: No tienes unidad asignada.")
         return redirect('sigera:personnel_list')
 
-    clothing_types = ClothingType.objects.prefetch_related('sizes').order_by('name')
+    clothing_types = ClothingType.objects.filter(show_in_measure_sheet=True).prefetch_related('sizes').order_by('name')
     existing_measures = {
         measure.clothing_type_id: measure
         for measure in PersonnelClothingMeasure.objects.filter(personnel=person).select_related('clothing_type', 'clothing_size')
@@ -652,8 +664,9 @@ def assignment_create(request):
                     batch.save()
                     
                     # Guardar la asignación
+                    assignment.reception_status = 'PENDING'
                     assignment.save()
-                    messages.success(request, "La entrega se ha registrado correctamente y el inventario del pañol fue actualizado.")
+                    messages.success(request, "La entrega se registró como pendiente de recepción y el inventario del pañol fue actualizado.")
                     return redirect('sigera:assignment_list')
                 else:
                     messages.error(request, "Error crítico: El stock disponible cambió concurridamente. Reintente.")
@@ -665,6 +678,155 @@ def assignment_create(request):
         form = ClothingAssignmentForm(initial=initial_data)
         
     return render(request, 'sigera/assignment_form.html', {'form': form})
+
+
+@login_required
+def assignment_confirm_reception(request, pk):
+    user = request.user
+    assignment = get_object_or_404(
+        ClothingAssignment.objects.select_related('personnel__assigned_unit'),
+        pk=pk,
+        returned=False,
+        reception_status='PENDING',
+    )
+
+    user_unit = getattr(user, 'unit', None)
+    can_confirm = user_unit and assignment.personnel.assigned_unit_id == user_unit.id
+    if not can_confirm:
+        messages.error(request, "Solo el usuario del destino del causante puede confirmar esta recepción.")
+        return redirect('sigera:assignment_list')
+
+    if request.method == 'POST':
+        assignment.reception_status = 'CONFIRMED'
+        assignment.received_by = user
+        assignment.received_at = timezone.now()
+        assignment.save(update_fields=['reception_status', 'received_by', 'received_at'])
+        messages.success(request, "Recepción confirmada correctamente.")
+
+    return redirect('sigera:assignment_list')
+
+
+@login_required
+def assignment_reception_pdf(request, pk):
+    user = request.user
+    assignment = get_object_or_404(
+        ClothingAssignment.objects.select_related(
+            'personnel__assigned_unit',
+            'batch__clothing_size__clothing_type',
+            'issued_by',
+        ),
+        pk=pk,
+    )
+
+    user_unit = getattr(user, 'unit', None)
+    can_download = user.is_superuser or (user_unit and assignment.personnel.assigned_unit_id == user_unit.id)
+    if not can_download:
+        messages.error(request, "No tiene permisos para descargar esta constancia.")
+        return redirect('sigera:assignment_list')
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.5 * cm,
+    )
+    styles = getSampleStyleSheet()
+    normal = styles['Normal']
+    title_style = styles['Title']
+    section_style = ParagraphStyle(
+        'SectionTitle',
+        parent=styles['Heading3'],
+        textColor=colors.HexColor('#462880'),
+        spaceBefore=10,
+        spaceAfter=6,
+    )
+
+    personnel = assignment.personnel
+    clothing_size = assignment.batch.clothing_size
+    clothing_type = clothing_size.clothing_type
+    unit_name = personnel.assigned_unit.name if personnel.assigned_unit else 'Sin destino'
+
+    elements = [
+        Paragraph("CONSTANCIA DE RECEPCION DE PRENDA / EQUIPAMIENTO", title_style),
+        Spacer(1, 10),
+        Paragraph("Sistema de Gestion de Ropa Aeronaval - SIGERA", normal),
+        Spacer(1, 14),
+        Paragraph("Datos del personal receptor", section_style),
+    ]
+
+    personnel_data = [
+        ["Apellido y nombre", f"{personnel.last_name}, {personnel.first_name}"],
+        ["Jerarquia / rango", personnel.get_rank_display()],
+        ["Matricula", personnel.dni],
+        ["Destino", unit_name],
+    ]
+    personnel_table = Table(personnel_data, colWidths=[5 * cm, 11 * cm])
+    personnel_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f1f3f5')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#adb5bd')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 7),
+    ]))
+    elements.append(personnel_table)
+
+    elements.extend([
+        Spacer(1, 12),
+        Paragraph("Material entregado", section_style),
+    ])
+    material_data = [
+        ["Prenda / equipamiento", clothing_type.name],
+        ["Talle", clothing_size.size],
+        ["Cantidad", str(assignment.quantity)],
+        ["Lote / ingreso", str(assignment.batch.id)],
+        ["Fecha de entrega", assignment.assigned_date.strftime('%d/%m/%Y') if assignment.assigned_date else '-'],
+        ["Entregado por", assignment.issued_by.get_full_name() or assignment.issued_by.username],
+        ["Estado de recepcion", assignment.get_reception_status_display()],
+        ["Observaciones", assignment.notes or "-"],
+    ]
+    material_table = Table(material_data, colWidths=[5 * cm, 11 * cm])
+    material_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#fff3cd')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#adb5bd')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('PADDING', (0, 0), (-1, -1), 7),
+    ]))
+    elements.append(material_table)
+
+    elements.extend([
+        Spacer(1, 20),
+        Paragraph(
+            "Declaro haber recibido el material detallado precedentemente, en la cantidad indicada, para su uso y control conforme las normas internas vigentes.",
+            normal,
+        ),
+        Spacer(1, 36),
+    ])
+
+    signature_data = [
+        ["", ""],
+        ["Firma y aclaracion del receptor", "Firma y aclaracion del responsable del destino"],
+        ["Fecha: ____ / ____ / ______", "Fecha: ____ / ____ / ______"],
+    ]
+    signature_table = Table(signature_data, colWidths=[8 * cm, 8 * cm])
+    signature_table.setStyle(TableStyle([
+        ('LINEABOVE', (0, 1), (0, 1), 1, colors.black),
+        ('LINEABOVE', (1, 1), (1, 1), 1, colors.black),
+        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+        ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor('#495057')),
+        ('PADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(signature_table)
+
+    doc.build(elements)
+    buffer.seek(0)
+    filename = f"recepcion_sigera_{assignment.id}.pdf"
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 from django.utils import timezone
 from .forms import ClothingTypeForm, ClothingBatchForm
@@ -823,7 +985,7 @@ def assignment_return_view(request, pk):
         return redirect('sigera:assignment_list')
 
     if request.method == 'POST':
-        assignment = get_object_or_404(ClothingAssignment, pk=pk, returned=False)
+        assignment = get_object_or_404(ClothingAssignment, pk=pk, returned=False, reception_status='CONFIRMED')
 
         if not assignment.batch.clothing_size.clothing_type.must_be_returned:
             messages.error(request, "Esta entrega no puede devolverse porque la prenda está marcada como no retornable.")

@@ -58,13 +58,14 @@ class ClothingAssignmentForm(forms.ModelForm):
 class ClothingTypeForm(forms.ModelForm):
     class Meta:
         model = ClothingType
-        fields = ['name', 'description', 'nato_stock_number', 'shelf_life_months', 'must_be_returned']
+        fields = ['name', 'description', 'nato_stock_number', 'shelf_life_months', 'must_be_returned', 'show_in_measure_sheet']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Ej: Mameluco de Vuelo', 'style': 'text-transform: uppercase;'}),
             'description': forms.Textarea(attrs={'rows': 2, 'style': 'text-transform: uppercase;'}),
             'nato_stock_number': forms.TextInput(attrs={'placeholder': 'NNE o NSN...', 'style': 'text-transform: uppercase;'}),
             'shelf_life_months': forms.NumberInput(attrs={'min': '1', 'value': '12'}),
             'must_be_returned': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'show_in_measure_sheet': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 

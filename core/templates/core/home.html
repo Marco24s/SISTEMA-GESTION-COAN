@@ -277,7 +277,7 @@
                     <tr>
                         <th>Material</th>
                         <th class="text-end">Stock</th>
-                        <th class="text-end">Previsto</th>
+                        <th class="text-end">Plan total</th>
                         <th class="text-end">Faltante</th>
                         <th>Compra</th>
                     </tr>
@@ -472,7 +472,7 @@
                             <tr>
                                 <td>
                                     <div class="fw-bold">{{ alert.grease_type.nomenclatura }}</div>
-                                    <small class="text-muted">Stock {{ alert.total_available|smart_number }} / Previsto {{ alert.total_projected|smart_number }}</small>
+                                    <small class="text-muted">Stock {{ alert.total_available|smart_number }} / Plan {{ alert.total_projected|smart_number }}</small>
                                 </td>
                                 <td class="text-end fw-bold text-danger">{{ alert.shortfall|smart_number }} {{ alert.grease_type.unidad }}</td>
                                 <td>

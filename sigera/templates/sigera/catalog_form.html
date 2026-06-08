@@ -44,6 +44,10 @@
                         {{ form.must_be_returned|as_crispy_field }}
                     </div>
 
+                    <div class="mb-4">
+                        {{ form.show_in_measure_sheet|as_crispy_field }}
+                    </div>
+
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                         <a href="{% url 'sigera:catalog_list' %}" class="btn btn-light px-4 border">Cancelar</a>
                         <button type="submit" class="btn btn-primary px-5" style="background-color: #6f42c1; border-color: #6f42c1;">

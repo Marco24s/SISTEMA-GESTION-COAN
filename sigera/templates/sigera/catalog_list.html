@@ -34,6 +34,7 @@
                         <th scope="col" class="py-3 text-muted">Talles Existentes</th>
                         <th scope="col" class="py-3 text-muted text-center">Vida Útil (M)</th>
                         <th scope="col" class="py-3 text-muted text-center">Retornable</th>
+                        <th scope="col" class="py-3 text-muted text-center">Planilla</th>
                         <th scope="col" class="py-3 text-muted text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -62,6 +63,13 @@
                                 {% endif %}
                             </td>
                             <td class="py-3 text-center">
+                                {% if item.show_in_measure_sheet %}
+                                    <span class="badge bg-primary"><i class="fa-solid fa-ruler-combined me-1"></i>Si</span>
+                                {% else %}
+                                    <span class="badge bg-light text-muted border"><i class="fa-solid fa-eye-slash me-1"></i>No</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-center">
                                 <a href="{% url 'sigera:catalog_edit' item.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2 me-1" title="Editar">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
@@ -74,7 +82,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center py-5 text-muted">
+                            <td colspan="6" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-book-open fa-3x mb-3" style="color: #e0cffc;"></i>
                                 <h5>No hay modelos registrados</h5>
                                 <p>Cargue el primer modelo de prenda en el sistema.</p>

@@ -100,17 +100,30 @@ def consume_grease(grease_type, quantity_to_consume, user, reference="", reason=
 
 def get_procurement_forecast(location=None):
     """
-    Calculates the procurement forecast using a daily fractional simulation.
+    Calculates the procurement forecast from employment plans and current stock.
     Returns a list of dictionaries, one per GreaseType, containing:
     - grease_type
     - total_available
     - total_projected
-    - shortfall (amount missing taking into account expirations over time)
+    - total_consumed_in_period
+    - total_pending_projected
+    - shortfall
     - plan_details (list of active plans contributing to consumption)
     - active_requirement
     """
-    from datetime import date, timedelta
+    from datetime import date
+    from django.db.models import Sum
     from .models import GreaseType
+
+    def merge_ranges(ranges):
+        ordered_ranges = sorted(ranges, key=lambda item: item[0])
+        merged = []
+        for start, end in ordered_ranges:
+            if not merged or start > merged[-1][1] + timedelta(days=1):
+                merged.append([start, end])
+            elif end > merged[-1][1]:
+                merged[-1][1] = end
+        return [(start, end) for start, end in merged]
     
     forecast_data = []
     today = date.today()
@@ -136,14 +149,18 @@ def get_procurement_forecast(location=None):
             'total_available': total_available,
             'stock_breakdown': [],
             'total_projected': 0.0,
+            'total_consumed_in_period': 0.0,
+            'total_pending_projected': 0.0,
             'shortfall': 0.0,
             'plan_details': [],
+            'consumption_details': [],
             'active_requirement': active_req,
         }
         
         # Gather all plans and daily rates
         plans_to_simulate = []
         projected_by_location = {}
+        plan_ranges_by_location = {}
         for assoc in gt.aircraft_associations.all():
             if location and assoc.aircraft_model.unit.name != location:
                 continue
@@ -159,6 +176,10 @@ def get_procurement_forecast(location=None):
                 daily_consumption = total_consumption / total_days
                 plan_location = assoc.aircraft_model.unit.name
                 projected_by_location[plan_location] = projected_by_location.get(plan_location, 0.0) + total_consumption
+
+                executed_until = min(plan.period_end_date, today)
+                if plan.period_start_date <= executed_until:
+                    plan_ranges_by_location.setdefault(plan_location, []).append((plan.period_start_date, executed_until))
                 
                 plans_to_simulate.append({
                     'start': plan.period_start_date,
@@ -174,12 +195,39 @@ def get_procurement_forecast(location=None):
                 })
                 fg['total_projected'] += total_consumption
 
-        stock_breakdown_locations = sorted(set(stock_by_location) | set(projected_by_location))
+        consumed_by_location = {}
+        for plan_location, ranges in plan_ranges_by_location.items():
+            consumed = 0.0
+            for start, end in merge_ranges(ranges):
+                movement_total = StockMovement.objects.filter(
+                    batch__grease_type=gt,
+                    batch__storage_location=plan_location,
+                    movement_type='CONSUMPTION',
+                    movement_date__date__gte=start,
+                    movement_date__date__lte=end,
+                ).aggregate(total=Sum('quantity_changed'))['total'] or 0
+                range_consumed = abs(float(movement_total))
+                consumed += range_consumed
+                fg['consumption_details'].append({
+                    'location': plan_location,
+                    'start': start,
+                    'end': end,
+                    'consumed': range_consumed,
+                })
+            consumed_by_location[plan_location] = consumed
+            fg['total_consumed_in_period'] += consumed
+
+        fg['total_consumed_in_period'] = min(fg['total_consumed_in_period'], fg['total_projected'])
+        fg['total_pending_projected'] = max(fg['total_projected'] - fg['total_consumed_in_period'], 0.0)
+
+        stock_breakdown_locations = sorted(set(stock_by_location) | set(projected_by_location) | set(consumed_by_location))
         fg['stock_breakdown'] = [
             {
                 'location': loc,
                 'quantity': stock_by_location.get(loc, 0.0),
                 'projected': projected_by_location.get(loc, 0.0),
+                'consumed': consumed_by_location.get(loc, 0.0),
+                'pending': max(projected_by_location.get(loc, 0.0) - consumed_by_location.get(loc, 0.0), 0.0),
             }
             for loc in stock_breakdown_locations
         ]
@@ -190,8 +238,9 @@ def get_procurement_forecast(location=None):
             # Original code included them if forecast_data.append(fg) is called.
             pass
             
-        # The user requested the difference to be just the real difference between stock and projected consumption.
-        # We compute the straightforward difference without simulating daily expirations.
+        # Operational purchase need compares current stock against the full plan need.
+        # Consumption remains visible as an audit/control value, but it does not reduce
+        # the purchase requirement.
         fg['shortfall'] = fg['total_projected'] - fg['total_available']
         forecast_data.append(fg)
         
