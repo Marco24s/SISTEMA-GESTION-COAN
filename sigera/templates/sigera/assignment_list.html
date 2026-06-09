@@ -2,6 +2,13 @@
 {% load static %}
 
 {% block content %}
+{% if request.GET.download_pdf %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        window.location.href = "{% url 'sigera:assignment_reception_pdf' request.GET.download_pdf %}";
+    });
+</script>
+{% endif %}
 <div class="row align-items-center mb-4 mt-2">
     <div class="col-md-6">
         <h2 class="fw-bold mb-0" style="color: #462880;"><i class="fa-solid fa-hand-holding-hand me-2"></i>Historial de Entregas</h2>
@@ -64,11 +71,14 @@
                             {% regroup assignment_list by personnel as grouped_assignments %}
                             {% for person_group in grouped_assignments %}
                                 <!-- FILA DEL ACORDEON (PERSONAL) -->
-                                <tr data-bs-toggle="collapse" data-bs-target="#collapse-person-{{ person_group.grouper.id }}" style="cursor: pointer;" class="table-light border-bottom">
+                                <tr data-bs-toggle="collapse" data-bs-target="#collapse-person-{{ person_group.grouper.id }}" style="cursor: pointer;" class="{% if person_group.grouper.id in pending_personnel_ids %}table-warning{% else %}table-light{% endif %} border-bottom">
                                     <td class="px-4 py-3">
                                         <div class="fw-bold" style="color: #462880; font-size: 1.1rem;">
                                             <i class="fa-solid fa-user-shield me-2 opacity-75"></i>
                                             {{ person_group.grouper.last_name }}, {{ person_group.grouper.first_name }}
+                                            {% if person_group.grouper.id in pending_personnel_ids %}
+                                            <span class="badge bg-warning text-dark ms-2 shadow-sm rounded-pill" style="font-size: 0.75rem; vertical-align: middle;"><i class="fa-solid fa-triangle-exclamation me-1"></i>Requiere Confirmación</span>
+                                            {% endif %}
                                         </div>
                                         <small class="text-muted"><i class="fa-solid fa-id-badge me-1"></i>{{ person_group.grouper.get_rank_display }} | Matrícula: {{ person_group.grouper.dni }}</small>
                                     </td>
@@ -135,11 +145,13 @@
                                                                 </td>
                                                                 <td class="py-2 align-middle text-center">
                                                                     {% if not item.returned %}
+                                                                        {% if user.is_superuser or user.unit and item.personnel.assigned_unit_id == user.unit.id %}
+                                                                        <a href="{% url 'sigera:assignment_reception_pdf' item.pk %}" class="btn btn-sm btn-outline-primary shadow-sm py-0 mb-1" title="Descargar formulario de recepción" target="_blank">
+                                                                            <i class="fa-solid fa-file-pdf"></i> PDF
+                                                                        </a>
+                                                                        {% endif %}
                                                                         {% if item.reception_status == 'PENDING' %}
                                                                             {% if user.unit and item.personnel.assigned_unit_id == user.unit.id %}
-                                                                            <a href="{% url 'sigera:assignment_reception_pdf' item.pk %}" class="btn btn-sm btn-outline-primary shadow-sm py-0 mb-1" title="Descargar formulario de recepción">
-                                                                                <i class="fa-solid fa-file-pdf"></i> PDF
-                                                                            </a>
                                                                             <form method="post" action="{% url 'sigera:assignment_confirm_reception' item.pk %}" onsubmit="return confirm('¿Confirma la recepción de esta prenda en destino?');">
                                                                                 {% csrf_token %}
                                                                                 <button type="submit" class="btn btn-sm btn-outline-success shadow-sm py-0" title="Confirmar recepción">
@@ -147,9 +159,6 @@
                                                                                 </button>
                                                                             </form>
                                                                             {% elif user.is_superuser %}
-                                                                            <a href="{% url 'sigera:assignment_reception_pdf' item.pk %}" class="btn btn-sm btn-outline-primary shadow-sm py-0 mb-1" title="Descargar formulario de recepción">
-                                                                                <i class="fa-solid fa-file-pdf"></i> PDF
-                                                                            </a>
                                                                             <div><span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span></div>
                                                                             {% else %}
                                                                                 <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span>
@@ -166,7 +175,7 @@
                                                                                 <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Pendiente</span>
                                                                             {% endif %}
                                                                         {% else %}
-                                                                            <span class="badge bg-light text-muted border"><i class="fa-solid fa-ban me-1"></i>No retorna</span>
+                                                                            <div><span class="badge bg-light text-muted border"><i class="fa-solid fa-ban me-1"></i>No retorna</span></div>
                                                                         {% endif %}
                                                                     {% else %}
                                                                         <span class="text-muted small"><i class="fa-solid fa-lock"></i> Cerrado</span>

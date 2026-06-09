@@ -9,6 +9,7 @@ from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, Clothi
 from .forms import PersonnelForm, ClothingAssignmentForm, PersonnelClothingMeasureForm
 import pandas as pd
 import io
+from xml.sax.saxutils import escape
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -40,6 +41,7 @@ def home(request):
 
     total_personnel = personnel_qs.count()
     active_assignments = assignments_qs.filter(returned=False).count()
+    pending_receptions = assignments_qs.filter(returned=False, reception_status='PENDING').count()
     
     # Actividad reciente: últimas 5 entregas
     recent_assignments = assignments_qs.select_related(
@@ -50,6 +52,7 @@ def home(request):
         'total_stock': total_stock,
         'total_personnel': total_personnel,
         'active_assignments': active_assignments,
+        'pending_receptions': pending_receptions,
         'recent_assignments': recent_assignments,
         'is_admin': is_admin,
     }
@@ -278,10 +281,13 @@ def assignment_list(request):
     # Ordenar: los más vencidos primero
     renewals_list.sort(key=lambda x: x.expiration_date)
     
+    pending_personnel_ids = set(assignments.filter(reception_status='PENDING').values_list('personnel_id', flat=True))
+    
     context = {
         'assignment_list': assignments,
         'personnel_first_provision': personnel_first_provision,
         'renewals_list': renewals_list,
+        'pending_personnel_ids': pending_personnel_ids,
         'search_query': query,
         'is_admin': is_admin,
     }
@@ -702,6 +708,7 @@ def assignment_confirm_reception(request, pk):
         assignment.received_at = timezone.now()
         assignment.save(update_fields=['reception_status', 'received_by', 'received_at'])
         messages.success(request, "Recepción confirmada correctamente.")
+        return redirect(f"{reverse('sigera:assignment_list')}?download_pdf={assignment.pk}")
 
     return redirect('sigera:assignment_list')
 
@@ -714,6 +721,7 @@ def assignment_reception_pdf(request, pk):
             'personnel__assigned_unit',
             'batch__clothing_size__clothing_type',
             'issued_by',
+            'received_by',
         ),
         pk=pk,
     )
@@ -743,14 +751,30 @@ def assignment_reception_pdf(request, pk):
         spaceBefore=10,
         spaceAfter=6,
     )
+    table_value_style = ParagraphStyle(
+        'TableValue',
+        parent=normal,
+        fontSize=10,
+        leading=13,
+    )
 
     personnel = assignment.personnel
     clothing_size = assignment.batch.clothing_size
     clothing_type = clothing_size.clothing_type
     unit_name = personnel.assigned_unit.name if personnel.assigned_unit else 'Sin destino'
 
+    inst_style = ParagraphStyle(
+        'InstTitle',
+        parent=styles['Normal'],
+        alignment=1,
+        fontName='Helvetica-Bold',
+        fontSize=11,
+    )
+
     elements = [
         Paragraph("CONSTANCIA DE RECEPCION DE PRENDA / EQUIPAMIENTO", title_style),
+        Spacer(1, 10),
+        Paragraph("ARMADA ARGENTINA - COMANDO DE LA AVIACIÓN NAVAL", inst_style),
         Spacer(1, 10),
         Paragraph("Sistema de Gestion de Ropa Aeronaval - SIGERA", normal),
         Spacer(1, 14),
@@ -777,13 +801,21 @@ def assignment_reception_pdf(request, pk):
         Spacer(1, 12),
         Paragraph("Material entregado", section_style),
     ])
+    deliverer_unit = getattr(assignment.received_by, 'unit', None) or personnel.assigned_unit
+    if deliverer_unit and deliverer_unit.description:
+        deliverer_text = deliverer_unit.description
+    elif deliverer_unit and deliverer_unit.name:
+        deliverer_text = deliverer_unit.name
+    else:
+        deliverer_text = "Unidad no informada"
+
     material_data = [
         ["Prenda / equipamiento", clothing_type.name],
         ["Talle", clothing_size.size],
         ["Cantidad", str(assignment.quantity)],
         ["Lote / ingreso", str(assignment.batch.id)],
         ["Fecha de entrega", assignment.assigned_date.strftime('%d/%m/%Y') if assignment.assigned_date else '-'],
-        ["Entregado por", assignment.issued_by.get_full_name() or assignment.issued_by.username],
+        ["Entregado por", Paragraph(escape(deliverer_text), table_value_style)],
         ["Estado de recepcion", assignment.get_reception_status_display()],
         ["Observaciones", assignment.notes or "-"],
     ]
@@ -836,6 +868,10 @@ def catalog_list(request):
     """
     Vista de listado del catálogo de prendas (modelos de vestuario).
     """
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
+        return redirect('sigera:home')
+
     clothing_types = ClothingType.objects.prefetch_related('sizes').order_by('name')
     sizes_in_stock = set(
         ClothingSize.objects.filter(batches__available_quantity__gt=0)
@@ -852,6 +888,9 @@ def catalog_create(request):
     """
     Vista para dar de alta un nuevo modelo de prenda.
     """
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
+        return redirect('sigera:home')
     if request.method == 'POST':
         form = ClothingTypeForm(request.POST)
         if form.is_valid():
@@ -865,6 +904,9 @@ def catalog_create(request):
 
 @login_required
 def catalog_edit(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
+        return redirect('sigera:home')
     item = get_object_or_404(ClothingType, pk=pk)
     if request.method == 'POST':
         form = ClothingTypeForm(request.POST, instance=item)
@@ -879,9 +921,9 @@ def catalog_edit(request, pk):
 
 @login_required
 def catalog_delete(request, pk):
-    if not (request.user.is_superuser or request.user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
-        messages.error(request, "Acceso denegado: No tienes permisos para eliminar modelos del catálogo.")
-        return redirect('sigera:catalog_list')
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
+        return redirect('sigera:home')
         
     item = get_object_or_404(ClothingType, pk=pk)
     if request.method == 'POST':
@@ -906,6 +948,9 @@ def catalog_size_create(request):
     """
     Vista para agregar un talle a un modelo de prenda existente.
     """
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
+        return redirect('sigera:home')
     if request.method == 'POST':
         form = ClothingSizeForm(request.POST)
         if form.is_valid():
@@ -919,6 +964,9 @@ def catalog_size_create(request):
 
 @login_required
 def catalog_size_edit(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
+        return redirect('sigera:home')
     size = get_object_or_404(ClothingSize, pk=pk)
     if request.method == 'POST':
         form = ClothingSizeForm(request.POST, instance=size)
@@ -932,9 +980,9 @@ def catalog_size_edit(request, pk):
 
 @login_required
 def catalog_size_delete(request, pk):
-    if not (request.user.is_superuser or request.user.groups.filter(name__in=['Administrador', 'Logistica']).exists()):
-        messages.error(request, "Acceso denegado: No tienes permisos para eliminar talles.")
-        return redirect('sigera:stock_list')
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
+        return redirect('sigera:home')
     size = get_object_or_404(ClothingSize, pk=pk)
     if request.method == 'POST':
         size.delete()

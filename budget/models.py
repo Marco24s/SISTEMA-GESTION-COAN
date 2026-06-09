@@ -201,6 +201,20 @@ class BudgetCompensacion(models.Model):
     def total_amount(self):
         return self.q1_amount + self.q2_amount + self.q3_amount + self.q4_amount
 
+    @property
+    def target_credit_display(self):
+        parts = [
+            self.target_ff.code if self.target_ff else "?",
+            self.programa.code if self.programa else "00",
+            self.target_subprog.code if self.target_subprog else "00",
+            self.target_inc.code if self.target_inc else "?",
+            self.target_ppp_inc.code if self.target_ppp_inc else "?",
+            self.target_pp_inc.code if self.target_pp_inc else "?",
+            self.target_pre_inc.code if self.target_pre_inc else "?",
+            self.target_incisos_agrupado.code if self.target_incisos_agrupado else "?",
+        ]
+        return "-".join(parts)
+
 class BudgetTipoGasto(models.Model):
     code = models.CharField(max_length=10, unique=True, verbose_name="Código")
     name = models.CharField(max_length=150, verbose_name="Nombre / Descripción")

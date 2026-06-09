@@ -537,7 +537,9 @@ def credit_detail(request, pk):
 def compensacion_list(request):
     if not is_admin(request.user): return redirect('budget:dashboard')
     compensaciones = BudgetCompensacion.objects.all().order_by('-created_at').select_related(
-        'fiscal_year', 'programa', 'source_credit', 'requested_by'
+        'fiscal_year', 'programa', 'source_credit', 'requested_by',
+        'target_ff', 'target_subprog', 'target_inc', 'target_ppp_inc',
+        'target_pp_inc', 'target_pre_inc', 'target_incisos_agrupado',
     )
     return render(request, 'budget/compensacion_list.html', {'compensaciones': compensaciones})
 

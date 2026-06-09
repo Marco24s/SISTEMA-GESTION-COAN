@@ -39,9 +39,11 @@
                 <li class="nav-item">
                     <a class="nav-link {% if 'assignment' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:assignment_list' %}">Entregas</a>
                 </li>
+                {% if user.is_superuser %}
                 <li class="nav-item">
                     <a class="nav-link {% if 'catalog' in request.resolver_match.url_name %}active fw-bold text-white border-bottom border-2 border-white pb-1{% endif %}" href="{% url 'sigera:catalog_list' %}">Catálogo</a>
                 </li>
+                {% endif %}
                 {% endif %}
             </ul>
             <ul class="navbar-nav ms-auto">

@@ -2,6 +2,42 @@
 {% load l10n %}
 
 {% block budget_content %}
+<style>
+    .comp-credit-flow {
+        display: grid;
+        gap: 0.35rem;
+        min-width: 0;
+    }
+    .comp-credit-line {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-width: 0;
+    }
+    .comp-credit-label {
+        flex: 0 0 auto;
+        min-width: 4.35rem;
+        padding: 0.16rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-align: center;
+        text-transform: uppercase;
+    }
+    .comp-credit-label.origin {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .comp-credit-label.target {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .comp-credit-code {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        font-weight: 700;
+    }
+</style>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="fw-bold"><i class="fa-solid fa-shuffle text-primary me-2"></i>Órdenes de Compensación de Partidas</h2>
     <a href="{% url 'budget:compensacion_create' %}" class="btn btn-primary rounded-pill px-4 shadow-sm">
@@ -16,7 +52,7 @@
                 <tr class="small text-uppercase text-muted border-bottom-0">
                     <th class="ps-4">ID / Fecha</th>
                     <th>Programa</th>
-                    <th>Crédito Origen</th>
+                    <th>Movimiento de Crédito</th>
                     <th class="text-end">Monto Total</th>
                     <th class="text-center">Estado</th>
                     <th class="text-end pe-4">Acciones</th>
@@ -33,7 +69,16 @@
                         <span class="badge bg-secondary-subtle text-secondary px-2 py-1">{{ comp.programa.code }}</span>
                     </td>
                     <td>
-                        <div class="small fw-semibold">{{ comp.source_credit }}</div>
+                        <div class="comp-credit-flow small">
+                            <div class="comp-credit-line">
+                                <span class="comp-credit-label origin">Origen</span>
+                                <span class="comp-credit-code">{{ comp.source_credit }}</span>
+                            </div>
+                            <div class="comp-credit-line">
+                                <span class="comp-credit-label target">Destino</span>
+                                <span class="comp-credit-code">{{ comp.target_credit_display }}</span>
+                            </div>
+                        </div>
                         <small class="text-muted">Solicitado por: {{ comp.requested_by.get_full_name|default:comp.requested_by.username }}</small>
                     </td>
                     <td class="text-end fw-bold">
