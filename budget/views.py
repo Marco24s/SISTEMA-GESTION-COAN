@@ -148,6 +148,29 @@ def dashboard(request):
                 t_str = f"{c.q_total:,.0f}".replace(",", ".")
                 a_str = f"{c.q_alloc:,.0f}".replace(",", ".")
                 v_str = f"{avail:,.0f}".replace(",", ".")
+                compensation_filter = {f'{field_name}__gt': 0}
+                is_compensated = BudgetCompensacion.objects.filter(
+                    status='EJECUTADO',
+                    source_credit=c,
+                    **compensation_filter,
+                ).exists() or BudgetCompensacion.objects.filter(
+                    fiscal_year=fiscal_year,
+                    status='EJECUTADO',
+                    programa=c.programa,
+                    target_ff=c.ff,
+                    target_subprog=c.subprog,
+                    target_inc=c.inc,
+                    target_ppp_inc=c.ppp_inc,
+                    target_pp_inc=c.pp_inc,
+                    target_pre_inc=c.pre_inc,
+                    target_incisos_agrupado=c.incisos_agrupado,
+                    **compensation_filter,
+                ).exists()
+                compensation_badge = (
+                    " <span class='badge rounded-pill text-bg-light border text-primary ms-1'>Compensado</span>"
+                    if is_compensated else ""
+                )
+                available_class = "text-danger" if avail < 0 else "text-info"
 
                 # Construir lista de distribuciones para este crédito y trimestre
                 alloc_data = []
@@ -177,10 +200,10 @@ def dashboard(request):
 
                 table_rows.append(
                     f"<tr>"
-                    f"  <td class='small fw-bold'>{c}</td>"
-                    f"  <td class='text-end small'>${t_str}</td>"
+                    f"  <td class='small fw-bold'>{c}{compensation_badge}</td>"
+                    f"  <td class='text-end small fw-semibold'>${t_str}</td>"
                     f"  <td class='text-end small'>{dist_cell}</td>"
-                    f"  <td class='text-end small text-info fw-bold'>${v_str}</td>"
+                    f"  <td class='text-end small {available_class} fw-bold'>${v_str}</td>"
                     f"</tr>"
                 )
 
@@ -193,9 +216,9 @@ def dashboard(request):
                 "  <thead class='bg-light text-muted'>"
                 "    <tr style='font-size: 0.75rem; text-transform: uppercase;'>"
                 "      <th class='ps-2'>Partida / Crédito</th>"
-                "      <th class='text-end'>Presupuesto</th>"
+                "      <th class='text-end'>Cr&eacute;dito vigente</th>"
                 "      <th class='text-end'>Distribuido</th>"
-                "      <th class='text-end'>Disponible</th>"
+                "      <th class='text-end'>Por distribuir</th>"
                 "    </tr>"
                 "  </thead>"
                 "  <tbody>"

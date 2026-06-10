@@ -516,6 +516,21 @@
                                                             <span class="badge bg-secondary-subtle text-secondary me-2">{{ alloc.ff }}</span>
                                                             {{ alloc.subpc }}
                                                         </div>
+                                                        {% if alloc.projects %}
+                                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                                            {% for project in alloc.projects %}
+                                                            <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle fw-semibold" style="font-size: 0.7rem;">
+                                                                <i class="fa-solid fa-tag me-1 opacity-75"></i>{{ project }}
+                                                            </span>
+                                                            {% endfor %}
+                                                        </div>
+                                                        {% else %}
+                                                        <div class="mt-1">
+                                                            <span class="badge rounded-pill bg-light text-muted border fw-semibold" style="font-size: 0.7rem;">
+                                                                Sin proyecto / plan
+                                                            </span>
+                                                        </div>
+                                                        {% endif %}
                                                         {% if alloc.notes %}
                                                         <div class="text-muted mt-1 italic" style="font-size: 0.75rem;">
                                                             <i class="fa-solid fa-comment-dots me-1 opacity-50"></i>{{ alloc.notes }}

@@ -52,6 +52,8 @@ def pin_required(system):
                 # Check if it has expired
                 if (time.time() - verification_timestamp) < expiration_seconds:
                     is_verified = True
+                    verified_pins[system] = time.time()
+                    request.session['verified_pins'] = verified_pins
                 else:
                     # Expired, clean it
                     del verified_pins[system]

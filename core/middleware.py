@@ -65,6 +65,8 @@ class PINSecurityMiddleware:
         if verification_timestamp:
             if (time.time() - verification_timestamp) < expiration_seconds:
                 is_verified = True
+                verified_pins[system] = time.time()
+                request.session['verified_pins'] = verified_pins
             else:
                 # Expiró, limpiar sesión de este sistema
                 del verified_pins[system]

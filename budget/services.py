@@ -221,7 +221,7 @@ def get_unit_execution_report(fiscal_year):
     report = []
     units = Unit.objects.filter(budget_allocations__credit__fiscal_year=fiscal_year).distinct()
     for unit in units:
-        allocations = BudgetAllocation.objects.filter(unit=unit, credit__fiscal_year=fiscal_year).select_related('credit__ff', 'credit__programa', 'credit__subprog', 'credit__inc', 'credit__ppp_inc', 'credit__pp_inc', 'credit__pre_inc')
+        allocations = BudgetAllocation.objects.filter(unit=unit, credit__fiscal_year=fiscal_year).select_related('credit__ff', 'credit__programa', 'credit__subprog', 'credit__inc', 'credit__ppp_inc', 'credit__pp_inc', 'credit__pre_inc').prefetch_related('custom_classes')
         total_allocated = allocations.aggregate(Sum('allocated_amount'))['allocated_amount__sum'] or 0
         executions = BudgetExecution.objects.filter(allocation__in=allocations)
         tc = executions.aggregate(Sum('commitment_amount'))['commitment_amount__sum'] or 0
@@ -240,7 +240,8 @@ def get_unit_execution_report(fiscal_year):
                 'available': alloc.allocated_amount - alloc.spent_amount,
                 'ff': alloc.credit.ff.code if alloc.credit.ff else "--",
                 'subprog': alloc.credit.subprog.code if alloc.credit.subprog else "--",
-                'notes': alloc.notes
+                'notes': alloc.notes,
+                'projects': [project.name for project in alloc.custom_classes.all()],
             })
 
         report.append({
