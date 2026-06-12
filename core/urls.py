@@ -59,6 +59,7 @@ urlpatterns = [
     
     # Flight Hours Calculator
     path('tools/flight-hours/', views.FlightHoursCalculatorView.as_view(), name='flight_hours_calculator'),
+    path('tools/usage-optimizer/', views.GreaseUsageOptimizerView.as_view(), name='grease_usage_optimizer'),
 
     # Procurement Forecasting
     path('procurement/', views.ProcurementForecastingView.as_view(), name='procurement_forecast'),

@@ -1,0 +1,308 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+{% block title %}Optimizador de Uso{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <div>
+        <h2 class="mb-0"><i class="fa-solid fa-list-check me-2"></i> Optimizador de Uso</h2>
+        <p class="text-muted mb-0 mt-1">Analiza necesidades de vuelo y vencimientos para recomendar que stock conviene utilizar primero.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <i class="fa-solid fa-sliders me-2"></i> Parametros
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'grease_usage_optimizer' %}">
+                    {% csrf_token %}
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Desde</label>
+                            <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label fw-semibold">Hasta</label>
+                            <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold"><i class="fa-solid fa-oil-can me-1 text-success"></i> Tipos de Grasa</label>
+                        <small class="d-block text-muted mb-2">Sin seleccion = todas las grasas</small>
+
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-filter fa-xs text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" placeholder="Filtrar grasas..." onkeyup="filterCheckboxes('optimizer-grease-container', this.value)">
+                        </div>
+
+                        <div class="border rounded p-2 overflow-auto shadow-sm bg-white" style="max-height: 260px;" id="optimizer-grease-container">
+                            {% for gt in grease_types %}
+                            <div class="form-check checkbox-item">
+                                <input class="form-check-input grease-check" type="checkbox" name="grease_ids" value="{{ gt.id }}" id="opt_gt_{{ gt.id }}"
+                                    {% if gt.id in selected_grease_ids %}checked{% endif %}>
+                                <label class="form-check-label d-block" for="opt_gt_{{ gt.id }}" style="cursor: pointer;">
+                                    {{ gt.nomenclatura }}
+                                </label>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted small mb-0">No hay tipos de grasa cargados</p>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mt-2 d-flex gap-2">
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAll('grease-check', true)">Seleccionar todas</button>
+                            <span class="text-muted">|</span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAll('grease-check', false)">Limpiar seleccion</button>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg border-0 shadow-sm">
+                            <i class="fa-solid fa-magnifying-glass-chart me-2"></i> Analizar Uso
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        {% if calculated %}
+            <div class="alert alert-info shadow-sm border-0 border-start border-4 border-info">
+                <i class="fa-solid fa-circle-info me-2"></i>
+                Analisis consultivo para <strong>{{ scope_location }}</strong>. No registra consumos, transferencias ni movimientos de stock.
+            </div>
+
+            {% for result in results %}
+                {% if result.has_activity %}
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <div class="fw-bold"><i class="fa-solid fa-oil-can me-2 text-success"></i>{{ result.grease_type.nomenclatura }}</div>
+                                <small class="text-muted">Unidad de medida: {{ result.grease_type.unidad }}</small>
+                            </div>
+                            {% if result.total_unmet > 0 %}
+                            <span class="badge bg-danger rounded-pill">Faltante: {{ result.total_unmet|quantity_2 }}</span>
+                            {% elif result.expiring_unused > 0 %}
+                            <span class="badge bg-warning text-dark rounded-pill">Queda en riesgo: {{ result.expiring_unused|quantity_2 }}</span>
+                            {% else %}
+                            <span class="badge bg-success rounded-pill">Necesidad cubierta</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 bg-light h-100">
+                                    <div class="small text-muted text-uppercase fw-bold">Necesidad estimada de material</div>
+                                    <div class="fs-4 fw-bold">{{ result.total_demand|quantity_2 }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 bg-light h-100">
+                                    <div class="small text-muted text-uppercase fw-bold">Stock disponible</div>
+                                    <div class="fs-4 fw-bold">{{ result.total_stock|quantity_2 }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="border rounded p-3 bg-light h-100">
+                                    <div class="small text-muted text-uppercase fw-bold">Asignado sugerido</div>
+                                    <div class="fs-4 fw-bold">{{ result.total_allocated|quantity_2 }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if result.location_summary %}
+                        <div class="fw-bold small text-muted text-uppercase mb-2">Resumen por ubicacion</div>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Ubicacion</th>
+                                        <th class="text-end">Necesidad</th>
+                                        <th class="text-end">Stock propio</th>
+                                        <th class="text-end">Balance inicial</th>
+                                        <th class="text-end">Recibe</th>
+                                        <th class="text-end">Entrega</th>
+                                        <th class="text-center">Resultado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in result.location_summary %}
+                                    <tr>
+                                        <td>{{ row.location }}</td>
+                                        <td class="text-end">{{ row.demand|quantity_2 }}</td>
+                                        <td class="text-end">{{ row.stock|quantity_2 }}</td>
+                                        <td class="text-end">
+                                            <span class="{% if row.initial_balance < 0 %}text-danger fw-bold{% elif row.initial_balance > 0 %}text-success fw-bold{% endif %}">
+                                                {{ row.initial_balance|quantity_2 }}
+                                            </span>
+                                        </td>
+                                        <td class="text-end">{{ row.incoming|quantity_2 }}</td>
+                                        <td class="text-end">{{ row.outgoing|quantity_2 }}</td>
+                                        <td class="text-center">
+                                            {% if row.unmet > 0 %}
+                                            <span class="badge bg-danger rounded-pill">Faltante</span>
+                                            {% elif row.incoming > 0 %}
+                                            <span class="badge bg-success rounded-pill">Cubierto por transferencia</span>
+                                            {% elif row.outgoing > 0 %}
+                                            <span class="badge bg-warning text-dark rounded-pill">Aporta sobrante</span>
+                                            {% elif row.demand > 0 %}
+                                            <span class="badge bg-primary rounded-pill">Cubierto</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary rounded-pill">Reserva</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+
+                        {% if result.allocations %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Prioridad</th>
+                                        <th>Desde</th>
+                                        <th>Lote</th>
+                                        <th>Vence</th>
+                                        <th>Hacia</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th class="text-center">Recomendacion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for allocation in result.allocations %}
+                                    <tr>
+                                        <td class="fw-bold">{{ forloop.counter }}</td>
+                                        <td>{{ allocation.source_location }}</td>
+                                        <td>{{ allocation.batch.batch_number }}</td>
+                                        <td>{{ allocation.expiration_date|date:'d/m/Y' }}</td>
+                                        <td>{{ allocation.target_location }}</td>
+                                        <td class="text-end fw-bold">
+                                            {{ allocation.quantity|quantity_2 }}
+                                            {% with cans=allocation.quantity|container_label:allocation.batch %}
+                                            {% if cans %}<span class="text-muted small d-block">({{ cans }})</span>{% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td class="text-center">
+                                            {% if allocation.requires_transfer %}
+                                            <span class="badge bg-warning text-dark rounded-pill">Sugerir transferencia</span>
+                                            {% else %}
+                                            <span class="badge bg-primary rounded-pill">Usar en ubicacion</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-secondary mb-0">
+                            No hay necesidad proyectada para este material en el periodo seleccionado.
+                        </div>
+                        {% endif %}
+
+                        {% if result.unmet_demand %}
+                        <div class="alert alert-danger mt-3 mb-0">
+                            <div class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> Necesidad no cubierta</div>
+                            {% for item in result.unmet_demand %}
+                                <div>{{ item.location }}: faltan {{ item.quantity|quantity_2 }} {{ result.grease_type.unidad }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if result.remaining_stock %}
+                        <div class="mt-3">
+                            <div class="fw-bold small text-muted text-uppercase mb-2">Stock que no seria necesario utilizar</div>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Ubicacion</th>
+                                            <th>Lote</th>
+                                            <th>Vence</th>
+                                            <th class="text-end">Cantidad</th>
+                                            <th class="text-center">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in result.remaining_stock %}
+                                        <tr>
+                                            <td>{{ item.batch.storage_location }}</td>
+                                            <td>{{ item.batch.batch_number }}</td>
+                                            <td>{{ item.batch.expiration_date|date:'d/m/Y' }}</td>
+                                            <td class="text-end">
+                                                {{ item.quantity|quantity_2 }}
+                                                {% with cans=item.quantity|container_label:item.batch %}
+                                                {% if cans %}<span class="text-muted small d-block">({{ cans }})</span>{% endif %}
+                                                {% endwith %}
+                                            </td>
+                                            <td class="text-center">
+                                                {% if item.expires_within_period %}
+                                                <span class="badge bg-warning text-dark rounded-pill">En riesgo</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary rounded-pill">Reserva</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% empty %}
+            <div class="alert alert-secondary shadow-sm">
+                No hay datos para analizar con los filtros seleccionados.
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="card shadow-sm border-0 h-100 d-flex align-items-center justify-content-center bg-white" style="min-height: 400px;">
+            <div class="card-body text-center py-5">
+                <div class="mb-4 text-primary opacity-25">
+                    <i class="fa-solid fa-list-check fa-5x"></i>
+                </div>
+                <h4 class="text-dark fw-bold">Asesor de uso logistico</h4>
+                <p class="text-muted">Seleccione un periodo y ejecute el analisis para priorizar el uso segun necesidad y vencimiento.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleAll(className, value) {
+    const checks = document.getElementsByClassName(className);
+    for (let check of checks) {
+        if (check.closest('.checkbox-item').style.display !== 'none') {
+            check.checked = value;
+        }
+    }
+}
+
+function filterCheckboxes(containerId, query) {
+    const container = document.getElementById(containerId);
+    const items = container.getElementsByClassName('checkbox-item');
+    const filter = query.toLowerCase();
+
+    for (let item of items) {
+        const text = item.textContent || item.innerText;
+        item.style.display = text.toLowerCase().indexOf(filter) > -1 ? "" : "none";
+    }
+}
+</script>
+{% endblock %}

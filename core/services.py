@@ -415,3 +415,253 @@ def calculate_flight_hours_projection(selected_aircraft_ids=None, selected_greas
         'bottleneck': bottleneck,
         'no_consumption': no_consumption
     }
+
+
+def optimize_grease_usage(selected_grease_ids=None, start_date=None, end_date=None, location=None):
+    """
+    Builds a read-only usage recommendation for grease/oil stock.
+
+    The optimizer never mutates stock. It estimates operational demand from flight
+    plans and aircraft consumption rates, then proposes which available batches
+    should be used first based on expiration date.
+    """
+    from decimal import Decimal
+    from django.db.models import Min
+    from .models import AircraftGrease, FlightPlan, GreaseType
+
+    today = timezone.localdate()
+    start_date = start_date or today
+    end_date = end_date or start_date
+    selected_grease_ids = [str(item) for item in selected_grease_ids or [] if str(item)]
+
+    representative_ids = GreaseType.objects.values('nomenclatura').annotate(
+        min_id=Min('id')
+    ).values_list('min_id', flat=True)
+    grease_queryset = GreaseType.objects.filter(pk__in=representative_ids).order_by('nomenclatura')
+
+    if selected_grease_ids:
+        selected_names = set(
+            GreaseType.objects.filter(pk__in=selected_grease_ids).values_list('nomenclatura', flat=True)
+        )
+        grease_queryset = grease_queryset.filter(nomenclatura__in=selected_names)
+
+    results = []
+
+    for grease in grease_queryset:
+        grease_type_ids = list(
+            GreaseType.objects.filter(nomenclatura=grease.nomenclatura).values_list('id', flat=True)
+        )
+        demand_by_location = {}
+        demand_details = []
+
+        associations = AircraftGrease.objects.select_related(
+            'aircraft_model',
+            'aircraft_model__unit',
+            'grease_type',
+        ).filter(grease_type_id__in=grease_type_ids)
+
+        if location:
+            associations = associations.filter(aircraft_model__unit__name=location)
+
+        for assoc in associations:
+            plans = FlightPlan.objects.filter(
+                aircraft_model=assoc.aircraft_model,
+                period_start_date__lte=end_date,
+                period_end_date__gte=start_date,
+            )
+            for plan in plans:
+                if not plan.period_start_date or not plan.period_end_date:
+                    continue
+
+                total_days = (plan.period_end_date - plan.period_start_date).days + 1
+                if total_days <= 0:
+                    continue
+
+                overlap_start = max(plan.period_start_date, start_date)
+                overlap_end = min(plan.period_end_date, end_date)
+                overlap_days = (overlap_end - overlap_start).days + 1
+                if overlap_days <= 0:
+                    continue
+
+                plan_consumption = assoc.hourly_consumption_rate * plan.planned_hours
+                projected = plan_consumption * Decimal(overlap_days) / Decimal(total_days)
+                plan_location = assoc.aircraft_model.unit.name
+
+                demand_by_location[plan_location] = demand_by_location.get(plan_location, Decimal('0')) + projected
+                demand_details.append({
+                    'location': plan_location,
+                    'aircraft': assoc.aircraft_model,
+                    'plan': plan,
+                    'rate': assoc.hourly_consumption_rate,
+                    'projected': projected,
+                    'overlap_start': overlap_start,
+                    'overlap_end': overlap_end,
+                })
+
+        batches = GreaseBatch.objects.active().available_with_stock().filter(
+            grease_type_id__in=grease_type_ids
+        ).select_related('grease_type').order_by('expiration_date', 'storage_location', 'batch_number')
+
+        if location:
+            batches = batches.filter(storage_location=location)
+
+        stock_items = [
+            {
+                'batch': batch,
+                'remaining': batch.available_quantity,
+            }
+            for batch in batches
+        ]
+
+        allocations = []
+        unmet_demand = []
+        location_summary = {}
+        stock_by_location = {}
+        all_locations = set(demand_by_location)
+
+        for item in stock_items:
+            batch = item['batch']
+            all_locations.add(batch.storage_location)
+            stock_by_location[batch.storage_location] = (
+                stock_by_location.get(batch.storage_location, Decimal('0')) + batch.available_quantity
+            )
+
+        for loc in sorted(all_locations):
+            location_summary[loc] = {
+                'location': loc,
+                'demand': demand_by_location.get(loc, Decimal('0')),
+                'stock': stock_by_location.get(loc, Decimal('0')),
+                'initial_balance': stock_by_location.get(loc, Decimal('0')) - demand_by_location.get(loc, Decimal('0')),
+                'covered_local': Decimal('0'),
+                'incoming': Decimal('0'),
+                'outgoing': Decimal('0'),
+                'unmet': Decimal('0'),
+                'surplus_after_need': Decimal('0'),
+            }
+
+        # First, each location covers its own need with its own stock, using the
+        # closest expiration dates first. Only real surplus is later offered out.
+        remaining_need_by_location = {}
+        for demand_location, required_amount in sorted(demand_by_location.items()):
+            remaining_need = required_amount
+            local_items = [
+                item for item in stock_items
+                if item['batch'].storage_location == demand_location and item['remaining'] > 0
+            ]
+            local_items.sort(key=lambda item: (item['batch'].expiration_date, item['batch'].batch_number))
+
+            for stock_item in local_items:
+                if remaining_need <= 0:
+                    break
+
+                assigned = min(stock_item['remaining'], remaining_need)
+                batch = stock_item['batch']
+                stock_item['remaining'] -= assigned
+                remaining_need -= assigned
+
+                allocations.append({
+                    'source_location': batch.storage_location,
+                    'target_location': demand_location,
+                    'batch': batch,
+                    'expiration_date': batch.expiration_date,
+                    'quantity': assigned,
+                    'requires_transfer': False,
+                })
+                location_summary[demand_location]['covered_local'] += assigned
+
+            remaining_need_by_location[demand_location] = remaining_need
+
+        # Then transfer only remaining stock toward unresolved needs. This makes
+        # total stock behave as a shared pool without stripping a unit below its
+        # own operational requirement.
+        transfer_pool = [
+            item for item in stock_items
+            if item['remaining'] > 0
+        ]
+        transfer_pool.sort(key=lambda item: (
+            item['batch'].expiration_date,
+            item['batch'].storage_location,
+            item['batch'].batch_number,
+        ))
+
+        for demand_location, remaining_need in sorted(
+            remaining_need_by_location.items(),
+            key=lambda item: (-item[1], item[0])
+        ):
+            if remaining_need <= 0:
+                continue
+
+            for stock_item in transfer_pool:
+                if remaining_need <= 0:
+                    break
+                if stock_item['remaining'] <= 0:
+                    continue
+                if stock_item['batch'].storage_location == demand_location:
+                    continue
+
+                assigned = min(stock_item['remaining'], remaining_need)
+                batch = stock_item['batch']
+                stock_item['remaining'] -= assigned
+                remaining_need -= assigned
+
+                allocations.append({
+                    'source_location': batch.storage_location,
+                    'target_location': demand_location,
+                    'batch': batch,
+                    'expiration_date': batch.expiration_date,
+                    'quantity': assigned,
+                    'requires_transfer': True,
+                })
+                location_summary[demand_location]['incoming'] += assigned
+                location_summary[batch.storage_location]['outgoing'] += assigned
+
+            if remaining_need > 0:
+                unmet_demand.append({
+                    'location': demand_location,
+                    'quantity': remaining_need,
+                })
+                location_summary[demand_location]['unmet'] = remaining_need
+
+        remaining_stock = [
+            {
+                'batch': item['batch'],
+                'quantity': item['remaining'],
+                'expires_within_period': item['batch'].expiration_date <= end_date,
+            }
+            for item in stock_items
+            if item['remaining'] > 0
+        ]
+
+        total_demand = sum(demand_by_location.values(), Decimal('0'))
+        total_stock = sum((item['remaining'] for item in stock_items), Decimal('0')) + sum(
+            (item['quantity'] for item in allocations), Decimal('0')
+        )
+        total_allocated = sum((item['quantity'] for item in allocations), Decimal('0'))
+        total_unmet = sum((item['quantity'] for item in unmet_demand), Decimal('0'))
+        expiring_unused = sum(
+            (item['quantity'] for item in remaining_stock if item['expires_within_period']),
+            Decimal('0')
+        )
+        for summary in location_summary.values():
+            summary['surplus_after_need'] = max(
+                summary['stock'] - summary['demand'] - summary['outgoing'] + summary['incoming'],
+                Decimal('0')
+            )
+
+        results.append({
+            'grease_type': grease,
+            'demand_by_location': demand_by_location,
+            'demand_details': demand_details,
+            'location_summary': list(location_summary.values()),
+            'allocations': allocations,
+            'remaining_stock': remaining_stock,
+            'unmet_demand': unmet_demand,
+            'total_demand': total_demand,
+            'total_stock': total_stock,
+            'total_allocated': total_allocated,
+            'total_unmet': total_unmet,
+            'expiring_unused': expiring_unused,
+            'has_activity': total_demand > 0 or total_stock > 0,
+        })
+
+    return results

@@ -140,8 +140,8 @@
                         </li>
                         {% if user.is_staff or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm transition-all {% if 'measurementunit' in request.resolver_match.url_name or request.resolver_match.url_name == 'flight_hours_calculator' %}bg-white text-primary fw-bold{% endif %}" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown" style="width: 40px; height: 40px; padding: 0; {% if 'measurementunit' not in request.resolver_match.url_name and request.resolver_match.url_name != 'flight_hours_calculator' %}background-color: rgba(255, 255, 255, 0.1);{% endif %}" onmouseover="{% if 'measurementunit' not in request.resolver_match.url_name and request.resolver_match.url_name != 'flight_hours_calculator' %}this.style.backgroundColor='rgba(255, 255, 255, 0.25)';{% endif %} this.querySelector('i').classList.add('fa-spin')" onmouseout="{% if 'measurementunit' not in request.resolver_match.url_name and request.resolver_match.url_name != 'flight_hours_calculator' %}this.style.backgroundColor='rgba(255, 255, 255, 0.1)';{% endif %} this.querySelector('i').classList.remove('fa-spin')">
-                                <i class="fa-solid fa-gear fs-5"></i>
+                            <a class="nav-link dropdown-toggle text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm transition-all" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown" style="width: 40px; height: 40px; padding: 0; background-color: rgba(255, 255, 255, 0.1);" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'; this.querySelector('i').classList.add('fa-spin')" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.1)'; this.querySelector('i').classList.remove('fa-spin')">
+                                <i class="fa-solid fa-gear fs-5 text-white"></i>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3" aria-labelledby="configDropdown">
                                 <li><h6 class="dropdown-header text-primary fw-bold text-uppercase small">Configuración</h6></li>
@@ -149,6 +149,7 @@
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header text-primary fw-bold text-uppercase small">Herramientas</h6></li>
                                 <li><a class="dropdown-item py-2" href="{% url 'flight_hours_calculator' %}"><i class="fa-solid fa-calculator me-2 text-secondary"></i>Calculadora de Horas</a></li>
+                                <li><a class="dropdown-item py-2" href="{% url 'grease_usage_optimizer' %}"><i class="fa-solid fa-list-check me-2 text-secondary"></i>Optimizador de Uso</a></li>
                             </ul>
                         </li>
                         {% endif %}

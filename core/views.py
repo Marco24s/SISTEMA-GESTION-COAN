@@ -883,6 +883,66 @@ class FlightHoursCalculatorView(LoginRequiredMixin, TemplateView):
             'calculated': True,
         })
 
+
+class GreaseUsageOptimizerView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/grease_usage_optimizer.html'
+
+    def get_grease_types(self):
+        from django.db.models import Min
+        unique_ids = GreaseType.objects.values('nomenclatura').annotate(min_id=Min('id')).values_list('min_id', flat=True)
+        return GreaseType.objects.filter(pk__in=unique_ids).order_by('nomenclatura')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        context['grease_types'] = self.get_grease_types()
+        context['start_date'] = today
+        context['end_date'] = today + timedelta(days=30)
+        return context
+
+    def post(self, request, *args, **kwargs):
+        from datetime import datetime
+        from .services import optimize_grease_usage
+
+        user = request.user
+        is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+        location = user.unit.name if (not is_admin and getattr(user, 'unit', None)) else None
+
+        selected_grease_ids = request.POST.getlist('grease_ids')
+        start_date_raw = request.POST.get('start_date')
+        end_date_raw = request.POST.get('end_date')
+        today = timezone.localdate()
+
+        try:
+            start_date = datetime.strptime(start_date_raw, '%Y-%m-%d').date() if start_date_raw else today
+            end_date = datetime.strptime(end_date_raw, '%Y-%m-%d').date() if end_date_raw else today + timedelta(days=30)
+        except ValueError:
+            messages.error(request, "Las fechas ingresadas no son validas.")
+            start_date = today
+            end_date = today + timedelta(days=30)
+
+        if start_date > end_date:
+            messages.error(request, "La fecha de inicio no puede ser posterior a la fecha de fin.")
+            start_date, end_date = end_date, start_date
+
+        results = optimize_grease_usage(
+            selected_grease_ids=selected_grease_ids,
+            start_date=start_date,
+            end_date=end_date,
+            location=location,
+        )
+        visible_results = [item for item in results if item.get('has_activity')]
+
+        return render(request, self.template_name, {
+            'grease_types': self.get_grease_types(),
+            'selected_grease_ids': [int(i) for i in selected_grease_ids] if selected_grease_ids else [],
+            'start_date': start_date,
+            'end_date': end_date,
+            'results': visible_results,
+            'calculated': True,
+            'scope_location': location or 'Todas las unidades',
+        })
+
 # --- CSV Exports ---
 @login_required
 def export_grease_batches_csv(request):

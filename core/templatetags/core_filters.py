@@ -1,5 +1,5 @@
 from django import template
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 register = template.Library()
 
@@ -23,6 +23,38 @@ def smart_number(value):
         return rounded_val
     except (ValueError, TypeError):
         return value
+
+@register.filter
+def quantity_2(value):
+    """
+    Format quantities with at most 2 decimals, dropping trailing zeros.
+    """
+    try:
+        d = Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP).normalize()
+        if d == d.to_integral():
+            return int(d)
+        return d
+    except Exception:
+        return value
+
+@register.filter
+def container_label(quantity, batch):
+    """
+    Return an approximate container count label for a batch quantity.
+    """
+    try:
+        if not batch or not getattr(batch, 'container_size', None):
+            return ''
+
+        container_size = Decimal(str(batch.container_size))
+        if container_size <= 0:
+            return ''
+
+        count = int((Decimal(str(quantity)) / container_size).to_integral_value(rounding=ROUND_CEILING))
+        unit = "lata" if count == 1 else "latas"
+        return f"{count} {unit}"
+    except Exception:
+        return ''
 
 @register.filter
 def abs_val(value):
