@@ -195,7 +195,7 @@ class SupervivenciaDashboardView(LoginRequiredMixin, TemplateView):
                 "medium_count": SurvivalMedium.objects.filter(is_active=True).count(),
                 "catalog_count": PyrotechnicCatalogItem.objects.filter(is_active=True).count(),
                 "total_active_material": active_items.count(),
-                "mounted_count": active_items.filter(operational_status="INSTALLED").count(),
+                "mounted_count": active_assignments.count(),
                 "stock_count": active_items.filter(operational_status="STOCK").count(),
                 "expired_count": active_items.filter(expiration_date__lte=today).count(),
                 "next_6_months_count": active_items.filter(

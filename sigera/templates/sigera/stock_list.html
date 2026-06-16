@@ -30,10 +30,7 @@
                 <thead style="background-color: #f8f9fa;">
                     <tr>
                         <th scope="col" class="py-3 px-4 text-muted">Prenda</th>
-                        <th scope="col" class="py-3 text-muted">Talle</th>
-                        <th scope="col" class="py-3 text-muted">Fecha Recepción</th>
-                        <th scope="col" class="py-3 text-muted">Proveedor</th>
-                        <th scope="col" class="py-3 text-muted">Orden/Remito</th>
+                        <th scope="col" class="py-3 text-muted">Talles</th>
                         <th scope="col" class="py-3 text-muted text-center">Cant. Disponible</th>
                         <th scope="col" class="py-3 text-muted text-center">Estado</th>
                         <th scope="col" class="py-3 text-muted text-center">Acciones</th>
@@ -44,11 +41,8 @@
                         <!-- Main Master Row -->
                         <tr data-bs-toggle="collapse" data-bs-target="#group-{{ forloop.counter }}" style="cursor: pointer; background-color: #fdfdfd;" class="accordion-toggle border-bottom">
                             <td class="px-4 py-3 fw-bold">{{ group.clothing_type_name }} <a href="javascript:void(0)" class="ms-1 text-muted" title="Ver detalle de lotes"><i class="fa-solid fa-chevron-down fa-xs"></i></a></td>
-                            <td class="py-3">
-                                <span class="badge bg-light text-dark border px-2 py-1 fs-6">{{ group.size }}</span>
-                            </td>
-                            <td colspan="3" class="py-3 text-muted" style="font-size: 0.9em;">
-                                <i class="fa-solid fa-layer-group me-1"></i> {{ group.batches|length }} lote(s) conforman el stock
+                            <td class="py-3 text-muted" style="font-size: 0.9em;">
+                                <i class="fa-solid fa-layer-group me-1"></i> {{ group.sizes|length }} talle(s) disponibles
                             </td>
                             <td class="text-center py-3">
                                 <span class="fs-5 fw-bold">{{ group.total_available }}</span> <span class="text-muted small">/ {{ group.total_initial }}</span>
@@ -76,42 +70,52 @@
                         
                         <!-- Collapsible Detail Row -->
                         <tr class="collapse" id="group-{{ forloop.counter }}">
-                            <td colspan="8" class="p-0 border-0">
+                            <td colspan="5" class="p-0 border-0">
                                 <div class="bg-light p-3 border-bottom shadow-sm" style="background-color: #f8f9fa !important; box-shadow: inset 0px 3px 5px rgba(0,0,0,0.02) !important;">
-                                    <table class="table table-sm table-bordered bg-white mb-0">
-                                        <thead class="table-light text-muted" style="font-size: 0.85em;">
-                                            <tr>
-                                                <th>Fecha Recepción</th>
-                                                <th>Proveedor</th>
-                                                <th>Orden/Remito</th>
-                                                <th class="text-center">Cant. Disp. Lote</th>
-                                                <th class="text-center">Acciones Lote</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for batch in group.batches %}
-                                            <tr>
-                                                <td class="py-2"><i class="fa-regular fa-calendar-alt text-muted me-1"></i> {{ batch.reception_date|date:"d/m/Y" }}</td>
-                                                <td class="py-2">{{ batch.provider|default:"-" }}</td>
-                                                <td class="py-2">{{ batch.purchase_order|default:"-" }}</td>
-                                                <td class="text-center py-2"><strong>{{ batch.available_quantity }}</strong> <span class="text-muted small">/ {{ batch.initial_quantity }}</span></td>
-                                                <td class="text-center py-1">
-                                                    <a href="{% url 'sigera:batch_movements' batch.pk %}" class="btn btn-sm btn-outline-secondary me-1 py-0 px-2" title="Movimientos">
-                                                        <i class="fa-solid fa-list"></i>
-                                                    </a>
-                                                    {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
-                                                    <form action="{% url 'sigera:batch_delete' batch.pk %}" method="post" class="d-inline">
-                                                        {% csrf_token %}
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="return confirm('¿Está seguro de querer borrar este lote de la base de datos de manera permanente?');" title="Eliminar de la Base de Datos">
-                                                            <i class="fa-solid fa-trash"></i>
-                                                        </button>
-                                                    </form>
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
+                                    {% for size_group in group.sizes %}
+                                        <div class="mb-3">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <h6 class="mb-0 fw-bold me-2"><span class="badge bg-secondary">Talle: {{ size_group.size }}</span></h6>
+                                                <span class="text-muted small">Total Disponible: <strong>{{ size_group.total_available }}</strong></span>
+                                            </div>
+                                            <table class="table table-sm table-bordered bg-white mb-0">
+                                                <thead class="table-light text-muted" style="font-size: 0.85em;">
+                                                    <tr>
+                                                        <th>Fecha Recepción</th>
+                                                        <th>Proveedor</th>
+                                                        <th>Orden/Remito</th>
+                                                        <th class="text-center">Depósito</th>
+                                                        <th class="text-center">Cant. Disp. Lote</th>
+                                                        <th class="text-center">Acciones Lote</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for batch in size_group.batches %}
+                                                    <tr>
+                                                        <td class="py-2"><i class="fa-regular fa-calendar-alt text-muted me-1"></i> {{ batch.reception_date|date:"d/m/Y" }}</td>
+                                                        <td class="py-2">{{ batch.provider|default:"-" }}</td>
+                                                        <td class="py-2">{{ batch.purchase_order|default:"-" }}</td>
+                                                        <td class="text-center py-2">{{ batch.storage_location|default:"-" }}</td>
+                                                        <td class="text-center py-2"><strong>{{ batch.available_quantity }}</strong> <span class="text-muted small">/ {{ batch.initial_quantity }}</span></td>
+                                                        <td class="text-center py-1">
+                                                            <a href="{% url 'sigera:batch_movements' batch.pk %}" class="btn btn-sm btn-outline-secondary me-1 py-0 px-2" title="Movimientos">
+                                                                <i class="fa-solid fa-list"></i>
+                                                            </a>
+                                                            {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
+                                                            <form action="{% url 'sigera:batch_delete' batch.pk %}" method="post" class="d-inline">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="return confirm('¿Está seguro de querer borrar este lote de la base de datos de manera permanente?');" title="Eliminar de la Base de Datos">
+                                                                    <i class="fa-solid fa-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% endfor %}
                                 </div>
                             </td>
                         </tr>

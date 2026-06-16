@@ -90,41 +90,83 @@ def stock_list(request):
         else:
             batch.stock_category = None
             
-    # Agrupar lotes por modelo y talle para la vista
+    # Agrupar lotes por tipo de prenda, luego por talle para la vista
     grouped_stock = []
-    current_group = None
+    current_type_group = None
     
     for batch in stock_batches:
-        if current_group is None or current_group['clothing_size'] != batch.clothing_size:
-            if current_group is not None:
-                # Calculate category for the total
-                total_qty = current_group['total_available']
+        clothing_type = batch.clothing_size.clothing_type
+        
+        # 1. Agrupación por Prenda
+        if current_type_group is None or current_type_group['clothing_type_id'] != clothing_type.id:
+            if current_type_group is not None:
+                # Calcular la categoría global para la prenda sumando todo
+                total_qty = current_type_group['total_available']
                 for threshold in stock_thresholds:
                     if threshold.matches(total_qty):
-                        current_group['stock_category'] = threshold
+                        current_type_group['stock_category'] = threshold
                         break
-                grouped_stock.append(current_group)
+                grouped_stock.append(current_type_group)
                 
-            current_group = {
-                'clothing_size': batch.clothing_size,
-                'clothing_type_name': batch.clothing_size.clothing_type.name,
+            current_type_group = {
+                'clothing_type_id': clothing_type.id,
+                'clothing_type_name': clothing_type.name,
+                'total_available': 0,
+                'total_initial': 0,
+                'sizes': [],
+                'stock_category': None
+            }
+        
+        # 2. Agrupación por Talle dentro de la Prenda
+        sizes_list = current_type_group['sizes']
+        if not sizes_list or sizes_list[-1]['clothing_size_id'] != batch.clothing_size.id:
+            # Calcular categoría para el talle anterior si existe
+            if sizes_list:
+                prev_size_qty = sizes_list[-1]['total_available']
+                for threshold in stock_thresholds:
+                    if threshold.matches(prev_size_qty):
+                        sizes_list[-1]['stock_category'] = threshold
+                        break
+            
+            sizes_list.append({
+                'clothing_size_id': batch.clothing_size.id,
                 'size': batch.clothing_size.size,
                 'total_available': 0,
                 'total_initial': 0,
                 'batches': [],
                 'stock_category': None
-            }
-        current_group['batches'].append(batch)
-        current_group['total_available'] += (batch.available_quantity or 0)
-        current_group['total_initial'] += (batch.initial_quantity or 0)
+            })
+            
+        current_size_group = sizes_list[-1]
         
-    if current_group is not None:
-        total_qty = current_group['total_available']
+        # Añadir batch al talle
+        current_size_group['batches'].append(batch)
+        
+        qty_avail = batch.available_quantity or 0
+        qty_init = batch.initial_quantity or 0
+        
+        current_size_group['total_available'] += qty_avail
+        current_size_group['total_initial'] += qty_init
+        
+        current_type_group['total_available'] += qty_avail
+        current_type_group['total_initial'] += qty_init
+
+    if current_type_group is not None:
+        # Calcular categoría para el último talle
+        if current_type_group['sizes']:
+            prev_size_qty = current_type_group['sizes'][-1]['total_available']
+            for threshold in stock_thresholds:
+                if threshold.matches(prev_size_qty):
+                    current_type_group['sizes'][-1]['stock_category'] = threshold
+                    break
+                    
+        # Calcular categoría para la última prenda
+        total_qty = current_type_group['total_available']
         for threshold in stock_thresholds:
             if threshold.matches(total_qty):
-                current_group['stock_category'] = threshold
+                current_type_group['stock_category'] = threshold
                 break
-        grouped_stock.append(current_group)
+        grouped_stock.append(current_type_group)
     
     context = {
         'grouped_stock': grouped_stock,

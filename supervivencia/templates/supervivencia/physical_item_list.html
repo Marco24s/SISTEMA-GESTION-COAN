@@ -111,7 +111,8 @@
                     <tr>
                         <td>
                             <strong>{{ item.catalog_item.nomenclature }}</strong>
-                            <br><small class="text-muted">{{ item.catalog_item.system }}</small>
+                            <br><small class="text-muted">Sis: {{ item.catalog_item.system }}</small>
+                            {% if item.catalog_item.part_number %}<br><small class="text-muted">N°: {{ item.catalog_item.part_number }}</small>{% endif %}
                         </td>
                         <td>
                             {% if item.serial_number %}<div>Serie: <strong>{{ item.serial_number }}</strong></div>{% endif %}

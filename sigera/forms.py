@@ -90,13 +90,14 @@ class ClothingBatchForm(forms.ModelForm):
     class Meta:
         model = ClothingBatch
         # available_quantity is handled in the view
-        fields = ['clothing_type', 'clothing_size', 'reception_date', 'initial_quantity', 'provider', 'purchase_order', 'unit_price']
+        fields = ['clothing_type', 'clothing_size', 'reception_date', 'initial_quantity', 'provider', 'purchase_order', 'unit_price', 'storage_location']
         widgets = {
             'clothing_size': forms.Select(),
             'reception_date': forms.DateInput(attrs={'type': 'date'}),
             'initial_quantity': forms.NumberInput(attrs={'min': '1', 'value': '1'}),
             'provider': forms.TextInput(attrs={'placeholder': 'Ej: Proveedor S.A.', 'style': 'text-transform: uppercase;'}),
             'purchase_order': forms.TextInput(attrs={'placeholder': 'N° de Remito/Factura', 'style': 'text-transform: uppercase;'}),
+            'storage_location': forms.TextInput(attrs={'placeholder': 'Ej: Estante 4, Pañol Central', 'style': 'text-transform: uppercase;'}),
         }
 
     def __init__(self, *args, **kwargs):

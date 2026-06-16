@@ -51,6 +51,7 @@ class ClothingBatch(models.Model):
     provider = models.CharField(max_length=150, blank=True, null=True, verbose_name="Proveedor")
     purchase_order = models.CharField(max_length=100, blank=True, null=True, verbose_name="Orden de Compra / Remito / Factura")
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True, verbose_name="Precio Unitario ($)")
+    storage_location = models.CharField(max_length=150, blank=True, null=True, verbose_name="Depósito / Ubicación", help_text="Ej: Estante 4, Pañol Central")
     
     class Meta:
         verbose_name = "Lote/Ingreso de Ropa"
@@ -63,6 +64,7 @@ class ClothingBatch(models.Model):
     def save(self, *args, **kwargs):
         if self.provider: self.provider = self.provider.upper()
         if self.purchase_order: self.purchase_order = self.purchase_order.upper()
+        if self.storage_location: self.storage_location = self.storage_location.upper()
         super().save(*args, **kwargs)
 
 class Personnel(models.Model):

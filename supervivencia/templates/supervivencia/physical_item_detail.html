@@ -25,7 +25,10 @@
             <div class="col-lg-4">
                 <div class="small text-muted text-uppercase">Material</div>
                 <div class="h4 mb-1">{{ item.catalog_item.nomenclature }}</div>
-                <div class="text-muted">{{ item.catalog_item.system }}</div>
+                <div class="text-muted">Sistema: <strong>{{ item.catalog_item.system }}</strong></div>
+                {% if item.catalog_item.part_number %}
+                <div class="text-muted">N° Parte: <strong>{{ item.catalog_item.part_number }}</strong></div>
+                {% endif %}
             </div>
             <div class="col-lg-3">
                 <div class="small text-muted text-uppercase">Identificacion</div>
@@ -93,7 +96,7 @@
         <div class="card border-0 shadow-sm h-100">
             <div class="card-header bg-white border-bottom py-3">
                 <h5 class="mb-0 fw-bold" style="color:#b91c1c;">
-                    <i class="fa-solid fa-link me-2"></i>Asignacion actual
+                    <i class="fa-solid fa-link me-2"></i>Montaje actual
                 </h5>
             </div>
             <div class="card-body">
@@ -107,10 +110,18 @@
                         {{ active_assignment.position|default:"-" }}
                     </div>
                     <div class="mt-2 text-muted">Montado desde {{ active_assignment.installed_at|date:"d/m/Y" }}</div>
+                    <div class="mt-3">
+                        <form method="post" action="{% url 'supervivencia:assignment_delete' active_assignment.id %}" onsubmit="return confirm('¿Seguro que desea desmontar este material del medio?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-warning text-dark">
+                                <i class="fa-solid fa-link-slash"></i> Desmontar
+                            </button>
+                        </form>
+                    </div>
                 {% else %}
-                    <div class="text-muted">Este material no tiene una asignacion activa.</div>
+                    <div class="text-muted">Este material no tiene un montaje activo.</div>
                     <a href="{% url 'supervivencia:assignment_create' %}?physical_item={{ item.id }}" class="btn btn-sm btn-outline-danger mt-3">
-                        <i class="fa-solid fa-plus me-1"></i> Asignar
+                        <i class="fa-solid fa-plus me-1"></i> Montar
                     </a>
                 {% endif %}
             </div>
@@ -155,7 +166,7 @@
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-header bg-white border-bottom py-3">
         <h5 class="mb-0 fw-bold" style="color:#495057;">
-            <i class="fa-solid fa-link me-2"></i>Asignaciones
+            <i class="fa-solid fa-link me-2"></i>Historial de montajes
         </h5>
     </div>
     <div class="card-body p-0">
@@ -191,7 +202,7 @@
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5" class="text-center text-muted py-4">No hay asignaciones registradas para este material.</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted py-4">No hay montajes registrados para este material.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

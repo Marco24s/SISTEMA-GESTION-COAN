@@ -172,7 +172,7 @@ class PyrotechnicStorageLocation(models.Model):
         ("OTRO", "Otro"),
     ]
 
-    code = models.CharField(max_length=50, unique=True, verbose_name="Destino")
+    code = models.CharField(max_length=50, verbose_name="Destino")
     name = models.CharField(max_length=150, verbose_name="Ubicacion")
     location_type = models.CharField(
         max_length=30,
@@ -191,6 +191,12 @@ class PyrotechnicStorageLocation(models.Model):
         verbose_name = "Ubicacion pirotecnica"
         verbose_name_plural = "Ubicaciones pirotecnicas"
         ordering = ["code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["code", "name", "location_type", "unit"],
+                name="unique_storage_location_combination"
+            )
+        ]
 
     def __str__(self):
         return f"{self.code} - {self.name}"

@@ -173,8 +173,8 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
             "lot_number": forms.TextInput(attrs={"placeholder": "Ej: LOTE-2026-01", "style": "text-transform: uppercase;"}),
             "lot_quantity": forms.NumberInput(attrs={"min": 1}),
             "manufacturer": forms.TextInput(attrs={"placeholder": "Fabricante", "style": "text-transform: uppercase;"}),
-            "manufacture_date": forms.DateInput(attrs={"type": "date"}),
-            "expiration_date": forms.DateInput(attrs={"type": "date"}),
+            "manufacture_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "expiration_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "current_location": forms.TextInput(attrs={"placeholder": "Pañol, polvorín, depósito o referencia actual", "style": "text-transform: uppercase;"}),
             "certificate_reference": forms.TextInput(attrs={"placeholder": "Certificado, acta o documento", "style": "text-transform: uppercase;"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
@@ -334,8 +334,8 @@ class PyrotechnicAssignmentForm(forms.ModelForm):
             "removed_at": "Fecha de retiro",
         }
         widgets = {
-            "installed_at": forms.DateInput(attrs={"type": "date"}),
-            "removed_at": forms.DateInput(attrs={"type": "date"}),
+            "installed_at": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "removed_at": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "position": forms.TextInput(attrs={"placeholder": "Ej: ALOJAMIENTO DERECHO", "style": "text-transform: uppercase;"}),
             "notes": forms.Textarea(attrs={"rows": 3, "style": "text-transform: uppercase;"}),
         }

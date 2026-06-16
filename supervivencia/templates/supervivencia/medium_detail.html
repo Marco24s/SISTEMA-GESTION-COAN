@@ -8,7 +8,7 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a href="{% url 'supervivencia:assignment_create' %}?medium={{ medium.id }}" class="btn btn-danger">
-            <i class="fa-solid fa-plus me-1"></i> Asignar material
+            <i class="fa-solid fa-plus me-1"></i> Montar material
         </a>
         <a href="{% url 'supervivencia:medium_update' medium.id %}" class="btn btn-outline-danger">
             <i class="fa-solid fa-pen-to-square me-1"></i> Editar medio
@@ -125,10 +125,10 @@
                             <a href="{% url 'supervivencia:assignment_update' assignment.id %}" class="btn btn-sm btn-outline-danger" title="Editar">
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <form method="post" action="{% url 'supervivencia:assignment_delete' assignment.id %}" class="d-inline" onsubmit="return confirm('Retirar esta asignacion?');">
+                            <form method="post" action="{% url 'supervivencia:assignment_delete' assignment.id %}" class="d-inline" onsubmit="return confirm('¿Seguro que desea desmontar este material del medio?');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Retirar">
-                                    <i class="fa-solid fa-ban"></i>
+                                <button type="submit" class="btn btn-sm btn-warning text-dark" title="Desmontar">
+                                    <i class="fa-solid fa-link-slash"></i> Desmontar
                                 </button>
                             </form>
                         </td>
@@ -146,7 +146,7 @@
 <div class="card shadow-sm border-0 mb-5">
     <div class="card-header bg-white border-bottom py-3">
         <h5 class="mb-0 fw-bold" style="color:#495057;">
-            <i class="fa-solid fa-clock-rotate-left me-2"></i>Asignaciones retiradas
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>Desmontajes (historial)
         </h5>
     </div>
     <div class="card-body p-0">

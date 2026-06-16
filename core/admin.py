@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from .models import (
     CustomUser, 
     Unit, 
@@ -25,7 +26,17 @@ class UserSystemPINAdmin(admin.ModelAdmin):
             obj.pin_hash = make_password(obj.pin_hash)
         super().save_model(request, obj, form, change)
 
+class CustomUserChangeForm(UserChangeForm):
+    class Meta(UserChangeForm.Meta):
+        model = CustomUser
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = CustomUser
+
 class CustomUserAdmin(UserAdmin):
+    form = CustomUserChangeForm
+    add_form = CustomUserCreationForm
     model = CustomUser
     list_display = ['username', 'email', 'unit', 'is_staff']
     
