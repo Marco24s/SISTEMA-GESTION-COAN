@@ -43,7 +43,11 @@ class CustomUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ('Asignación de Unidad', {'fields': ('unit',)}),
     )
-    add_fieldsets = UserAdmin.add_fieldsets + (
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'password1', 'password2'),
+        }),
         ('Asignación de Unidad', {'fields': ('unit',)}),
     )
 

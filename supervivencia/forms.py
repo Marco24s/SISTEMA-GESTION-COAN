@@ -183,6 +183,9 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["catalog_item"].queryset = PyrotechnicCatalogItem.objects.filter(is_active=True).order_by("nomenclature")
+        self.fields["catalog_item"].label_from_instance = lambda obj: (
+            f"{obj.nomenclature} | N/P: {obj.part_number or '-'} | NSN: {obj.nsn or '-'}"
+        )
         self.fields["current_storage_location"].queryset = PyrotechnicStorageLocation.objects.filter(is_active=True).order_by("code")
         self.fields["serial_number"].required = False
         self.fields["lot_number"].required = False

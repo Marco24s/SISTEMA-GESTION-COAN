@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.urls import reverse
@@ -55,12 +56,12 @@ class SurvivalMedium(models.Model):
 class PyrotechnicCatalogItem(models.Model):
     nomenclature = models.CharField(max_length=150, verbose_name="Nomenclatura")
     system = models.CharField(max_length=150, verbose_name="Sistema")
-    part_number = models.CharField(max_length=80, unique=True, blank=True, null=True, verbose_name="N° / Parte")
-    nsn = models.CharField(max_length=80, blank=True, null=True, verbose_name="N.S.N")
+    part_number = models.CharField(max_length=80, blank=True, default="", verbose_name="N° / Parte")
+    nsn = models.CharField(max_length=80, blank=True, default="", verbose_name="N.S.N")
     alternate_part_number = models.CharField(
         max_length=120,
         blank=True,
-        null=True,
+        default="",
         verbose_name="Numero de parte alternativo",
     )
     theoretical_life_months = models.PositiveIntegerField(
@@ -77,30 +78,44 @@ class PyrotechnicCatalogItem(models.Model):
         verbose_name = "Elemento de pirotecnia"
         verbose_name_plural = "Catalogo de pirotecnia"
         ordering = ["nomenclature"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("nomenclature", "system", "part_number", "nsn", "alternate_part_number"),
+                name="unique_pyrotechnic_catalog_identity",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.nomenclature} - {self.system}"
 
     def clean(self):
         super().clean()
-        if self.part_number:
-            self.part_number = self.part_number.upper().strip()
-        else:
-            self.part_number = None
+        self.nomenclature = (self.nomenclature or "").upper().strip()
+        self.system = (self.system or "").upper().strip()
+        self.part_number = (self.part_number or "").upper().strip()
+        self.nsn = (self.nsn or "").upper().strip()
+        self.alternate_part_number = (self.alternate_part_number or "").upper().strip()
+
+        duplicate = PyrotechnicCatalogItem.objects.filter(
+            nomenclature=self.nomenclature,
+            system=self.system,
+            part_number=self.part_number,
+            nsn=self.nsn,
+            alternate_part_number=self.alternate_part_number,
+        ).exclude(pk=self.pk)
+        if duplicate.exists():
+            raise ValidationError(
+                "Ya existe un elemento de pirotecnia con la misma combinacion de nomenclatura, sistema, numero de parte, NSN y numero de parte alternativo."
+            )
 
     def save(self, *args, **kwargs):
         if self.nomenclature:
             self.nomenclature = self.nomenclature.upper().strip()
         if self.system:
             self.system = self.system.upper().strip()
-        if self.part_number:
-            self.part_number = self.part_number.upper().strip()
-        else:
-            self.part_number = None
-        if self.nsn:
-            self.nsn = self.nsn.upper().strip()
-        if self.alternate_part_number:
-            self.alternate_part_number = self.alternate_part_number.upper().strip()
+        self.part_number = (self.part_number or "").upper().strip()
+        self.nsn = (self.nsn or "").upper().strip()
+        self.alternate_part_number = (self.alternate_part_number or "").upper().strip()
         if self.description:
             self.description = self.description.upper().strip()
         super().save(*args, **kwargs)
