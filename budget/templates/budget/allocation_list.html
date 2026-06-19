@@ -1,5 +1,5 @@
 {% extends "budget/base_budget.html" %}
-{% load l10n %}
+{% load l10n budget_tags %}
 
 {% block budget_content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -81,11 +81,13 @@
                                     {% endfor %}
                                 </div>
                                 <div class="mt-2 small">
-                                    <span class="fw-bold text-dark">FF{{ alloc.credit.ff.code }} - {{ alloc.credit.subprog.code }}</span>
-                                    <span class="text-muted">{{ alloc.credit.programa.code }}</span>
-                                    <span class="mx-2 text-muted">|</span>
-                                    <span class="fw-semibold">{{ alloc.credit.pre_inc.code|default:"00" }}</span>
-                                    <span class="text-muted">({{ alloc.credit.pp_inc.code|default:"0" }}-{{ alloc.credit.ppp_inc.code|default:"0" }})</span>
+                                    <span class="fw-bold text-dark" title="FF / Programa / Subprograma / Inciso / Ppal.">
+                                        FF{{ alloc.credit.ff.code|ff_number|default:"-" }} -
+                                        {{ alloc.credit.programa.code|default:"-" }} -
+                                        {{ alloc.credit.subprog.code|default:"-" }} -
+                                        INC {{ alloc.credit.inc.code|default:"-" }} -
+                                        {{ alloc.credit.ppp_inc.code|default:"-" }}
+                                    </span>
                                 </div>
                                 <div class="allocation-mobile-amounts mt-2">
                                     <span class="amount-chip assigned-chip">

@@ -294,21 +294,27 @@
                         </div>
                     </td>
                     <td class="text-end">
-                        <div class="btn-group">
+                        <div class="d-flex justify-content-end gap-1">
                             <a href="{% url 'budget:execution_commitment' %}?allocation={{ alloc.id }}" class="btn btn-sm btn-outline-warning" title="Registrar Gasto">
                                 <i class="fa-solid fa-file-invoice-dollar"></i>
                             </a>
-                            {% if is_admin %}
-                            <a href="{% url 'budget:allocation_update' alloc.id %}" class="btn btn-sm btn-outline-info" title="Editar Distribución">
-                                <i class="fa-solid fa-pen"></i>
-                            </a>
+                            {% if user.is_superuser %}
+                            <form method="post"
+                                  action="{% url 'budget:allocation_delete' alloc.id %}"
+                                  onsubmit="return confirm('¿Eliminar la distribución de {{ alloc.unit.name|escapejs }}? Esta acción no se puede deshacer.');">
+                                {% csrf_token %}
+                                <input type="hidden" name="return_credit_id" value="{{ credit.id }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar distribución" aria-label="Eliminar distribución de {{ alloc.unit.name }}">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
                             {% endif %}
                         </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center py-4 text-muted small">
+                    <td colspan="9" class="text-center py-4 text-muted small">
                         Aún no se han realizado distribuciones de este crédito a ninguna unidad.
                     </td>
                 </tr>

@@ -87,6 +87,8 @@
                     <td class="text-center">
                         {% if comp.status == 'PENDIENTE' %}
                             <span class="badge bg-warning text-dark rounded-pill">PENDIENTE</span>
+                        {% elif comp.status == 'APROBADO' %}
+                            <span class="badge bg-info text-dark rounded-pill">APROBADO</span>
                         {% elif comp.status == 'EJECUTADO' %}
                             <span class="badge bg-success rounded-pill">EJECUTADO</span>
                         {% elif comp.status == 'RECHAZADO' %}
@@ -97,9 +99,29 @@
                     </td>
                     <td class="text-end pe-4">
                         {% if comp.status == 'PENDIENTE' %}
-                        <a href="{% url 'budget:compensacion_approve' comp.id %}" class="btn btn-sm btn-outline-success rounded-pill px-3">
-                            <i class="fa-solid fa-check-double me-1"></i> Aprobar y Ejecutar
-                        </a>
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'budget:compensacion_approve' comp.id %}" class="btn btn-sm btn-outline-success rounded-pill px-3">
+                                <i class="fa-solid fa-check me-1"></i> Aprobar
+                            </a>
+                            <form method="post" action="{% url 'budget:compensacion_reject' comp.id %}" onsubmit="return confirm('¿Rechazar esta compensacion?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                    <i class="fa-solid fa-xmark me-1"></i> Rechazar
+                                </button>
+                            </form>
+                        </div>
+                        {% elif comp.status == 'APROBADO' %}
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'budget:compensacion_execute' comp.id %}" class="btn btn-sm btn-success rounded-pill px-3">
+                                <i class="fa-solid fa-play me-1"></i> Ejecutar
+                            </a>
+                            <form method="post" action="{% url 'budget:compensacion_reject' comp.id %}" onsubmit="return confirm('¿Rechazar esta compensacion aprobada?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                    <i class="fa-solid fa-xmark me-1"></i> Rechazar
+                                </button>
+                            </form>
+                        </div>
                         {% else %}
                         <span class="text-muted small">Sin acciones</span>
                         {% endif %}

@@ -60,4 +60,6 @@ urlpatterns = [
     path('compensaciones/', views.compensacion_list, name='compensacion_list'),
     path('compensaciones/create/', views.compensacion_create, name='compensacion_create'),
     path('compensaciones/<int:pk>/approve/', views.compensacion_approve, name='compensacion_approve'),
+    path('compensaciones/<int:pk>/execute/', views.compensacion_execute, name='compensacion_execute'),
+    path('compensaciones/<int:pk>/reject/', views.compensacion_reject, name='compensacion_reject'),
 ]

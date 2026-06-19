@@ -14,7 +14,7 @@ from .models import (
 import csv
 from django.http import HttpResponse
 from .forms import (
-    BudgetFiscalYearForm, BudgetCreditForm, BudgetAllocationForm,
+    BudgetFiscalYearForm, BudgetCreditForm, BudgetAllocationForm, BudgetAllocationMetadataForm,
     BudgetExecutionCommitmentForm, BudgetExecutionAccrualForm, 
     BudgetExecutionPaymentForm, BudgetClassificationForm, BudgetClassificationAssignForm,
     BudgetCompensacionForm, BudgetFFForm, BudgetSubprogForm, BudgetProgForm,
@@ -415,7 +415,10 @@ def credit_list(request):
     fiscal_year = _get_fiscal_year_from_request(request)
     years = BudgetFiscalYear.objects.all().order_by('-year')
 
-    base_qs = BudgetCredit.objects.all()
+    base_qs = BudgetCredit.objects.select_related(
+        'fiscal_year', 'ff', 'programa', 'subprog', 'inc',
+        'ppp_inc', 'pp_inc', 'pre_inc', 'incisos_agrupado', 'credit_type',
+    )
     if fiscal_year:
         base_qs = base_qs.filter(fiscal_year=fiscal_year)
     
@@ -586,8 +589,6 @@ def compensacion_create(request):
                     form.cleaned_data['q3_amount'], form.cleaned_data['q4_amount']
                 )
                 services.request_compensacion(
-                    fiscal_year=form.cleaned_data['fiscal_year'],
-                    programa=form.cleaned_data['programa'],
                     source_credit=form.cleaned_data['source_credit'],
                     target_params=target_params,
                     q_amounts=q_amounts,
@@ -607,9 +608,6 @@ def compensacion_create(request):
                 from .models import BudgetCredit
                 sc = BudgetCredit.objects.get(pk=source_credit_id)
                 initial['source_credit'] = sc.pk
-                initial['fiscal_year'] = sc.fiscal_year.pk if sc.fiscal_year else None
-                initial['programa'] = sc.programa.pk if sc.programa else None
-                
                 # Pre-completar los campos de destino con los del origen
                 initial['target_ff'] = sc.ff.pk if sc.ff else None
                 initial['target_subprog'] = sc.subprog.pk if sc.subprog else None
@@ -628,13 +626,46 @@ def compensacion_approve(request, pk):
     compensacion = get_object_or_404(BudgetCompensacion, pk=pk)
     if request.method == 'POST':
         try:
-            services.execute_compensacion(compensacion.id, request.user)
-            messages.success(request, f"Compensación #{compensacion.id} ejecutada con éxito.")
+            services.approve_compensacion(compensacion.id, request.user)
+            messages.success(request, f"Compensacion #{compensacion.id} aprobada. Ya puede ejecutarse.")
         except Exception as e:
             error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
             messages.error(request, f"Error: {error_msg}")
         return redirect('budget:compensacion_list')
-    return render(request, 'budget/compensacion_confirm.html', {'compensacion': compensacion})
+    return render(request, 'budget/compensacion_confirm.html', {
+        'compensacion': compensacion,
+        'confirmation_action': 'approve',
+    })
+
+
+def compensacion_execute(request, pk):
+    if not is_admin(request.user): return redirect('budget:dashboard')
+    compensacion = get_object_or_404(BudgetCompensacion, pk=pk)
+    if request.method == 'POST':
+        try:
+            services.execute_compensacion(compensacion.id, request.user)
+            messages.success(request, f"Compensacion #{compensacion.id} ejecutada con exito.")
+        except Exception as e:
+            error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+            messages.error(request, f"Error: {error_msg}")
+        return redirect('budget:compensacion_list')
+    return render(request, 'budget/compensacion_confirm.html', {
+        'compensacion': compensacion,
+        'confirmation_action': 'execute',
+    })
+
+
+def compensacion_reject(request, pk):
+    if not is_admin(request.user): return redirect('budget:dashboard')
+    if request.method != 'POST':
+        return redirect('budget:compensacion_list')
+    try:
+        services.reject_compensacion(pk)
+        messages.success(request, f"Compensacion #{pk} rechazada.")
+    except Exception as e:
+        error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+        messages.error(request, f"Error: {error_msg}")
+    return redirect('budget:compensacion_list')
 
 def credit_create(request):
     if not is_admin(request.user): return redirect('budget:credit_list')
@@ -887,38 +918,27 @@ def allocation_update(request, pk):
     allocation = get_object_or_404(BudgetAllocation, pk=pk)
     
     if request.method == 'POST':
-        form = BudgetAllocationForm(request.POST, instance=allocation)
-        # Permitimos la validación usando todos los créditos
-        form.fields['credit'].queryset = BudgetCredit.objects.all()
-        
+        form = BudgetAllocationMetadataForm(request.POST, instance=allocation)
         if form.is_valid():
             try:
-                services.update_allocation(
+                services.update_allocation_metadata(
                     allocation_id=allocation.pk,
-                    q1=form.cleaned_data['q1_amount'],
-                    q2=form.cleaned_data['q2_amount'],
-                    q3=form.cleaned_data['q3_amount'],
-                    q4=form.cleaned_data['q4_amount'],
                     notes=form.cleaned_data['notes'],
                     classifications=form.cleaned_data.get('custom_classes')
                 )
-                messages.success(request, f"Distribución para {allocation.unit.name} actualizada.")
+                messages.success(request, f"Proyecto/plan y observaciones de {allocation.unit.name} actualizados.")
                 return redirect('budget:credit_detail', pk=allocation.credit.pk)
             except Exception as e:
                 error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
                 messages.error(request, f"Error: {error_msg}")
     else:
-        form = BudgetAllocationForm(instance=allocation)
-        # Aseguramos que el crédito actual esté en el queryset para que no de error
-        form.fields['credit'].queryset = BudgetCredit.objects.all()
-        
-    # Ocultamos el campo en el formulario y usamos el diseño estético de 'fixed_credit'
-    form.fields['credit'].widget = forms.HiddenInput()
+        form = BudgetAllocationMetadataForm(instance=allocation)
         
     return render(request, 'budget/form_base.html', {
         'form': form, 
-        'title': f'Editar Distribución: {allocation.unit.name}',
-        'fixed_credit': allocation.credit
+        'title': f'Editar proyecto y observaciones: {allocation.unit.name}',
+        'fixed_credit': allocation.credit,
+        'help_text': 'Los montos, la unidad de destino y el credito de origen no pueden modificarse desde esta accion.',
     })
 
 def allocation_delete(request, pk):
@@ -927,15 +947,21 @@ def allocation_delete(request, pk):
         return redirect('budget:allocation_list')
     
     allocation = get_object_or_404(BudgetAllocation, pk=pk)
+
+    def deletion_redirect():
+        return_credit_id = request.POST.get('return_credit_id')
+        if return_credit_id and str(allocation.credit_id) == return_credit_id:
+            return redirect('budget:credit_detail', pk=allocation.credit_id)
+        return redirect('budget:allocation_list')
     
     if request.method == 'POST':
         try:
             allocation.delete()
             messages.success(request, "Distribución de crédito eliminada exitosamente.")
-            return redirect('budget:allocation_list')
+            return deletion_redirect()
         except ProtectedError:
             messages.error(request, "No se puede eliminar esta distribución porque ya tiene gastos (ejecuciones) registrados. Debe eliminar los gastos asociados primero.")
-            return redirect('budget:allocation_list')
+            return deletion_redirect()
         
     return render(request, 'budget/confirm_delete.html', {
         'object': allocation,

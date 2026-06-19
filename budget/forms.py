@@ -145,6 +145,23 @@ class BudgetAllocationForm(forms.ModelForm):
         self.fields['custom_classes'].widget.attrs.update({'class': 'select2-multi'})
         self.fields['custom_classes'].help_text = "Opcional. Si todavia no tiene una asociacion, puede dejarlo sin seleccionar."
 
+
+class BudgetAllocationMetadataForm(forms.ModelForm):
+    class Meta:
+        model = BudgetAllocation
+        fields = ['custom_classes', 'notes']
+        labels = {
+            'custom_classes': 'Vincular a Proyecto / Plan de Gasto',
+            'notes': 'Observaciones',
+        }
+        widgets = {'notes': forms.Textarea(attrs={'rows': 4})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['custom_classes'].required = False
+        self.fields['custom_classes'].widget.attrs.update({'class': 'select2-multi'})
+        self.fields['custom_classes'].help_text = "Opcional. Puede vincular uno o varios proyectos, o dejar la distribucion sin proyecto."
+
 class AllocationChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
         available = obj.available_amount
@@ -292,7 +309,7 @@ class BudgetCompensacionForm(forms.ModelForm):
     class Meta:
         model = BudgetCompensacion
         fields = [
-            'fiscal_year', 'programa', 'source_credit',
+            'source_credit',
             'target_ff', 'target_subprog', 'target_inc', 'target_ppp_inc', 
             'target_pp_inc', 'target_pre_inc', 'target_incisos_agrupado',
             'q1_amount', 'q2_amount', 'q3_amount', 'q4_amount', 'notes'
@@ -307,9 +324,14 @@ class BudgetCompensacionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['source_credit'].queryset = BudgetCredit.objects.filter(total_amount__gt=0).order_by('programa__code', 'ff__code')
+        self.fields['source_credit'].queryset = BudgetCredit.objects.filter(
+            total_amount__gt=0,
+            fiscal_year__status='OPEN',
+        ).select_related('fiscal_year', 'programa').order_by('-fiscal_year__year', 'programa__code', 'ff__code')
         self.fields['source_credit'].label = "Crédito de Origen (AA.PP.)"
-        self.fields['programa'].help_text = "La compensación solo se permite entre partidas del mismo programa."
+        self.fields['source_credit'].help_text = "El ejercicio, programa y tipo de credito se toman automaticamente del origen."
+        for field_name in ('q1_amount', 'q2_amount', 'q3_amount', 'q4_amount'):
+            self.fields[field_name].min_value = 0
 
 
 class BudgetCreditAdjustmentForm(forms.Form):

@@ -49,10 +49,12 @@
                                 <input class="form-check-input" type="checkbox" id="select-all">
                             </div>
                         </th>
-                        <th style="width: 80px;">FF</th>
-                        <th>SUBPROG</th>
-                        <th>ACT. GENERAL</th>
-                        <th>INC-PPAL (SUBPC)</th>
+                        <th class="text-center">FF</th>
+                        <th class="text-center">Programa</th>
+                        <th class="text-center">Subprograma</th>
+                        <th class="text-center">Inciso</th>
+                        <th class="text-center">Ppal.</th>
+                        <th class="text-center">SUBPC</th>
                         <th class="text-end">{% if is_admin %}Monto Total{% else %}Monto Asignado{% endif %}</th>
                         <th class="text-center">Tipo</th>
                         <th class="text-end pe-4">Acciones</th>
@@ -66,17 +68,23 @@
                                 <input class="form-check-input select-item" type="checkbox" name="selected_ids" value="{{ credit.id }}">
                             </div>
                         </td>
-                        <td>
-                            <span class="badge bg-secondary-subtle text-secondary px-2 py-1">{{ credit.ff.code }}</span>
+                        <td class="text-center">
+                            <span class="fw-bold" title="{{ credit.ff.name|default:'Fuente de financiamiento' }}">{{ credit.ff.code|ff_number|default:"-" }}</span>
                         </td>
-                        <td><span class="fw-bold">{{ credit.subprog.code }}</span></td>
-                        <td style="max-width: 200px;">
-                            <div class="text-truncate fw-semibold" title="{{ credit.programa.name }}" style="font-size: 0.8rem;">{{ credit.programa.name }}</div>
-                            <small class="text-muted" style="font-size: 0.7rem;">{{ credit.ppp_inc.code }} / {{ credit.pp_inc.code }}</small>
+                        <td class="text-center">
+                            <span class="fw-bold" title="{{ credit.programa.name|default:'Programa' }}">{{ credit.programa.code|default:"-" }}</span>
                         </td>
-                        <td>
-                            <div class="fw-bold text-primary">{{ credit.pre_inc.code|default:"00" }}</div>
-                            <small class="text-muted" style="font-size: 0.7rem;">({{ credit.pp_inc.code|default:"0" }}-{{ credit.ppp_inc.code|default:"0" }})</small>
+                        <td class="text-center">
+                            <span class="fw-bold" title="{{ credit.subprog.name|default:'Subprograma' }}">{{ credit.subprog.code|default:"-" }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="fw-bold" title="{{ credit.inc.name|default:'Inciso' }}">{{ credit.inc.code|default:"-" }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="fw-bold" title="{{ credit.ppp_inc.name|default:'Partida principal' }}">{{ credit.ppp_inc.code|default:"-" }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="fw-bold" title="{{ credit.pre_inc.name|default:'Subpartida' }}">{{ credit.pre_inc.code|default:"-" }}</span>
                         </td>
                         <td class="text-end" style="width: 220px;">
                             <div class="fw-bold text-dark mb-1">
@@ -106,17 +114,9 @@
                         </td>
                         <td class="text-end pe-4" style="width: 100px;">
                             <div class="btn-group">
-                                <a href="{% url 'budget:allocation_create' %}?credit={{ credit.id }}" class="btn btn-sm btn-outline-success px-2 me-1" title="Distribuir a Unidad">
-                                    <i class="fa-solid fa-share-nodes"></i>
-                                </a>
                                 <a href="{% url 'budget:credit_detail' credit.id %}" class="btn btn-sm btn-outline-secondary px-2" title="Ver Detalles">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
-                                {% if credit.credit_type %}
-                                <a href="{% url 'budget:credit_unassign_type' credit.id %}" class="btn btn-sm btn-outline-warning rounded-pill px-2 me-1" title="Desasignar Tipo">
-                                    <i class="fa-solid fa-link-slash"></i>
-                                </a>
-                                {% endif %}
                                 {% if user.is_superuser %}
                                 <a href="{% url 'budget:credit_delete' credit.id %}" class="btn btn-sm btn-outline-danger rounded-pill px-2" title="Eliminar Crédito">
                                     <i class="fa-solid fa-trash"></i>
@@ -127,7 +127,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-5">
+                        <td colspan="10" class="text-center py-5">
                             <div class="text-muted">
                                 <i class="fa-solid fa-folder-open fa-3x mb-3 d-block opacity-25"></i>
                                 No hay créditos registrados para este ejercicio.

@@ -2,6 +2,15 @@ from django import template
 
 register = template.Library()
 
+
+@register.filter
+def ff_number(value):
+    """Muestra el codigo de fuente sin el prefijo FF."""
+    code = str(value or '').strip()
+    if code.upper().startswith('FF'):
+        return code[2:]
+    return code
+
 @register.filter
 def credit_type_badge_color(credit_type_code):
     """

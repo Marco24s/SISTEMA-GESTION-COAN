@@ -2,6 +2,7 @@ from django.db import transaction, IntegrityError
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.db.models import Sum, F
+from decimal import Decimal
 from .models import (
     BudgetFiscalYear, BudgetFF, BudgetSubprog, BudgetProg,
     BudgetPPPInc, BudgetPPInc, BudgetPreInc, BudgetIncisosAgrupado,
@@ -42,20 +43,23 @@ def allocate_credit(credit, unit, q1=0, q2=0, q3=0, q4=0, notes="", classificati
     if amount <= 0:
         raise ValidationError("El monto total a distribuir debe ser mayor a cero.")
 
+    credit = BudgetCredit.objects.select_for_update().get(pk=credit.pk)
+    reserved_q1, reserved_q2, reserved_q3, reserved_q4 = _compensation_reserved_by_quarter(credit)
+
     # Validaciones contra el crédito de origen por cada trimestre
     allocated_q1 = credit.allocations.aggregate(Sum('q1_amount'))['q1_amount__sum'] or 0
     allocated_q2 = credit.allocations.aggregate(Sum('q2_amount'))['q2_amount__sum'] or 0
     allocated_q3 = credit.allocations.aggregate(Sum('q3_amount'))['q3_amount__sum'] or 0
     allocated_q4 = credit.allocations.aggregate(Sum('q4_amount'))['q4_amount__sum'] or 0
 
-    if allocated_q1 + q1 > credit.q1_amount:
-        raise ValidationError(f"La distribución en T1 (${q1}) supera el disponible del crédito (${credit.q1_amount - allocated_q1}).")
-    if allocated_q2 + q2 > credit.q2_amount:
-        raise ValidationError(f"La distribución en T2 (${q2}) supera el disponible del crédito (${credit.q2_amount - allocated_q2}).")
-    if allocated_q3 + q3 > credit.q3_amount:
-        raise ValidationError(f"La distribución en T3 (${q3}) supera el disponible del crédito (${credit.q3_amount - allocated_q3}).")
-    if allocated_q4 + q4 > credit.q4_amount:
-        raise ValidationError(f"La distribución en T4 (${q4}) supera el disponible del crédito (${credit.q4_amount - allocated_q4}).")
+    if allocated_q1 + reserved_q1 + q1 > credit.q1_amount:
+        raise ValidationError(f"La distribucion en T1 (${q1}) supera el disponible real (${credit.q1_amount - allocated_q1 - reserved_q1}).")
+    if allocated_q2 + reserved_q2 + q2 > credit.q2_amount:
+        raise ValidationError(f"La distribucion en T2 (${q2}) supera el disponible real (${credit.q2_amount - allocated_q2 - reserved_q2}).")
+    if allocated_q3 + reserved_q3 + q3 > credit.q3_amount:
+        raise ValidationError(f"La distribucion en T3 (${q3}) supera el disponible real (${credit.q3_amount - allocated_q3 - reserved_q3}).")
+    if allocated_q4 + reserved_q4 + q4 > credit.q4_amount:
+        raise ValidationError(f"La distribucion en T4 (${q4}) supera el disponible real (${credit.q4_amount - allocated_q4 - reserved_q4}).")
     
     allocation = BudgetAllocation.objects.create(
         credit=credit, unit=unit, 
@@ -317,53 +321,175 @@ def unassign_credit_type(credit, unassign_amount, user, notes=""):
     
     return credit
 
-@transaction.atomic
-def request_compensacion(fiscal_year, programa, source_credit, target_params, q_amounts, user, notes=""):
-    """
-    Crea una solicitud de compensación validando fondos disponibles.
-    """
-    if source_credit.programa != programa:
-        raise ValidationError("El crédito de origen no pertenece al programa seleccionado.")
-    
-    q1, q2, q3, q4 = q_amounts
-    if q1 > source_credit.q1_amount or q2 > source_credit.q2_amount or q3 > source_credit.q3_amount or q4 > source_credit.q4_amount:
-        raise ValidationError("Fondos insuficientes en uno o más trimestres del crédito de origen.")
-    
-    return BudgetCompensacion.objects.create(
-        fiscal_year=fiscal_year,
-        programa=programa,
+COMPENSATION_ACTIVE_STATUSES = ('PENDIENTE', 'APROBADO')
+QUARTER_FIELDS = ('q1_amount', 'q2_amount', 'q3_amount', 'q4_amount')
+
+
+def _target_params_from_compensation(comp):
+    return {
+        'target_ff': comp.target_ff,
+        'target_subprog': comp.target_subprog,
+        'target_inc': comp.target_inc,
+        'target_ppp_inc': comp.target_ppp_inc,
+        'target_pp_inc': comp.target_pp_inc,
+        'target_pre_inc': comp.target_pre_inc,
+        'target_incisos_agrupado': comp.target_incisos_agrupado,
+    }
+
+
+def _compensation_reserved_by_quarter(source_credit, exclude_compensation_id=None):
+    reservations = BudgetCompensacion.objects.filter(
         source_credit=source_credit,
-        **target_params,
-        q1_amount=q1, q2_amount=q2, q3_amount=q3, q4_amount=q4,
-        requested_by=user,
-        notes=notes
+        status__in=COMPENSATION_ACTIVE_STATUSES,
     )
+    if exclude_compensation_id:
+        reservations = reservations.exclude(pk=exclude_compensation_id)
+    reserved = reservations.aggregate(
+        q1=Sum('q1_amount'), q2=Sum('q2_amount'),
+        q3=Sum('q3_amount'), q4=Sum('q4_amount'),
+    )
+    return tuple((reserved[f'q{index}'] or Decimal('0')) for index in range(1, 5))
+
+
+def _compensation_available_by_quarter(source_credit, exclude_compensation_id=None):
+    allocated = source_credit.allocations.aggregate(
+        q1=Sum('q1_amount'), q2=Sum('q2_amount'),
+        q3=Sum('q3_amount'), q4=Sum('q4_amount'),
+    )
+    reserved = _compensation_reserved_by_quarter(source_credit, exclude_compensation_id)
+
+    return tuple(
+        max(
+            getattr(source_credit, field)
+            - (allocated[f'q{index}'] or Decimal('0'))
+            - reserved[index - 1],
+            Decimal('0'),
+        )
+        for index, field in enumerate(QUARTER_FIELDS, start=1)
+    )
+
+
+def _validate_compensation(source_credit, target_params, q_amounts, exclude_compensation_id=None):
+    if source_credit.fiscal_year.status == 'CLOSED':
+        raise ValidationError("No se puede compensar credito de un ejercicio cerrado.")
+    if source_credit.programa is None:
+        raise ValidationError("El credito de origen no tiene un programa asociado.")
+
+    amounts = tuple(Decimal(str(value or 0)) for value in q_amounts)
+    if any(value < 0 for value in amounts):
+        raise ValidationError("Los montos trimestrales no pueden ser negativos.")
+    if not any(value > 0 for value in amounts):
+        raise ValidationError("Debe ingresar un monto mayor a cero en al menos un trimestre.")
+
+    target_identity = (
+        target_params['target_ff'].pk,
+        source_credit.programa_id,
+        target_params['target_subprog'].pk,
+        target_params['target_inc'].pk,
+        target_params['target_ppp_inc'].pk if target_params.get('target_ppp_inc') else None,
+        target_params['target_pp_inc'].pk if target_params.get('target_pp_inc') else None,
+        target_params['target_pre_inc'].pk if target_params.get('target_pre_inc') else None,
+        target_params['target_incisos_agrupado'].pk,
+    )
+    source_identity = (
+        source_credit.ff_id,
+        source_credit.programa_id,
+        source_credit.subprog_id,
+        source_credit.inc_id,
+        source_credit.ppp_inc_id,
+        source_credit.pp_inc_id,
+        source_credit.pre_inc_id,
+        source_credit.incisos_agrupado_id,
+    )
+    if target_identity == source_identity:
+        raise ValidationError("La partida de destino debe ser diferente de la partida de origen.")
+
+    available = _compensation_available_by_quarter(source_credit, exclude_compensation_id)
+    errors = []
+    for index, (requested, remaining) in enumerate(zip(amounts, available), start=1):
+        if requested > remaining:
+            errors.append(
+                f"T{index}: intenta compensar ${requested}, pero solo hay ${remaining} "
+                "sin distribuir."
+            )
+    if errors:
+        raise ValidationError([
+            "No se puede realizar la compensacion porque el monto solicitado ya esta "
+            "distribuido, reservado o supera el saldo disponible."
+        ] + errors)
+    return amounts
+
+
+@transaction.atomic
+def request_compensacion(source_credit, target_params, q_amounts, user, notes=""):
+    """Crea una solicitud y reserva saldo no distribuido del credito origen."""
+    source = BudgetCredit.objects.select_for_update().get(pk=source_credit.pk)
+    amounts = _validate_compensation(source, target_params, q_amounts)
+    return BudgetCompensacion.objects.create(
+        fiscal_year=source.fiscal_year,
+        programa=source.programa,
+        source_credit=source,
+        **target_params,
+        q1_amount=amounts[0], q2_amount=amounts[1],
+        q3_amount=amounts[2], q4_amount=amounts[3],
+        requested_by=user,
+        notes=notes,
+    )
+
+
+@transaction.atomic
+def approve_compensacion(compensacion_id, user):
+    """Aprueba una solicitud sin mover fondos."""
+    comp = BudgetCompensacion.objects.select_for_update().get(pk=compensacion_id)
+    if comp.status != 'PENDIENTE':
+        raise ValidationError("Solo se pueden aprobar compensaciones pendientes.")
+    source = BudgetCredit.objects.select_for_update().get(pk=comp.source_credit_id)
+    _validate_compensation(
+        source,
+        _target_params_from_compensation(comp),
+        (comp.q1_amount, comp.q2_amount, comp.q3_amount, comp.q4_amount),
+        exclude_compensation_id=comp.pk,
+    )
+    comp.status = 'APROBADO'
+    comp.approved_by = user
+    comp.save(update_fields=['status', 'approved_by', 'updated_at'])
+    return comp
+
+
+@transaction.atomic
+def reject_compensacion(compensacion_id):
+    """Rechaza una solicitud y libera el saldo reservado."""
+    comp = BudgetCompensacion.objects.select_for_update().get(pk=compensacion_id)
+    if comp.status not in COMPENSATION_ACTIVE_STATUSES:
+        raise ValidationError("Esta compensacion ya fue procesada.")
+    comp.status = 'RECHAZADO'
+    comp.save(update_fields=['status', 'updated_at'])
+    return comp
+
 
 @transaction.atomic
 def execute_compensacion(compensacion_id, user):
-    """
-    Ejecuta el movimiento de fondos de forma atómica.
-    """
+    """Revalida y ejecuta una compensacion previamente aprobada."""
     comp = BudgetCompensacion.objects.select_for_update().get(pk=compensacion_id)
-    
-    if comp.status != 'PENDIENTE':
-        raise ValidationError("Esta compensación ya ha sido procesada o ejecutada.")
-    
-    source = comp.source_credit
-    
-    # 1. Restar de origen
-    source.q1_amount -= comp.q1_amount
-    source.q2_amount -= comp.q2_amount
-    source.q3_amount -= comp.q3_amount
-    source.q4_amount -= comp.q4_amount
+    if comp.status != 'APROBADO':
+        raise ValidationError("La compensacion debe estar aprobada antes de ejecutarse.")
+    source = BudgetCredit.objects.select_for_update().get(pk=comp.source_credit_id)
+    amounts = _validate_compensation(
+        source,
+        _target_params_from_compensation(comp),
+        (comp.q1_amount, comp.q2_amount, comp.q3_amount, comp.q4_amount),
+        exclude_compensation_id=comp.pk,
+    )
+
+    for field, amount in zip(QUARTER_FIELDS, amounts):
+        setattr(source, field, getattr(source, field) - amount)
     source.save()
-    
-    # 2. Buscar o crear destino (tomamos el más reciente si hay varios)
-    target = BudgetCredit.objects.filter(
-        fiscal_year=comp.fiscal_year,
+
+    target = BudgetCredit.objects.select_for_update().filter(
+        fiscal_year=source.fiscal_year,
         credit_type=source.credit_type,
         ff=comp.target_ff,
-        programa=comp.programa,
+        programa=source.programa,
         subprog=comp.target_subprog,
         inc=comp.target_inc,
         ppp_inc=comp.target_ppp_inc,
@@ -371,13 +497,12 @@ def execute_compensacion(compensacion_id, user):
         pre_inc=comp.target_pre_inc,
         incisos_agrupado=comp.target_incisos_agrupado,
     ).first()
-    
     if not target:
         target = BudgetCredit.objects.create(
-            fiscal_year=comp.fiscal_year,
+            fiscal_year=source.fiscal_year,
             credit_type=source.credit_type,
             ff=comp.target_ff,
-            programa=comp.programa,
+            programa=source.programa,
             subprog=comp.target_subprog,
             inc=comp.target_inc,
             ppp_inc=comp.target_ppp_inc,
@@ -385,19 +510,13 @@ def execute_compensacion(compensacion_id, user):
             pre_inc=comp.target_pre_inc,
             incisos_agrupado=comp.target_incisos_agrupado,
         )
-    
-    # 3. Sumar a destino
-    target.q1_amount += comp.q1_amount
-    target.q2_amount += comp.q2_amount
-    target.q3_amount += comp.q3_amount
-    target.q4_amount += comp.q4_amount
+
+    for field, amount in zip(QUARTER_FIELDS, amounts):
+        setattr(target, field, getattr(target, field) + amount)
     target.save()
-    
-    # 4. Marcar como ejecutada
+
     comp.status = 'EJECUTADO'
-    comp.approved_by = user
-    comp.save()
-    
+    comp.save(update_fields=['status', 'updated_at'])
     return comp
 
 
@@ -424,6 +543,7 @@ def adjust_credit(credit_id, q1_new, q2_new, q3_new, q4_new, reason, user):
     q2_a = allocs['q2'] or 0
     q3_a = allocs['q3'] or 0
     q4_a = allocs['q4'] or 0
+    reserved_q1, reserved_q2, reserved_q3, reserved_q4 = _compensation_reserved_by_quarter(credit)
 
     # Si el usuario no envió un monto (campo vacío), mantenemos el actual
     q1_new = q1_new if q1_new is not None else credit.q1_amount
@@ -431,10 +551,10 @@ def adjust_credit(credit_id, q1_new, q2_new, q3_new, q4_new, reason, user):
     q3_new = q3_new if q3_new is not None else credit.q3_amount
     q4_new = q4_new if q4_new is not None else credit.q4_amount
 
-    if q1_new < q1_a: raise ValidationError(f"T1: El nuevo monto (${q1_new}) es inferior a lo ya distribuido (${q1_a}).")
-    if q2_new < q2_a: raise ValidationError(f"T2: El nuevo monto (${q2_new}) es inferior a lo ya distribuido (${q2_a}).")
-    if q3_new < q3_a: raise ValidationError(f"T3: El nuevo monto (${q3_new}) es inferior a lo ya distribuido (${q3_a}).")
-    if q4_new < q4_a: raise ValidationError(f"T4: El nuevo monto (${q4_new}) es inferior a lo ya distribuido (${q4_a}).")
+    if q1_new < q1_a + reserved_q1: raise ValidationError(f"T1: El nuevo monto no puede ser menor a lo distribuido y reservado (${q1_a + reserved_q1}).")
+    if q2_new < q2_a + reserved_q2: raise ValidationError(f"T2: El nuevo monto no puede ser menor a lo distribuido y reservado (${q2_a + reserved_q2}).")
+    if q3_new < q3_a + reserved_q3: raise ValidationError(f"T3: El nuevo monto no puede ser menor a lo distribuido y reservado (${q3_a + reserved_q3}).")
+    if q4_new < q4_a + reserved_q4: raise ValidationError(f"T4: El nuevo monto no puede ser menor a lo distribuido y reservado (${q4_a + reserved_q4}).")
 
     # Guardar estado anterior
     adj = BudgetCreditAdjustment(
@@ -463,7 +583,8 @@ def update_allocation(allocation_id, q1=None, q2=None, q3=None, q4=None, notes=N
     Actualiza una distribución existente validando contra el crédito y lo ya gastado.
     """
     allocation = BudgetAllocation.objects.select_for_update().get(pk=allocation_id)
-    credit = allocation.credit
+    credit = BudgetCredit.objects.select_for_update().get(pk=allocation.credit_id)
+    reserved_q1, reserved_q2, reserved_q3, reserved_q4 = _compensation_reserved_by_quarter(credit)
 
     if credit.fiscal_year.status == 'CLOSED':
         raise ValidationError("No se puede modificar una distribución en un ejercicio cerrado.")
@@ -488,14 +609,14 @@ def update_allocation(allocation_id, q1=None, q2=None, q3=None, q4=None, notes=N
     
     q1_o, q2_o, q3_o, q4_o = (other_allocs['q1_s'] or 0), (other_allocs['q2_s'] or 0), (other_allocs['q3_s'] or 0), (other_allocs['q4_s'] or 0)
 
-    if q1 + q1_o > credit.q1_amount:
-        raise ValidationError(f"T1: El monto (${q1}) supera el disponible del crédito (${credit.q1_amount - q1_o}).")
-    if q2 + q2_o > credit.q2_amount:
-        raise ValidationError(f"T2: El monto (${q2}) supera el disponible del crédito (${credit.q2_amount - q2_o}).")
-    if q3 + q3_o > credit.q3_amount:
-        raise ValidationError(f"T3: El monto (${q3}) supera el disponible del crédito (${credit.q3_amount - q3_o}).")
-    if q4 + q4_o > credit.q4_amount:
-        raise ValidationError(f"T4: El monto (${q4}) supera el disponible del crédito (${credit.q4_amount - q4_o}).")
+    if q1 + q1_o + reserved_q1 > credit.q1_amount:
+        raise ValidationError(f"T1: El monto (${q1}) supera el disponible real (${credit.q1_amount - q1_o - reserved_q1}).")
+    if q2 + q2_o + reserved_q2 > credit.q2_amount:
+        raise ValidationError(f"T2: El monto (${q2}) supera el disponible real (${credit.q2_amount - q2_o - reserved_q2}).")
+    if q3 + q3_o + reserved_q3 > credit.q3_amount:
+        raise ValidationError(f"T3: El monto (${q3}) supera el disponible real (${credit.q3_amount - q3_o - reserved_q3}).")
+    if q4 + q4_o + reserved_q4 > credit.q4_amount:
+        raise ValidationError(f"T4: El monto (${q4}) supera el disponible real (${credit.q4_amount - q4_o - reserved_q4}).")
 
     # 3. Actualizar
     allocation.q1_amount = q1
@@ -508,4 +629,20 @@ def update_allocation(allocation_id, q1=None, q2=None, q3=None, q4=None, notes=N
         allocation.custom_classes.set(classifications)
     allocation.save()
     
+    return allocation
+
+
+@transaction.atomic
+def update_allocation_metadata(allocation_id, notes, classifications):
+    """Actualiza solo proyectos asociados y observaciones de una distribucion."""
+    allocation = BudgetAllocation.objects.select_for_update().select_related(
+        'credit__fiscal_year'
+    ).get(pk=allocation_id)
+
+    if allocation.credit.fiscal_year.status == 'CLOSED':
+        raise ValidationError("No se puede modificar una distribucion de un ejercicio cerrado.")
+
+    allocation.notes = notes
+    allocation.save(update_fields=['notes'])
+    allocation.custom_classes.set(classifications)
     return allocation
