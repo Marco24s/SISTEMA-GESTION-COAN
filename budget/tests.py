@@ -153,3 +153,27 @@ class BudgetCompensacionTests(TestCase):
         self.assertEqual(allocation.q1_amount, Decimal("600.00"))
         self.assertEqual(allocation.notes, "Observacion actualizada")
         self.assertEqual(list(allocation.custom_classes.all()), [project])
+
+    def test_dashboard_credit_type_modal_uses_quarter_amounts(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.client.force_login(self.user)
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        credit_type_rows = list(response.context["stats"]["credit_by_type"])
+        self.assertEqual(len(credit_type_rows), 1)
+        self.assertEqual(credit_type_rows[0]["q1"], Decimal("1000.00"))
+        self.assertEqual(credit_type_rows[0]["allocated"], Decimal("600.00"))
+        self.assertEqual(len(credit_type_rows[0]["subpcs"]), 1)
+        self.assertEqual(credit_type_rows[0]["subpcs"][0]["q1"], Decimal("1000.00"))
+        self.assertEqual(credit_type_rows[0]["subpcs"][0]["allocated"], Decimal("600.00"))
+        self.assertEqual(credit_type_rows[0]["subpcs"][0]["allocated_q1"], Decimal("600.00"))
+        allocated_rows = response.context["stats"]["allocated_by_subpc"]
+        self.assertEqual(len(allocated_rows), 1)
+        self.assertEqual(allocated_rows[0]["q1"], Decimal("600.00"))
+        self.assertEqual(allocated_rows[0]["available"], Decimal("600.00"))
+        self.assertContains(response, "Programacion trimestral")
+        self.assertContains(response, "SUBPC 1")
+        self.assertContains(response, "Detalle por unidad")

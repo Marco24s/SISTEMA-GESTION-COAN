@@ -259,34 +259,162 @@ def dashboard(request):
             code = item['credit_type__code']
             if code not in grouped_stats:
                 grouped_stats[code] = {
+                    'code': code,
                     'name': item['credit_type__name'],
                     'total': 0,
-                    'subpcs': []
+                    'subpcs': [],
+                    'q1': Decimal('0'), 'q2': Decimal('0'),
+                    'q3': Decimal('0'), 'q4': Decimal('0'),
+                    'allocated_q1': Decimal('0'), 'allocated_q2': Decimal('0'),
+                    'allocated_q3': Decimal('0'), 'allocated_q4': Decimal('0'),
+                    'allocated': Decimal('0'),
+                    'details': [],
+                    'subpc_lookup': {},
                 }
             grouped_stats[code]['total'] += item['subtotal'] or 0
             if item['subtotal'] and item['subtotal'] > 0:
-                grouped_stats[code]['subpcs'].append({
-                    'code': item['pre_inc__code'] or 'S/D',
-                    'amount': item['subtotal']
-                })
-        
+                subpc_code = item['pre_inc__code'] or 'S/D'
+                subpc = {
+                    'code': subpc_code,
+                    'amount': item['subtotal'],
+                    'total': item['subtotal'],
+                    'q1': Decimal('0'), 'q2': Decimal('0'),
+                    'q3': Decimal('0'), 'q4': Decimal('0'),
+                    'allocated_q1': Decimal('0'), 'allocated_q2': Decimal('0'),
+                    'allocated_q3': Decimal('0'), 'allocated_q4': Decimal('0'),
+                    'allocated': Decimal('0'),
+                    'details': [],
+                    'modal_id': f"credit-type-{len(grouped_stats)}-subpc-{len(grouped_stats[code]['subpcs']) + 1}",
+                }
+                grouped_stats[code]['subpcs'].append(subpc)
+                grouped_stats[code]['subpc_lookup'][subpc_code] = subpc
+
+        if is_admin_user:
+            detail_credits = BudgetCredit.objects.filter(
+                fiscal_year=fiscal_year,
+                credit_type__isnull=False,
+            ).select_related(
+                'credit_type', 'ff', 'programa', 'subprog', 'inc',
+                'ppp_inc', 'pre_inc',
+            ).prefetch_related('allocations')
+
+            for credit in detail_credits:
+                row = grouped_stats.get(credit.credit_type.code)
+                if not row:
+                    continue
+                subpc = row['subpc_lookup'].get(credit.pre_inc.code if credit.pre_inc else 'S/D')
+                if not subpc:
+                    continue
+                amounts = [credit.q1_amount, credit.q2_amount, credit.q3_amount, credit.q4_amount]
+                allocated_quarters = [
+                    sum((getattr(allocation, f'q{quarter}_amount') for allocation in credit.allocations.all()), Decimal('0'))
+                    for quarter in range(1, 5)
+                ]
+                for quarter, amount in enumerate(amounts, start=1):
+                    row[f'q{quarter}'] += amount
+                    subpc[f'q{quarter}'] += amount
+                    row[f'allocated_q{quarter}'] += allocated_quarters[quarter - 1]
+                    subpc[f'allocated_q{quarter}'] += allocated_quarters[quarter - 1]
+                row['allocated'] += sum(allocated_quarters, Decimal('0'))
+                subpc['allocated'] += sum(allocated_quarters, Decimal('0'))
+                detail = {
+                    'ff': credit.ff.code if credit.ff else '-',
+                    'programa': credit.programa.code if credit.programa else '-',
+                    'subprograma': credit.subprog.code if credit.subprog else '-',
+                    'inciso': credit.inc.code if credit.inc else '-',
+                    'ppal': credit.ppp_inc.code if credit.ppp_inc else '-',
+                    'subpc': credit.pre_inc.code if credit.pre_inc else '-',
+                    'q1': amounts[0], 'q2': amounts[1],
+                    'q3': amounts[2], 'q4': amounts[3],
+                    'total': sum(amounts, Decimal('0')),
+                }
+                row['details'].append(detail)
+                subpc['details'].append(detail)
+        else:
+            detail_allocations = allocations.filter(
+                credit__credit_type__isnull=False,
+            ).select_related(
+                'credit__credit_type', 'credit__ff', 'credit__programa',
+                'credit__subprog', 'credit__inc', 'credit__ppp_inc', 'credit__pre_inc',
+            )
+            for allocation in detail_allocations:
+                credit = allocation.credit
+                row = grouped_stats.get(credit.credit_type.code)
+                if not row:
+                    continue
+                subpc = row['subpc_lookup'].get(credit.pre_inc.code if credit.pre_inc else 'S/D')
+                if not subpc:
+                    continue
+                amounts = [allocation.q1_amount, allocation.q2_amount, allocation.q3_amount, allocation.q4_amount]
+                for quarter, amount in enumerate(amounts, start=1):
+                    row[f'q{quarter}'] += amount
+                    subpc[f'q{quarter}'] += amount
+                    row[f'allocated_q{quarter}'] += amount
+                    subpc[f'allocated_q{quarter}'] += amount
+                row['allocated'] += sum(amounts, Decimal('0'))
+                subpc['allocated'] += sum(amounts, Decimal('0'))
+                detail = {
+                    'ff': credit.ff.code if credit.ff else '-',
+                    'programa': credit.programa.code if credit.programa else '-',
+                    'subprograma': credit.subprog.code if credit.subprog else '-',
+                    'inciso': credit.inc.code if credit.inc else '-',
+                    'ppal': credit.ppp_inc.code if credit.ppp_inc else '-',
+                    'subpc': credit.pre_inc.code if credit.pre_inc else '-',
+                    'q1': amounts[0], 'q2': amounts[1],
+                    'q3': amounts[2], 'q4': amounts[3],
+                    'total': sum(amounts, Decimal('0')),
+                }
+                row['details'].append(detail)
+                subpc['details'].append(detail)
+
+        for row in grouped_stats.values():
+            row['available'] = row['total'] - row['allocated']
+            for subpc in row['subpcs']:
+                subpc['available'] = subpc['total'] - subpc['allocated']
+
         stats['credit_by_type'] = grouped_stats.values()
 
-        # Desglose de Crédito Distribuido por SUBPC
-        if is_admin_user:
-            stats['allocated_by_subpc'] = (
-                BudgetAllocation.objects.filter(credit__fiscal_year=fiscal_year)
-                .values('credit__pre_inc__code')
-                .annotate(subtotal=Sum('allocated_amount'))
-                .order_by('credit__pre_inc__code')
-            )
-        else:
-            stats['allocated_by_subpc'] = (
-                BudgetAllocation.objects.filter(credit__fiscal_year=fiscal_year, unit=request.user.unit)
-                .values('credit__pre_inc__code')
-                .annotate(subtotal=Sum('allocated_amount'))
-                .order_by('credit__pre_inc__code')
-            )
+        # Desglose de credito distribuido por SUBPC, trimestre y unidad.
+        allocated_groups = {}
+        allocation_details = allocations.select_related(
+            'unit', 'credit__ff', 'credit__programa', 'credit__subprog',
+            'credit__inc', 'credit__ppp_inc', 'credit__pre_inc',
+        )
+        for allocation in allocation_details:
+            credit = allocation.credit
+            subpc_code = credit.pre_inc.code if credit.pre_inc else 'S/D'
+            if subpc_code not in allocated_groups:
+                allocated_groups[subpc_code] = {
+                    'code': subpc_code,
+                    'subtotal': Decimal('0'),
+                    'spent': Decimal('0'),
+                    'q1': Decimal('0'), 'q2': Decimal('0'),
+                    'q3': Decimal('0'), 'q4': Decimal('0'),
+                    'details': [],
+                    'modal_id': f"allocated-subpc-{len(allocated_groups) + 1}",
+                }
+
+            row = allocated_groups[subpc_code]
+            amounts = [allocation.q1_amount, allocation.q2_amount, allocation.q3_amount, allocation.q4_amount]
+            row['subtotal'] += sum(amounts, Decimal('0'))
+            row['spent'] += allocation.spent_amount
+            for quarter, amount in enumerate(amounts, start=1):
+                row[f'q{quarter}'] += amount
+            row['details'].append({
+                'unit': allocation.unit.name,
+                'ff': credit.ff.code if credit.ff else '-',
+                'programa': credit.programa.code if credit.programa else '-',
+                'subprograma': credit.subprog.code if credit.subprog else '-',
+                'inciso': credit.inc.code if credit.inc else '-',
+                'ppal': credit.ppp_inc.code if credit.ppp_inc else '-',
+                'q1': amounts[0], 'q2': amounts[1],
+                'q3': amounts[2], 'q4': amounts[3],
+                'total': sum(amounts, Decimal('0')),
+            })
+
+        for row in allocated_groups.values():
+            row['available'] = row['subtotal'] - row['spent']
+        stats['allocated_by_subpc'] = [allocated_groups[key] for key in sorted(allocated_groups)]
 
     return render(request, 'budget/dashboard.html', {'fiscal_year': fiscal_year, 'stats': stats, 'unit_report': unit_report, 'is_admin': is_admin_user})
 

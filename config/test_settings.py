@@ -7,7 +7,7 @@ DATABASES = {
     }
 }
 
-ROOT_URLCONF = "budget.urls"
+ROOT_URLCONF = "config.test_urls"
 
 STORAGES = {
     "default": {
