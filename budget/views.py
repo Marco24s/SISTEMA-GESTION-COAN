@@ -9,12 +9,14 @@ from .models import (
     BudgetFiscalYear, BudgetFF, BudgetSubprog, BudgetProg,
     BudgetPPPInc, BudgetPPInc, BudgetPreInc, BudgetIncisosAgrupado,
     BudgetInc, BudgetCredit, BudgetAllocation, BudgetExecution,
-    BudgetClassification, BudgetCreditType, BudgetCreditTypeLog, BudgetCompensacion, BudgetTipoGasto, InsufficientFundsError
+    BudgetClassification, BudgetCreditType, BudgetCreditTypeLog, BudgetCompensacion,
+    BudgetAllocationReclassification, BudgetTipoGasto, InsufficientFundsError
 )
 import csv
 from django.http import HttpResponse
 from .forms import (
     BudgetFiscalYearForm, BudgetCreditForm, BudgetAllocationForm, BudgetAllocationMetadataForm,
+    BudgetAllocationReclassificationForm,
     BudgetExecutionCommitmentForm, BudgetExecutionAccrualForm, 
     BudgetExecutionPaymentForm, BudgetClassificationForm, BudgetClassificationAssignForm,
     BudgetCompensacionForm, BudgetFFForm, BudgetSubprogForm, BudgetProgForm,
@@ -673,6 +675,96 @@ def credit_detail(request, pk):
     # Remanentes trimestrales
     q_rems = [q1 - q1_a, q2 - q2_a, q3 - q3_a, q4 - q4_a]
 
+    def _quarter_totals(queryset):
+        data = queryset.aggregate(
+            q1=Sum('q1_amount'), q2=Sum('q2_amount'),
+            q3=Sum('q3_amount'), q4=Sum('q4_amount'),
+        )
+        return [data[f'q{i}'] or Decimal('0') for i in range(1, 5)]
+
+    comp_out_qs = BudgetCompensacion.objects.filter(
+        source_credit=credit,
+        status='EJECUTADO',
+    )
+    compensation_out = _quarter_totals(comp_out_qs)
+
+    comp_in_qs = BudgetCompensacion.objects.filter(
+        fiscal_year=credit.fiscal_year,
+        source_credit__credit_type_id=credit.credit_type_id,
+        programa=credit.programa,
+        target_ff=credit.ff,
+        target_subprog=credit.subprog,
+        target_inc=credit.inc,
+        target_ppp_inc=credit.ppp_inc,
+        target_pp_inc=credit.pp_inc,
+        target_pre_inc=credit.pre_inc,
+        target_incisos_agrupado=credit.incisos_agrupado,
+        status='EJECUTADO',
+    )
+    compensation_in = _quarter_totals(comp_in_qs)
+
+    recl_out_qs = BudgetAllocationReclassification.objects.filter(
+        source_credit=credit,
+        status='EJECUTADO',
+    )
+    reclassification_out = _quarter_totals(recl_out_qs)
+
+    recl_in_qs = BudgetAllocationReclassification.objects.filter(
+        target_credit=credit,
+        status='EJECUTADO',
+    )
+    reclassification_in = _quarter_totals(recl_in_qs)
+
+    q_tooltips = ["", "", "", ""]
+    
+    def _add_tooltip(qs, is_in):
+        for obj in qs:
+            for i in range(4):
+                amt = getattr(obj, f'q{i+1}_amount', Decimal('0'))
+                if amt > 0:
+                    sign = "+" if is_in else "-"
+                    word = "Entró de" if is_in else "Salió a"
+                    if not is_in and getattr(obj, 'target_inc', None):
+                        inc_str = obj.target_inc.code
+                    elif is_in and getattr(obj, 'source_credit', None) and getattr(obj.source_credit, 'inc', None):
+                        inc_str = obj.source_credit.inc.code
+                    else:
+                        inc_str = "?"
+                    
+                    q_tooltips[i] += f"{word} Inc {inc_str}: {sign}${amt:,.2f}<br>"
+
+    _add_tooltip(comp_out_qs, is_in=False)
+    _add_tooltip(comp_in_qs, is_in=True)
+    _add_tooltip(recl_out_qs, is_in=False)
+    _add_tooltip(recl_in_qs, is_in=True)
+    
+    q_movements = [
+        compensation_in[i] + reclassification_in[i] - compensation_out[i] - reclassification_out[i]
+        for i in range(4)
+    ]
+    q_originals = [
+        amount - movement
+        for amount, movement in zip([q1, q2, q3, q4], q_movements)
+    ]
+    q_cards = [
+        {
+            'label': label,
+            'original': original,
+            'vigente': vigente,
+            'movement': movement,
+            'remaining': remaining,
+            'tooltip': tooltip,
+        }
+        for label, original, vigente, movement, remaining, tooltip in zip(
+            ['1er Trimestre', '2do Trimestre', '3er Trimestre', '4to Trimestre'],
+            q_originals,
+            [q1, q2, q3, q4],
+            q_movements,
+            q_rems,
+            q_tooltips,
+        )
+    ]
+
     context = {
         'credit': credit,
         'allocations': allocations,
@@ -683,6 +775,7 @@ def credit_detail(request, pk):
         'q_fills': [q1_fill, q2_fill, q3_fill, q4_fill],
         'q_segs': [q1_seg, q2_seg, q3_seg, q4_seg],
         'q_rems': q_rems,
+        'q_cards': q_cards,
         'is_admin': is_admin(request.user),
         'adjustments': credit.adjustments.all().select_related('user').order_by('-timestamp'),
     }
@@ -695,7 +788,16 @@ def compensacion_list(request):
         'target_ff', 'target_subprog', 'target_inc', 'target_ppp_inc',
         'target_pp_inc', 'target_pre_inc', 'target_incisos_agrupado',
     )
-    return render(request, 'budget/compensacion_list.html', {'compensaciones': compensaciones})
+    reclassifications = BudgetAllocationReclassification.objects.all().order_by('-created_at').select_related(
+        'source_allocation__unit', 'source_credit__programa', 'source_credit__ff',
+        'target_allocation__unit', 'target_credit', 'target_ff', 'target_subprog',
+        'target_inc', 'target_ppp_inc', 'target_pp_inc', 'target_pre_inc',
+        'target_incisos_agrupado', 'requested_by', 'approved_by', 'executed_by',
+    )
+    return render(request, 'budget/compensacion_list.html', {
+        'compensaciones': compensaciones,
+        'reclassifications': reclassifications,
+    })
 
 def compensacion_create(request):
     if not is_admin(request.user): return redirect('budget:dashboard')
@@ -790,6 +892,53 @@ def compensacion_reject(request, pk):
     try:
         services.reject_compensacion(pk)
         messages.success(request, f"Compensacion #{pk} rechazada.")
+    except Exception as e:
+        error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+        messages.error(request, f"Error: {error_msg}")
+    return redirect('budget:compensacion_list')
+
+
+def allocation_reclassification_approve(request, pk):
+    if not is_admin(request.user): return redirect('budget:dashboard')
+    item = get_object_or_404(BudgetAllocationReclassification, pk=pk)
+    if request.method == 'POST':
+        try:
+            services.approve_allocation_reclassification(item.id, request.user)
+            messages.success(request, f"Reclasificacion #{item.id} aprobada. Ya puede ejecutarse.")
+        except Exception as e:
+            error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+            messages.error(request, f"Error: {error_msg}")
+        return redirect('budget:compensacion_list')
+    return render(request, 'budget/reclassification_confirm.html', {
+        'item': item,
+        'confirmation_action': 'approve',
+    })
+
+
+def allocation_reclassification_execute(request, pk):
+    if not is_admin(request.user): return redirect('budget:dashboard')
+    item = get_object_or_404(BudgetAllocationReclassification, pk=pk)
+    if request.method == 'POST':
+        try:
+            services.execute_allocation_reclassification(item.id, request.user)
+            messages.success(request, f"Reclasificacion #{item.id} ejecutada con exito.")
+        except Exception as e:
+            error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+            messages.error(request, f"Error: {error_msg}")
+        return redirect('budget:compensacion_list')
+    return render(request, 'budget/reclassification_confirm.html', {
+        'item': item,
+        'confirmation_action': 'execute',
+    })
+
+
+def allocation_reclassification_reject(request, pk):
+    if not is_admin(request.user): return redirect('budget:dashboard')
+    if request.method != 'POST':
+        return redirect('budget:compensacion_list')
+    try:
+        services.reject_allocation_reclassification(pk)
+        messages.success(request, f"Reclasificacion #{pk} rechazada.")
     except Exception as e:
         error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
         messages.error(request, f"Error: {error_msg}")
@@ -1067,6 +1216,62 @@ def allocation_update(request, pk):
         'title': f'Editar proyecto y observaciones: {allocation.unit.name}',
         'fixed_credit': allocation.credit,
         'help_text': 'Los montos, la unidad de destino y el credito de origen no pueden modificarse desde esta accion.',
+    })
+
+
+def allocation_reclassify(request, pk):
+    if not is_admin(request.user): return redirect('budget:allocation_list')
+    allocation = get_object_or_404(
+        BudgetAllocation.objects.select_related(
+            'credit__fiscal_year', 'credit__ff', 'credit__programa', 'credit__subprog',
+            'credit__inc', 'credit__ppp_inc', 'credit__pp_inc', 'credit__pre_inc',
+            'credit__incisos_agrupado', 'unit'
+        ),
+        pk=pk
+    )
+
+    if request.method == 'POST':
+        form = BudgetAllocationReclassificationForm(request.POST, allocation=allocation)
+        if form.is_valid():
+            try:
+                target_params = {
+                    'target_ff': form.cleaned_data['target_ff'],
+                    'target_subprog': form.cleaned_data['target_subprog'],
+                    'target_inc': form.cleaned_data['target_inc'],
+                    'target_ppp_inc': form.cleaned_data['target_ppp_inc'],
+                    'target_pp_inc': form.cleaned_data['target_pp_inc'],
+                    'target_pre_inc': form.cleaned_data['target_pre_inc'],
+                    'target_incisos_agrupado': form.cleaned_data['target_incisos_agrupado'],
+                }
+                q_amounts = (
+                    form.cleaned_data['q1_amount'], form.cleaned_data['q2_amount'],
+                    form.cleaned_data['q3_amount'], form.cleaned_data['q4_amount'],
+                )
+                item = services.request_allocation_reclassification(
+                    allocation_id=allocation.pk,
+                    target_params=target_params,
+                    q_amounts=q_amounts,
+                    user=request.user,
+                    notes=form.cleaned_data['notes'],
+                )
+                messages.success(
+                    request,
+                    f"Solicitud de cambio de inciso #{item.id} creada. Queda pendiente de aprobacion."
+                )
+                return redirect('budget:compensacion_list')
+            except Exception as e:
+                error_msg = ", ".join(e.messages) if hasattr(e, 'messages') else str(e)
+                messages.error(request, f"Error: {error_msg}")
+    else:
+        form = BudgetAllocationReclassificationForm(allocation=allocation)
+
+    return render(request, 'budget/form_base.html', {
+        'form': form,
+        'title': f'Cambio de inciso asignado: {allocation.unit.name}',
+        'fixed_credit': allocation.credit,
+        'reference_label': 'Disponible sin comprometer en esta distribucion',
+        'reference_amount': allocation.available_amount,
+        'help_text': 'Esta accion mueve solo saldo disponible de esta distribucion. No modifica ni traslada gastos ya comprometidos/devengados.',
     })
 
 def allocation_delete(request, pk):

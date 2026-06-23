@@ -323,6 +323,13 @@ class PyrotechnicAssignmentForm(forms.ModelForm):
         label="Material fisico disponible",
         help_text="Solo se muestran materiales activos que no estan montados en otro medio.",
     )
+    mount_quantity = forms.IntegerField(
+        label="Cantidad a montar",
+        min_value=1,
+        help_text="Si monta menos de la cantidad del lote, el resto permanecerá en la ubicación actual. Dejar vacío para montar todo el lote.",
+        required=False,
+        widget=forms.NumberInput(attrs={"placeholder": "Ej: 2", "class": "form-control"}),
+    )
 
     class Meta:
         model = PyrotechnicAssignment
@@ -374,6 +381,13 @@ class PyrotechnicAssignmentForm(forms.ModelForm):
         removed_at = cleaned_data.get("removed_at")
         if is_active and removed_at:
             raise forms.ValidationError("Una asignacion activa no debe tener fecha de retiro.")
+        
+        mount_quantity = cleaned_data.get("mount_quantity")
+        if physical_item and mount_quantity:
+            if mount_quantity > physical_item.lot_quantity:
+                raise forms.ValidationError({
+                    "mount_quantity": f"La cantidad a montar ({mount_quantity}) no puede ser mayor que la cantidad disponible en el lote ({physical_item.lot_quantity})."
+                })
         if physical_item and is_active:
             if not physical_item.is_active:
                 raise forms.ValidationError("No se puede montar/asignar material inactivo.")

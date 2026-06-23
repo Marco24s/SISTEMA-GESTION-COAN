@@ -1,0 +1,90 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block budget_content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold">
+                <i class="fa-solid fa-clipboard-check text-success me-2"></i>
+                {% if confirmation_action == 'execute' %}Ejecutar Cambio de Inciso Asignado{% else %}Aprobar Cambio de Inciso Asignado{% endif %}
+            </h2>
+            <a href="{% url 'budget:compensacion_list' %}" class="btn btn-outline-secondary rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left"></i> Volver
+            </a>
+        </div>
+
+        <div class="card card-stats p-4 border-top border-4 border-info">
+            <h5 class="fw-bold mb-4">Resumen de la Solicitud</h5>
+
+            <div class="row g-4">
+                <div class="col-md-5">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="small fw-bold text-uppercase text-danger mb-2">
+                            <i class="fa-solid fa-minus-circle me-1"></i> Distribucion origen
+                        </div>
+                        <div class="fw-bold mb-1">{{ item.source_allocation.unit.name|default:"Origen eliminado" }}</div>
+                        <div class="small text-muted mb-3">{{ item.source_credit|default:"Credito eliminado" }}</div>
+                        <div class="border-top pt-2">
+                            <div class="d-flex justify-content-between small"><span>T1:</span> <strong>-${{ item.q1_amount|localize }}</strong></div>
+                            <div class="d-flex justify-content-between small"><span>T2:</span> <strong>-${{ item.q2_amount|localize }}</strong></div>
+                            <div class="d-flex justify-content-between small"><span>T3:</span> <strong>-${{ item.q3_amount|localize }}</strong></div>
+                            <div class="d-flex justify-content-between small"><span>T4:</span> <strong>-${{ item.q4_amount|localize }}</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-2 d-flex align-items-center justify-content-center">
+                    <i class="fa-solid fa-right-long fa-3x text-muted opacity-25"></i>
+                </div>
+
+                <div class="col-md-5">
+                    <div class="p-3 bg-light rounded-3 h-100">
+                        <div class="small fw-bold text-uppercase text-success mb-2">
+                            <i class="fa-solid fa-plus-circle me-1"></i> Partida destino
+                        </div>
+                        <div class="fw-bold mb-3">{{ item.target_credit_display }}</div>
+                        <div class="small mb-1">
+                            <strong>FF:</strong> {{ item.target_ff.code }} |
+                            <strong>Inc:</strong> {{ item.target_inc.code }} |
+                            <strong>SUBPC:</strong> {{ item.target_pre_inc.code|default:"-" }}
+                        </div>
+                        <div class="border-top pt-2">
+                            <div class="d-flex justify-content-between small"><span>T1:</span> <strong>+${{ item.q1_amount|localize }}</strong></div>
+                            <div class="d-flex justify-content-between small"><span>T2:</span> <strong>+${{ item.q2_amount|localize }}</strong></div>
+                            <div class="d-flex justify-content-between small"><span>T3:</span> <strong>+${{ item.q3_amount|localize }}</strong></div>
+                            <div class="d-flex justify-content-between small"><span>T4:</span> <strong>+${{ item.q4_amount|localize }}</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if confirmation_action == 'execute' %}
+            <div class="alert alert-warning mt-4 mb-0 border-0 bg-warning bg-opacity-10">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                Al ejecutar, el sistema volvera a validar que el saldo siga disponible y recien ahi movera la distribucion.
+            </div>
+            {% else %}
+            <div class="alert alert-info mt-4 mb-0 border-0 bg-info bg-opacity-10">
+                <i class="fa-solid fa-circle-info me-2"></i>
+                Aprobar no mueve fondos. La solicitud quedara lista para ejecucion posterior.
+            </div>
+            {% endif %}
+
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg rounded-pill fw-bold py-3 shadow">
+                        {% if confirmation_action == 'execute' %}
+                        <i class="fa-solid fa-play me-2"></i> CONFIRMAR Y EJECUTAR
+                        {% else %}
+                        <i class="fa-solid fa-check me-2"></i> CONFIRMAR APROBACION
+                        {% endif %}
+                    </button>
+                    <a href="{% url 'budget:compensacion_list' %}" class="btn btn-link text-muted">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

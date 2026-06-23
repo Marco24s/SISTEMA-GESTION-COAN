@@ -162,6 +162,48 @@ class BudgetAllocationMetadataForm(forms.ModelForm):
         self.fields['custom_classes'].widget.attrs.update({'class': 'select2-multi'})
         self.fields['custom_classes'].help_text = "Opcional. Puede vincular uno o varios proyectos, o dejar la distribucion sin proyecto."
 
+
+class BudgetAllocationReclassificationForm(forms.Form):
+    target_ff = forms.ModelChoiceField(queryset=BudgetFF.objects.all(), label="FF destino")
+    target_subprog = forms.ModelChoiceField(queryset=BudgetSubprog.objects.all(), label="Subprograma destino")
+    target_inc = forms.ModelChoiceField(queryset=BudgetInc.objects.all(), label="Inciso destino")
+    target_ppp_inc = forms.ModelChoiceField(queryset=BudgetPPPInc.objects.all(), label="PPAL destino", required=False)
+    target_pp_inc = forms.ModelChoiceField(queryset=BudgetPPInc.objects.all(), label="Parcial destino", required=False)
+    target_pre_inc = forms.ModelChoiceField(queryset=BudgetPreInc.objects.all(), label="SUBPC destino", required=False)
+    target_incisos_agrupado = forms.ModelChoiceField(queryset=BudgetIncisosAgrupado.objects.all(), label="Moneda destino")
+    q1_amount = forms.DecimalField(max_digits=18, decimal_places=2, label="Monto T1 a cambiar", required=False, localize=True)
+    q2_amount = forms.DecimalField(max_digits=18, decimal_places=2, label="Monto T2 a cambiar", required=False, localize=True)
+    q3_amount = forms.DecimalField(max_digits=18, decimal_places=2, label="Monto T3 a cambiar", required=False, localize=True)
+    q4_amount = forms.DecimalField(max_digits=18, decimal_places=2, label="Monto T4 a cambiar", required=False, localize=True)
+    notes = forms.CharField(label="Observaciones", required=False, widget=forms.Textarea(attrs={'rows': 3}))
+
+    def __init__(self, *args, **kwargs):
+        allocation = kwargs.pop('allocation', None)
+        super().__init__(*args, **kwargs)
+        for field_name in ('q1_amount', 'q2_amount', 'q3_amount', 'q4_amount'):
+            self.fields[field_name].widget.attrs.update({'class': 'form-control currency-input', 'placeholder': '0,00'})
+            self.fields[field_name].min_value = 0
+        if allocation:
+            credit = allocation.credit
+            self.fields['target_ff'].initial = credit.ff_id
+            self.fields['target_subprog'].initial = credit.subprog_id
+            self.fields['target_inc'].initial = credit.inc_id
+            self.fields['target_ppp_inc'].initial = credit.ppp_inc_id
+            self.fields['target_pp_inc'].initial = credit.pp_inc_id
+            self.fields['target_pre_inc'].initial = credit.pre_inc_id
+            self.fields['target_incisos_agrupado'].initial = credit.incisos_agrupado_id
+            self.fields['q1_amount'].help_text = f"Disponible en la distribucion origen T1: ${allocation.q1_amount}"
+            self.fields['q2_amount'].help_text = f"Disponible en la distribucion origen T2: ${allocation.q2_amount}"
+            self.fields['q3_amount'].help_text = f"Disponible en la distribucion origen T3: ${allocation.q3_amount}"
+            self.fields['q4_amount'].help_text = f"Disponible en la distribucion origen T4: ${allocation.q4_amount}"
+
+    def clean(self):
+        cleaned = super().clean()
+        amounts = [cleaned.get(field) or 0 for field in ('q1_amount', 'q2_amount', 'q3_amount', 'q4_amount')]
+        if not any(amount > 0 for amount in amounts):
+            raise forms.ValidationError("Debe ingresar un monto mayor a cero en al menos un trimestre.")
+        return cleaned
+
 class AllocationChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
         available = obj.available_amount

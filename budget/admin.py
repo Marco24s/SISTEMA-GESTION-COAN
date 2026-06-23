@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (
     BudgetFiscalYear, BudgetFF, BudgetSubprog, BudgetProg,
     BudgetPPPInc, BudgetPPInc, BudgetPreInc, BudgetIncisosAgrupado,
-    BudgetInc, BudgetCredit, BudgetAllocation, BudgetExecution
+    BudgetInc, BudgetCredit, BudgetAllocation, BudgetExecution,
+    BudgetAllocationReclassification
 )
 
 @admin.register(BudgetFiscalYear)
@@ -49,3 +50,9 @@ class BudgetAllocationAdmin(admin.ModelAdmin):
 class BudgetExecutionAdmin(admin.ModelAdmin):
     list_display = ('reference_code', 'allocation', 'commitment_amount', 'accrued_amount', 'paid_amount', 'user')
     list_filter = ('allocation__unit', 'user')
+
+
+@admin.register(BudgetAllocationReclassification)
+class BudgetAllocationReclassificationAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'source_allocation', 'target_allocation', 'total_amount', 'status', 'user')
+    list_filter = ('status', 'user', 'source_credit__fiscal_year')

@@ -27,6 +27,7 @@ urlpatterns = [
     path('allocations/', views.allocation_list, name='allocation_list'),
     path('allocations/create/', views.allocation_create, name='allocation_create'),
     path('allocations/<int:pk>/edit/', views.allocation_update, name='allocation_update'),
+    path('allocations/<int:pk>/reclassify/', views.allocation_reclassify, name='allocation_reclassify'),
     path('allocations/<int:pk>/delete/', views.allocation_delete, name='allocation_delete'),
     path('allocations/bulk-delete/', views.allocation_bulk_delete, name='allocation_bulk_delete'),
     
@@ -62,4 +63,7 @@ urlpatterns = [
     path('compensaciones/<int:pk>/approve/', views.compensacion_approve, name='compensacion_approve'),
     path('compensaciones/<int:pk>/execute/', views.compensacion_execute, name='compensacion_execute'),
     path('compensaciones/<int:pk>/reject/', views.compensacion_reject, name='compensacion_reject'),
+    path('reclasificaciones/<int:pk>/approve/', views.allocation_reclassification_approve, name='allocation_reclassification_approve'),
+    path('reclasificaciones/<int:pk>/execute/', views.allocation_reclassification_execute, name='allocation_reclassification_execute'),
+    path('reclasificaciones/<int:pk>/reject/', views.allocation_reclassification_reject, name='allocation_reclassification_reject'),
 ]

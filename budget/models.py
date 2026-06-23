@@ -155,6 +155,68 @@ class BudgetAllocation(models.Model):
     def __str__(self):
         return f"Distribución {self.unit.name} - {self.credit}"
 
+class BudgetAllocationReclassification(models.Model):
+    STATUS_CHOICES = [
+        ('PENDIENTE', 'Pendiente'),
+        ('APROBADO', 'Aprobado (Listo para Ejecutar)'),
+        ('RECHAZADO', 'Rechazado'),
+        ('EJECUTADO', 'Ejecutado'),
+    ]
+
+    source_allocation = models.ForeignKey(BudgetAllocation, on_delete=models.SET_NULL, null=True, blank=True, related_name="reclassifications_out", verbose_name="Distribucion origen")
+    target_allocation = models.ForeignKey(BudgetAllocation, on_delete=models.SET_NULL, null=True, blank=True, related_name="reclassifications_in", verbose_name="Distribucion destino")
+    source_credit = models.ForeignKey(BudgetCredit, on_delete=models.SET_NULL, null=True, blank=True, related_name="allocation_reclassifications_out", verbose_name="Credito origen")
+    target_credit = models.ForeignKey(BudgetCredit, on_delete=models.SET_NULL, null=True, blank=True, related_name="allocation_reclassifications_in", verbose_name="Credito destino")
+    target_ff = models.ForeignKey(BudgetFF, on_delete=models.PROTECT, null=True, blank=True, verbose_name="FF destino")
+    target_subprog = models.ForeignKey(BudgetSubprog, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Subprograma destino")
+    target_inc = models.ForeignKey(BudgetInc, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Inciso destino")
+    target_ppp_inc = models.ForeignKey(BudgetPPPInc, on_delete=models.PROTECT, null=True, blank=True, verbose_name="PPAL destino")
+    target_pp_inc = models.ForeignKey(BudgetPPInc, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Parcial destino")
+    target_pre_inc = models.ForeignKey(BudgetPreInc, on_delete=models.PROTECT, null=True, blank=True, verbose_name="SUBPC destino")
+    target_incisos_agrupado = models.ForeignKey(BudgetIncisosAgrupado, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Moneda destino")
+    q1_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Monto T1")
+    q2_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Monto T2")
+    q3_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Monto T3")
+    q4_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Monto T4")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDIENTE', verbose_name="Estado")
+    notes = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    user = models.ForeignKey(CustomUser, on_delete=models.PROTECT, verbose_name="Realizado por")
+    requested_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='reclasificaciones_solicitadas', verbose_name="Solicitado por")
+    approved_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='reclasificaciones_aprobadas', verbose_name="Aprobado por")
+    executed_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='reclasificaciones_ejecutadas', verbose_name="Ejecutado por")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha y hora")
+    updated_at = models.DateTimeField(auto_now=True, null=True, verbose_name="Ultima actualizacion")
+
+    class Meta:
+        verbose_name = "Reclasificacion de distribucion"
+        verbose_name_plural = "Reclasificaciones de distribuciones"
+        ordering = ['-created_at']
+
+    @property
+    def total_amount(self):
+        return self.q1_amount + self.q2_amount + self.q3_amount + self.q4_amount
+
+    def __str__(self):
+        return f"Reclasificacion #{self.pk} - ${self.total_amount}"
+
+    @property
+    def target_credit_display(self):
+        if self.target_credit:
+            return str(self.target_credit)
+        source_program = self.source_credit.programa if self.source_credit else None
+        parts = [
+            self.target_ff.code if self.target_ff else "?",
+            source_program.code if source_program else "00",
+            self.target_subprog.code if self.target_subprog else "00",
+            self.target_inc.code if self.target_inc else "?",
+            self.target_ppp_inc.code if self.target_ppp_inc else "?",
+            self.target_pp_inc.code if self.target_pp_inc else "?",
+            self.target_pre_inc.code if self.target_pre_inc else "?",
+            self.target_incisos_agrupado.code if self.target_incisos_agrupado else "?",
+        ]
+        return "-".join(parts)
+
+
 class BudgetCompensacion(models.Model):
     STATUS_CHOICES = [
         ('PENDIENTE', 'Pendiente'),

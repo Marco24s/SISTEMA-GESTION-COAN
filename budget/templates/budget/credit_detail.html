@@ -28,7 +28,7 @@
         <div class="card border-0 shadow-lg rounded-4 overflow-hidden mb-4" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white;">
             <div class="card-body p-4 position-relative">
                 <!-- Decoración de fondo -->
-                <div class="position-absolute top-50 translate-middle-y end-0 opacity-10 pe-4" style="pointer-events: none;">
+                <div class="position-absolute top-50 translate-middle-y end-0 opacity-10 pe-4" style="pointer-events: none; opacity: 0.04 !important;">
                     <i class="fa-solid fa-layer-group" style="font-size: 12rem;"></i>
                 </div>
 
@@ -69,15 +69,15 @@
                     <div class="d-flex align-items-center text-white-50 px-1 opacity-50"><i class="fa-solid fa-angle-right"></i></div>
 
                     <!-- Inciso -->
-                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center border border-white border-opacity-25" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
-                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Inciso</div>
-                        <div class="fw-bolder fs-5 text-warning">{{ credit.inc.code|default:"--" }}</div>
+                    <div class="rounded-3 p-3 flex-fill text-center border border-warning border-opacity-50 shadow-sm" style="background-color: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(30, 41, 59, 0.95)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(15, 23, 42, 0.88)'">
+                        <div class="text-white small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem; text-shadow: 0 1px 2px rgba(0,0,0,0.45);">Inciso</div>
+                        <div class="fw-bolder fs-5 text-warning" style="text-shadow: 0 2px 4px rgba(0,0,0,0.55);">{{ credit.inc.code|default:"--" }}</div>
                     </div>
 
                     <!-- Ppal -->
-                    <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
-                        <div class="text-white-50 small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">Ppal</div>
-                        <div class="fw-bolder fs-5">{{ credit.ppp_inc.code|default:"--" }}</div>
+                    <div class="rounded-3 p-3 flex-fill text-center border border-white border-opacity-50 shadow-sm" style="background-color: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(30, 41, 59, 0.95)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(15, 23, 42, 0.88)'">
+                        <div class="text-white small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem; text-shadow: 0 1px 2px rgba(0,0,0,0.45);">Ppal</div>
+                        <div class="fw-bolder fs-5 text-white" style="text-shadow: 0 2px 4px rgba(0,0,0,0.55);">{{ credit.ppp_inc.code|default:"--" }}</div>
                     </div>
 
                     <!-- Parcial -->
@@ -115,46 +115,28 @@
                 Programación Trimestral (Crédito Original)
             </h5>
             <div class="row text-center g-2 mb-4">
-                <div class="col-6 col-md-3 border-end">
+                {% for item in q_cards %}
+                <div class="col-6 col-md-3 {% if not forloop.last %}border-end{% endif %}">
                     <div class="bg-white rounded-3 p-2 shadow-sm h-100">
-                        <label class="text-muted small d-block mb-1">1er Trimestre</label>
-                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q1_amount|localize }}</div>
-                        <div class="mt-1 pt-1 border-top border-light">
-                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
-                            <span class="fw-bold {% if q_rems.0 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.0|localize }}</span>
+                        <label class="text-muted small d-block mb-2">{{ item.label }}</label>
+                        <div class="d-flex flex-column justify-content-center align-items-center small border-bottom border-light pb-1 gap-1">
+                            <span class="text-muted text-uppercase fw-bold" style="font-size: 0.62rem;">Original</span>
+                            <span class="fw-bold text-dark text-nowrap">${{ item.original|localize }}</span>
+                        </div>
+                        <div class="d-flex flex-column justify-content-center align-items-center small border-bottom border-light py-1 gap-1"
+                             {% if item.tooltip %}data-bs-toggle="tooltip" data-bs-html="true" title="{{ item.tooltip }}"{% endif %} style="cursor: {% if item.tooltip %}help{% else %}default{% endif %};">
+                            <span class="text-muted text-uppercase fw-bold" style="font-size: 0.62rem;">Vigente {% if item.tooltip %}<i class="fa-solid fa-circle-info text-info ms-1"></i>{% endif %}</span>
+                            <span class="fw-bold text-dark text-nowrap">${{ item.vigente|localize }}</span>
+                        </div>
+                        <div class="d-flex flex-column justify-content-center align-items-center small pt-1 gap-1">
+                            <span class="text-muted text-uppercase fw-bold" style="font-size: 0.62rem;">Disponible</span>
+                            <span class="fw-bold text-nowrap {% if item.remaining > 0 %}text-success{% else %}text-muted opacity-75{% endif %}">
+                                ${{ item.remaining|localize }}
+                            </span>
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3 border-end">
-                    <div class="bg-white rounded-3 p-2 shadow-sm h-100">
-                        <label class="text-muted small d-block mb-1">2do Trimestre</label>
-                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q2_amount|localize }}</div>
-                        <div class="mt-1 pt-1 border-top border-light">
-                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
-                            <span class="fw-bold {% if q_rems.1 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.1|localize }}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3 border-end">
-                    <div class="bg-white rounded-3 p-2 shadow-sm h-100">
-                        <label class="text-muted small d-block mb-1">3er Trimestre</label>
-                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q3_amount|localize }}</div>
-                        <div class="mt-1 pt-1 border-top border-light">
-                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
-                            <span class="fw-bold {% if q_rems.2 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.2|localize }}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="bg-white rounded-3 p-2 shadow-sm h-100">
-                        <label class="text-muted small d-block mb-1">4to Trimestre</label>
-                        <div class="fw-bold text-dark text-nowrap" style="font-size: 0.95rem;">${{ credit.q4_amount|localize }}</div>
-                        <div class="mt-1 pt-1 border-top border-light">
-                            <small class="text-muted d-block" style="font-size: 0.65rem;">DISPONIBLE:</small>
-                            <span class="fw-bold {% if q_rems.3 > 0 %}text-success{% else %}text-muted opacity-50{% endif %}" style="font-size: 0.8rem;">${{ q_rems.3|localize }}</span>
-                        </div>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
 
             <!-- Barra de Distribución Acumulada -->
@@ -299,6 +281,9 @@
                                 <i class="fa-solid fa-file-invoice-dollar"></i>
                             </a>
                             {% if user.is_superuser %}
+                            <a href="{% url 'budget:allocation_reclassify' alloc.id %}" class="btn btn-sm btn-outline-info" title="Cambiar inciso de esta distribucion">
+                                <i class="fa-solid fa-right-left"></i>
+                            </a>
                             <form method="post"
                                   action="{% url 'budget:allocation_delete' alloc.id %}"
                                   onsubmit="return confirm('¿Eliminar la distribución de {{ alloc.unit.name|escapejs }}? Esta acción no se puede deshacer.');">

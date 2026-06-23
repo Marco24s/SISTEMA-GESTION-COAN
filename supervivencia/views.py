@@ -902,22 +902,51 @@ class PyrotechnicAssignmentCreateView(LoginRequiredMixin, SuccessMessageMixin, C
     success_message = "Asignacion cargada correctamente."
 
     def form_valid(self, form):
-        form.instance.created_by = self.request.user
-        response = super().form_valid(form)
-        if form.instance.is_active:
-            item = form.instance.physical_item
-            previous_location = item.current_location
-            item.operational_status = "INSTALLED"
-            item.save(update_fields=["operational_status", "updated_at"])
-            _create_pyrotechnic_movement(
-                assignment=form.instance,
-                movement_type="INSTALLED",
-                movement_date=form.instance.installed_at,
-                user=self.request.user,
-                from_reference=previous_location,
-                to_reference=_assignment_destination(form.instance),
-                notes="Asignacion cargada desde el modulo.",
-            )
+        item = form.instance.physical_item
+        mount_qty = form.cleaned_data.get("mount_quantity")
+        previous_location = item.current_location
+
+        if mount_qty and mount_qty < item.lot_quantity:
+            original_qty = item.lot_quantity
+            item.lot_quantity = original_qty - mount_qty
+            item.save(update_fields=["lot_quantity", "updated_at"])
+
+            clone = PyrotechnicPhysicalItem.objects.get(pk=item.pk)
+            clone.pk = None
+            clone.lot_quantity = mount_qty
+            if form.instance.is_active:
+                clone.operational_status = "INSTALLED"
+            clone.save()
+
+            form.instance.physical_item = clone
+            form.instance.created_by = self.request.user
+            response = super().form_valid(form)
+
+            if form.instance.is_active:
+                _create_pyrotechnic_movement(
+                    assignment=form.instance,
+                    movement_type="INSTALLED",
+                    movement_date=form.instance.installed_at,
+                    user=self.request.user,
+                    from_reference=previous_location,
+                    to_reference=_assignment_destination(form.instance),
+                    notes=f"Asignacion parcial ({mount_qty} de {original_qty}).",
+                )
+        else:
+            form.instance.created_by = self.request.user
+            response = super().form_valid(form)
+            if form.instance.is_active:
+                item.operational_status = "INSTALLED"
+                item.save(update_fields=["operational_status", "updated_at"])
+                _create_pyrotechnic_movement(
+                    assignment=form.instance,
+                    movement_type="INSTALLED",
+                    movement_date=form.instance.installed_at,
+                    user=self.request.user,
+                    from_reference=previous_location,
+                    to_reference=_assignment_destination(form.instance),
+                    notes="Asignacion cargada desde el modulo.",
+                )
         return response
 
     def get_initial(self):

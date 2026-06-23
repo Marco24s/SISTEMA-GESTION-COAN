@@ -57,6 +57,9 @@
                     {{ form.physical_item|as_crispy_field }}
                     <small class="text-muted">El material que ya esta activo en otro medio no aparece en esta lista.</small>
                 </div>
+                <div class="col-lg-12 mb-3" id="mount-quantity-container" style="display: none;">
+                    {{ form.mount_quantity|as_crispy_field }}
+                </div>
             </div>
         </div>
     </div>
@@ -112,4 +115,52 @@
         </button>
     </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const itemSelect = document.getElementById('id_physical_item');
+    const qtyInput = document.getElementById('id_mount_quantity');
+    const qtyContainer = document.getElementById('mount-quantity-container');
+    
+    function updateQty() {
+        if (!itemSelect || !qtyInput) return;
+        const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+        if (!selectedOption || !selectedOption.value) {
+            if (qtyContainer) qtyContainer.style.display = 'none';
+            qtyInput.value = '';
+            qtyInput.removeAttribute('max');
+            return;
+        }
+        
+        const text = selectedOption.text;
+        const match = text.match(/\|\s*Cantidad\s*(\d+)/);
+        if (match) {
+            const maxQty = parseInt(match[1], 10);
+            if (maxQty > 1) {
+                if (qtyContainer) qtyContainer.style.display = 'block';
+                qtyInput.setAttribute('max', maxQty);
+                // Si el input esta vacio o tiene un valor mayor al maximo, se lo asignamos al maximo
+                if (!qtyInput.value || parseInt(qtyInput.value, 10) > maxQty) {
+                    qtyInput.value = maxQty;
+                }
+            } else {
+                // Es un item unico (cant = 1)
+                if (qtyContainer) qtyContainer.style.display = 'none';
+                qtyInput.value = 1;
+                qtyInput.removeAttribute('max');
+            }
+        } else {
+            // No dice cantidad (cant = 1)
+            if (qtyContainer) qtyContainer.style.display = 'none';
+            qtyInput.value = 1;
+            qtyInput.removeAttribute('max');
+        }
+    }
+    
+    if (itemSelect) {
+        itemSelect.addEventListener('change', updateQty);
+        updateQty(); // Ejecutar al cargar la pagina
+    }
+});
+</script>
 {% endblock %}

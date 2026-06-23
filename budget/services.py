@@ -7,7 +7,8 @@ from .models import (
     BudgetFiscalYear, BudgetFF, BudgetSubprog, BudgetProg,
     BudgetPPPInc, BudgetPPInc, BudgetPreInc, BudgetIncisosAgrupado,
     BudgetInc, BudgetCredit, BudgetAllocation, BudgetExecution,
-    BudgetCreditTypeLog, BudgetCompensacion, InsufficientFundsError
+    BudgetCreditTypeLog, BudgetCompensacion, BudgetAllocationReclassification,
+    InsufficientFundsError
 )
 
 @transaction.atomic
@@ -322,6 +323,7 @@ def unassign_credit_type(credit, unassign_amount, user, notes=""):
     return credit
 
 COMPENSATION_ACTIVE_STATUSES = ('PENDIENTE', 'APROBADO')
+RECLASSIFICATION_ACTIVE_STATUSES = ('PENDIENTE', 'APROBADO')
 QUARTER_FIELDS = ('q1_amount', 'q2_amount', 'q3_amount', 'q4_amount')
 
 
@@ -646,3 +648,222 @@ def update_allocation_metadata(allocation_id, notes, classifications):
     allocation.save(update_fields=['notes'])
     allocation.custom_classes.set(classifications)
     return allocation
+
+
+def _credit_identity(credit):
+    return (
+        credit.ff_id,
+        credit.programa_id,
+        credit.subprog_id,
+        credit.inc_id,
+        credit.ppp_inc_id,
+        credit.pp_inc_id,
+        credit.pre_inc_id,
+        credit.incisos_agrupado_id,
+    )
+
+
+def _reclassification_target_params(item):
+    return {
+        'target_ff': item.target_ff,
+        'target_subprog': item.target_subprog,
+        'target_inc': item.target_inc,
+        'target_ppp_inc': item.target_ppp_inc,
+        'target_pp_inc': item.target_pp_inc,
+        'target_pre_inc': item.target_pre_inc,
+        'target_incisos_agrupado': item.target_incisos_agrupado,
+    }
+
+
+def _reclassification_reserved_by_quarter(source_allocation, exclude_reclassification_id=None):
+    reservations = BudgetAllocationReclassification.objects.filter(
+        source_allocation=source_allocation,
+        status__in=RECLASSIFICATION_ACTIVE_STATUSES,
+    )
+    if exclude_reclassification_id:
+        reservations = reservations.exclude(pk=exclude_reclassification_id)
+    reserved = reservations.aggregate(
+        q1=Sum('q1_amount'), q2=Sum('q2_amount'),
+        q3=Sum('q3_amount'), q4=Sum('q4_amount'),
+    )
+    return tuple((reserved[f'q{index}'] or Decimal('0')) for index in range(1, 5))
+
+
+def _validate_allocation_reclassification(source_allocation, source_credit, target_params, q_amounts, exclude_reclassification_id=None):
+    if source_credit.fiscal_year.status == 'CLOSED':
+        raise ValidationError("No se puede cambiar el inciso de una distribucion de un ejercicio cerrado.")
+    if source_credit.programa is None:
+        raise ValidationError("El credito de origen no tiene un programa asociado.")
+
+    amounts = tuple(Decimal(str(value or 0)) for value in q_amounts)
+    if any(value < 0 for value in amounts):
+        raise ValidationError("Los montos trimestrales no pueden ser negativos.")
+    if not any(value > 0 for value in amounts):
+        raise ValidationError("Debe ingresar un monto mayor a cero en al menos un trimestre.")
+
+    target_identity = (
+        target_params['target_ff'].pk,
+        source_credit.programa_id,
+        target_params['target_subprog'].pk,
+        target_params['target_inc'].pk,
+        target_params['target_ppp_inc'].pk if target_params.get('target_ppp_inc') else None,
+        target_params['target_pp_inc'].pk if target_params.get('target_pp_inc') else None,
+        target_params['target_pre_inc'].pk if target_params.get('target_pre_inc') else None,
+        target_params['target_incisos_agrupado'].pk,
+    )
+    if target_identity == _credit_identity(source_credit):
+        raise ValidationError("La partida de destino debe ser diferente de la partida de origen.")
+
+    reserved = _reclassification_reserved_by_quarter(source_allocation, exclude_reclassification_id)
+    errors = []
+    for index, (field, requested, reserved_amount) in enumerate(zip(QUARTER_FIELDS, amounts, reserved), start=1):
+        available = getattr(source_allocation, field) - reserved_amount
+        if requested > available:
+            errors.append(f"T{index}: intenta cambiar ${requested}, pero solo hay ${available} disponible sin reservar.")
+
+    total_to_move = sum(amounts, Decimal('0'))
+    reserved_total = sum(reserved, Decimal('0'))
+    real_available = source_allocation.available_amount - reserved_total
+    if total_to_move > real_available:
+        errors.append(
+            f"El monto total a cambiar (${total_to_move}) supera el disponible sin comprometer "
+            f"y sin reservar (${real_available})."
+        )
+    if source_allocation.allocated_amount - total_to_move < source_allocation.spent_amount:
+        errors.append("La distribucion origen no puede quedar por debajo de lo ya comprometido.")
+    if errors:
+        raise ValidationError(errors)
+    return amounts
+
+
+@transaction.atomic
+def request_allocation_reclassification(allocation_id, target_params, q_amounts, user, notes=""):
+    """Crea una solicitud y reserva saldo disponible de una distribucion."""
+    source_allocation = BudgetAllocation.objects.select_for_update().get(pk=allocation_id)
+    source_credit = BudgetCredit.objects.select_for_update().get(pk=source_allocation.credit_id)
+    amounts = _validate_allocation_reclassification(
+        source_allocation, source_credit, target_params, q_amounts
+    )
+
+    return BudgetAllocationReclassification.objects.create(
+        source_allocation=source_allocation,
+        source_credit=source_credit,
+        **target_params,
+        q1_amount=amounts[0],
+        q2_amount=amounts[1],
+        q3_amount=amounts[2],
+        q4_amount=amounts[3],
+        status='PENDIENTE',
+        notes=notes,
+        user=user,
+        requested_by=user,
+    )
+
+
+@transaction.atomic
+def approve_allocation_reclassification(reclassification_id, user):
+    item = BudgetAllocationReclassification.objects.select_for_update().get(pk=reclassification_id)
+    if item.status != 'PENDIENTE':
+        raise ValidationError("Solo se pueden aprobar reclasificaciones pendientes.")
+    if not item.source_allocation_id or not item.source_credit_id:
+        raise ValidationError("La solicitud ya no tiene una distribucion o credito de origen disponible.")
+
+    source_allocation = BudgetAllocation.objects.select_for_update().get(pk=item.source_allocation_id)
+    source_credit = BudgetCredit.objects.select_for_update().get(pk=item.source_credit_id)
+    _validate_allocation_reclassification(
+        source_allocation,
+        source_credit,
+        _reclassification_target_params(item),
+        (item.q1_amount, item.q2_amount, item.q3_amount, item.q4_amount),
+        exclude_reclassification_id=item.pk,
+    )
+    item.status = 'APROBADO'
+    item.approved_by = user
+    item.save(update_fields=['status', 'approved_by', 'updated_at'])
+    return item
+
+
+@transaction.atomic
+def reject_allocation_reclassification(reclassification_id):
+    item = BudgetAllocationReclassification.objects.select_for_update().get(pk=reclassification_id)
+    if item.status not in RECLASSIFICATION_ACTIVE_STATUSES:
+        raise ValidationError("Esta reclasificacion ya fue procesada.")
+    item.status = 'RECHAZADO'
+    item.save(update_fields=['status', 'updated_at'])
+    return item
+
+
+@transaction.atomic
+def execute_allocation_reclassification(reclassification_id, user):
+    item = BudgetAllocationReclassification.objects.select_for_update().get(pk=reclassification_id)
+    if item.status != 'APROBADO':
+        raise ValidationError("La reclasificacion debe estar aprobada antes de ejecutarse.")
+    if not item.source_allocation_id or not item.source_credit_id:
+        raise ValidationError("La solicitud ya no tiene una distribucion o credito de origen disponible.")
+
+    source_allocation = BudgetAllocation.objects.select_for_update().select_related(
+        'unit'
+    ).prefetch_related('custom_classes').get(pk=item.source_allocation_id)
+    source_credit = BudgetCredit.objects.select_for_update().get(pk=item.source_credit_id)
+    target_params = _reclassification_target_params(item)
+    amounts = _validate_allocation_reclassification(
+        source_allocation,
+        source_credit,
+        target_params,
+        (item.q1_amount, item.q2_amount, item.q3_amount, item.q4_amount),
+        exclude_reclassification_id=item.pk,
+    )
+
+    for field, amount in zip(QUARTER_FIELDS, amounts):
+        setattr(source_allocation, field, getattr(source_allocation, field) - amount)
+        setattr(source_credit, field, getattr(source_credit, field) - amount)
+    source_allocation.save()
+    source_credit.save()
+
+    target_credit = BudgetCredit.objects.select_for_update().filter(
+        fiscal_year=source_credit.fiscal_year,
+        credit_type_id=source_credit.credit_type_id,
+        ff=target_params['target_ff'],
+        programa_id=source_credit.programa_id,
+        subprog=target_params['target_subprog'],
+        inc=target_params['target_inc'],
+        ppp_inc=target_params['target_ppp_inc'],
+        pp_inc=target_params['target_pp_inc'],
+        pre_inc=target_params['target_pre_inc'],
+        incisos_agrupado=target_params['target_incisos_agrupado'],
+    ).first()
+    if not target_credit:
+        target_credit = BudgetCredit.objects.create(
+            fiscal_year=source_credit.fiscal_year,
+            credit_type_id=source_credit.credit_type_id,
+            ff=target_params['target_ff'],
+            programa_id=source_credit.programa_id,
+            subprog=target_params['target_subprog'],
+            inc=target_params['target_inc'],
+            ppp_inc=target_params['target_ppp_inc'],
+            pp_inc=target_params['target_pp_inc'],
+            pre_inc=target_params['target_pre_inc'],
+            incisos_agrupado=target_params['target_incisos_agrupado'],
+        )
+
+    for field, amount in zip(QUARTER_FIELDS, amounts):
+        setattr(target_credit, field, getattr(target_credit, field) + amount)
+    target_credit.save()
+
+    target_allocation = BudgetAllocation.objects.create(
+        credit=target_credit,
+        unit=source_allocation.unit,
+        q1_amount=amounts[0],
+        q2_amount=amounts[1],
+        q3_amount=amounts[2],
+        q4_amount=amounts[3],
+        notes=item.notes or source_allocation.notes,
+    )
+    target_allocation.custom_classes.set(source_allocation.custom_classes.all())
+
+    item.target_credit = target_credit
+    item.target_allocation = target_allocation
+    item.status = 'EJECUTADO'
+    item.executed_by = user
+    item.save(update_fields=['target_credit', 'target_allocation', 'status', 'executed_by', 'updated_at'])
+    return target_allocation
