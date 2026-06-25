@@ -84,8 +84,7 @@
             <div class="card-body">
                 {% if item.current_storage_location %}
                     <span class="badge bg-light text-dark border">{{ item.current_storage_location.code }}</span>
-                    <div class="fw-bold mt-2">{{ item.current_storage_location.name }}</div>
-                    <div class="text-muted">{{ item.current_storage_location.get_location_type_display }}</div>
+                    <div class="fw-bold mt-2">{{ item.current_storage_location.get_name_display }}</div>
                 {% else %}
                     <div class="fw-bold">{{ item.current_location|default:"Sin ubicacion" }}</div>
                 {% endif %}

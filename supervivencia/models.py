@@ -179,7 +179,7 @@ class PyrotechnicCatalogLifeRule(models.Model):
 
 
 class PyrotechnicStorageLocation(models.Model):
-    LOCATION_TYPE_CHOICES = [
+    LOCATION_CHOICES = [
         ("POLVORIN", "Polvorin"),
         ("PANOL", "Pañol"),
         ("DEPOSITO", "Deposito"),
@@ -188,12 +188,11 @@ class PyrotechnicStorageLocation(models.Model):
     ]
 
     code = models.CharField(max_length=50, verbose_name="Destino")
-    name = models.CharField(max_length=150, verbose_name="Ubicacion")
-    location_type = models.CharField(
-        max_length=30,
-        choices=LOCATION_TYPE_CHOICES,
+    name = models.CharField(
+        max_length=150,
+        choices=LOCATION_CHOICES,
         default="DEPOSITO",
-        verbose_name="Tipo de ubicacion",
+        verbose_name="Ubicacion",
     )
     unit = models.ForeignKey(Unit, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Unidad")
     is_restricted = models.BooleanField(default=True, verbose_name="Zona restringida")
@@ -208,7 +207,7 @@ class PyrotechnicStorageLocation(models.Model):
         ordering = ["code"]
         constraints = [
             models.UniqueConstraint(
-                fields=["code", "name", "location_type", "unit"],
+                fields=["code", "name", "unit"],
                 name="unique_storage_location_combination"
             )
         ]

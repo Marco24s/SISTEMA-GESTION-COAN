@@ -219,11 +219,10 @@ class PyrotechnicPhysicalItemForm(forms.ModelForm):
 class PyrotechnicStorageLocationForm(forms.ModelForm):
     class Meta:
         model = PyrotechnicStorageLocation
-        fields = ["code", "name", "location_type", "unit", "is_restricted", "notes", "is_active"]
+        fields = ["code", "name", "unit", "is_restricted", "notes", "is_active"]
         labels = {
             "code": "Destino",
             "name": "Ubicacion",
-            "location_type": "Tipo de ubicacion",
             "unit": "Unidad",
             "is_restricted": "Zona restringida",
             "notes": "Observaciones",
@@ -231,7 +230,6 @@ class PyrotechnicStorageLocationForm(forms.ModelForm):
         }
         widgets = {
             "code": forms.TextInput(attrs={"style": "text-transform: uppercase;"}),
-            "name": forms.TextInput(attrs={"style": "text-transform: uppercase;"}),
             "notes": forms.Textarea(attrs={"rows": 3, "style": "text-transform: uppercase;"}),
         }
 

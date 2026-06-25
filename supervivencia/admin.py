@@ -74,8 +74,8 @@ class PyrotechnicPhysicalItemAdmin(admin.ModelAdmin):
 
 @admin.register(PyrotechnicStorageLocation)
 class PyrotechnicStorageLocationAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "location_type", "unit", "is_restricted", "is_active")
-    list_filter = ("location_type", "unit", "is_restricted", "is_active")
+    list_display = ("code", "name", "unit", "is_restricted", "is_active")
+    list_filter = ("name", "unit", "is_restricted", "is_active")
     search_fields = ("code", "name", "unit__name", "notes")
 
 

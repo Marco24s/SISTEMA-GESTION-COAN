@@ -1052,14 +1052,14 @@ class PyrotechnicStorageLocationListView(LoginRequiredMixin, ListView):
                 | Q(notes__icontains=q)
             )
         if location_type:
-            queryset = queryset.filter(location_type=location_type)
+            queryset = queryset.filter(name=location_type)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["search_query"] = self.request.GET.get("q", "")
         context["selected_type"] = self.request.GET.get("type", "")
-        context["location_type_choices"] = PyrotechnicStorageLocation.LOCATION_TYPE_CHOICES
+        context["location_choices"] = PyrotechnicStorageLocation.LOCATION_CHOICES
         return context
 
 
