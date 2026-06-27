@@ -1,0 +1,86 @@
+{% extends "licitaciones/base_foreign.html" %}
+{% load humanize %}
+
+{% block title %}Licitaciones en el Exterior{% endblock %}
+
+{% block content %}
+<style>
+    .foreign-kpi { border:0; border-radius:8px; box-shadow:0 8px 20px rgba(15,23,42,.07); }
+    .currency-panel { border-left:4px solid #1f4b63; }
+</style>
+
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mt-4 mb-3 gap-3">
+    <div>
+        <h1 class="h2 mb-1"><i class="fa-solid fa-earth-americas me-2" style="color:#1f4b63;"></i>Licitaciones en el Exterior</h1>
+        <p class="text-muted mb-0">Seguimiento de requerimientos, evaluacion, adjudicacion y novedades documentales.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="get">
+            <select name="year" class="form-select" onchange="this.form.submit()">
+                {% for year in years %}
+                    <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+                {% empty %}
+                    <option value="">Sin datos</option>
+                {% endfor %}
+            </select>
+        </form>
+        <a href="{% url 'licitaciones:foreign_create' %}" class="btn btn-primary" style="background:#1f4b63;border-color:#1f4b63;">
+            <i class="fa-solid fa-plus me-1"></i> Nueva
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3"><div class="card foreign-kpi"><div class="card-body"><div class="text-muted small fw-bold">PROCESOS</div><div class="display-6 fw-bold">{{ total_count }}</div></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card foreign-kpi"><div class="card-body"><div class="text-muted small fw-bold">ACTIVOS</div><div class="display-6 fw-bold text-primary">{{ active_count }}</div></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card foreign-kpi"><div class="card-body"><div class="text-muted small fw-bold">ADJUDICADOS</div><div class="display-6 fw-bold text-success">{{ awarded_count }}</div></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card foreign-kpi"><div class="card-body"><div class="text-muted small fw-bold">EN TRAMITE</div><div class="display-6 fw-bold text-warning">{{ pending_count }}</div></div></div></div>
+</div>
+
+<div class="row g-4 mb-4">
+    {% for total in totals_by_currency %}
+    <div class="col-md-6 col-xl-4">
+        <div class="card shadow-sm border-0 currency-panel h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <h2 class="h5 mb-0">{{ total.custom_currency|default:total.currency }}</h2>
+                    <span class="badge text-bg-light">{{ total.process_count }} procesos</span>
+                </div>
+                <div class="small text-muted">DICTAMEN</div>
+                <div class="fs-5 fw-bold">{{ total.currency }} {{ total.evaluation_total|default:0|floatformat:2|intcomma }}</div>
+                <div class="small text-muted mt-3">ADJUDICADO</div>
+                <div class="fs-5 fw-bold text-success">{{ total.currency }} {{ total.awarded_total|default:0|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12"><div class="alert alert-light border">Todavia no hay licitaciones exteriores cargadas.</div></div>
+    {% endfor %}
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0">Procesos recientes</h2>
+        <a href="{% url 'licitaciones:foreign_list' %}" class="btn btn-sm btn-outline-secondary">Ver todos</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light"><tr><th>Licitacion</th><th>Moneda</th><th>REQ</th><th>Estado</th><th>Ultima novedad</th><th></th></tr></thead>
+            <tbody>
+            {% for process in processes|slice:":8" %}
+                <tr>
+                    <td><strong>{{ process.process_number }}</strong><br><small class="text-muted">{{ process.year }}</small></td>
+                    <td>{{ process.currency_label }}</td>
+                    <td>{{ process.requirements.all|length }}</td>
+                    <td>{{ process.get_status_display }}</td>
+                    <td>{% if process.latest_update %}{{ process.latest_update.event_date|date:"d/m/Y" }} - {{ process.latest_update.description|truncatechars:70 }}{% else %}<span class="text-muted">Sin novedades</span>{% endif %}</td>
+                    <td class="text-end"><a href="{{ process.get_absolute_url }}" class="btn btn-sm btn-outline-primary" title="Ver detalle"><i class="fa-solid fa-eye"></i></a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-4">Sin procesos cargados.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

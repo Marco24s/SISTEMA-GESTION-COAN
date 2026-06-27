@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Seleccionar tipo de licitacion{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-dark shadow-sm" style="background: linear-gradient(135deg, #334155 0%, #0f766e 100%);">
+    <div class="container-fluid px-4">
+        <a href="/" class="btn btn-sm text-white border-white me-3 d-inline-flex align-items-center justify-content-center"
+           style="border-radius: 50%; width: 36px; height: 36px; padding: 0; background: rgba(255,255,255,0.1);"
+           title="Volver al portal">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <span class="navbar-brand d-flex align-items-center mb-0">
+            <i class="fa-solid fa-file-contract me-2"></i>
+            <strong>Procesos Licitatorios</strong>
+        </span>
+        <span class="navbar-text text-white-50 ms-auto">
+            <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}
+        </span>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<style>
+    .tender-selection {
+        max-width: 960px;
+        margin: 0 auto;
+    }
+    .tender-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.25rem;
+    }
+    .tender-option {
+        border: 1px solid #dbe3ea;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+    }
+    .tender-option-icon {
+        width: 58px;
+        height: 58px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 1.5rem;
+    }
+    .tender-option-disabled {
+        background: #f8fafc;
+    }
+    @media (max-width: 767.98px) {
+        .tender-options {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<main class="container py-5">
+    <div class="tender-selection">
+        <div class="mb-4">
+            <h1 class="h2 fw-bold mb-2">Tipo de licitacion</h1>
+            <p class="text-muted mb-0">Seleccione el ambito del proceso licitatorio.</p>
+        </div>
+
+        <div class="tender-options">
+            <section class="card tender-option">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="tender-option-icon bg-success-subtle text-success mb-4">
+                        <i class="fa-solid fa-flag"></i>
+                    </div>
+                    <h2 class="h4 fw-bold">Licitacion nacional</h2>
+                    <p class="text-muted flex-grow-1">
+                        Gestion y seguimiento de los procesos licitatorios nacionales.
+                    </p>
+                    <a href="{% url 'licitaciones:dashboard' %}" class="btn btn-success">
+                        Ingresar <i class="fa-solid fa-arrow-right ms-2"></i>
+                    </a>
+                </div>
+            </section>
+
+            <section class="card tender-option">
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="tender-option-icon bg-secondary-subtle text-secondary mb-4">
+                        <i class="fa-solid fa-earth-americas"></i>
+                    </div>
+                    <h2 class="h4 fw-bold">Licitacion en el extranjero</h2>
+                    <p class="text-muted flex-grow-1">
+                        Espacio reservado para los procesos licitatorios en el exterior.
+                    </p>
+                    <a href="{% url 'licitaciones:foreign_dashboard' %}" class="btn btn-primary" style="background:#1f4b63;border-color:#1f4b63;">
+                        Ingresar <i class="fa-solid fa-arrow-right ms-2"></i>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </div>
+</main>
+{% endblock %}

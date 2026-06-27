@@ -2,7 +2,12 @@ from django import forms
 
 from core.models import Unit
 
-from .models import TenderProcess
+from .models import (
+    ForeignTenderProcess,
+    ForeignTenderRequirement,
+    ForeignTenderUpdate,
+    TenderProcess,
+)
 
 
 class TenderProcessForm(forms.ModelForm):
@@ -53,4 +58,73 @@ class TenderProcessForm(forms.ModelForm):
         ]
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class ForeignTenderProcessForm(forms.ModelForm):
+    class Meta:
+        model = ForeignTenderProcess
+        fields = [
+            "year",
+            "process_number",
+            "process_type",
+            "has_oca",
+            "status",
+            "currency",
+            "custom_currency",
+            "evaluation_amount",
+            "awarded_amount",
+            "notes",
+            "is_active",
+        ]
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+        help_texts = {
+            "currency": "La misma moneda se aplicara a requerimientos, dictamen y adjudicacion.",
+        }
+
+
+class ForeignTenderRequirementForm(forms.ModelForm):
+    unit = forms.ModelChoiceField(
+        queryset=Unit.objects.filter().order_by("name"),
+        label="Taller / destino",
+        required=False,
+    )
+
+    class Meta:
+        model = ForeignTenderRequirement
+        fields = [
+            "requirement_number",
+            "requested_amount",
+            "unit",
+            "workshop",
+            "aircraft",
+            "description",
+            "notes",
+        ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "notes": forms.Textarea(attrs={"rows": 2}),
+        }
+
+
+class ForeignTenderUpdateForm(forms.ModelForm):
+    event_date = forms.DateField(
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+        label="Fecha",
+    )
+
+    class Meta:
+        model = ForeignTenderUpdate
+        fields = [
+            "event_date",
+            "organization",
+            "document_type",
+            "document_number",
+            "description",
+        ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
         }

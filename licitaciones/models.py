@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 
@@ -198,3 +199,261 @@ class TenderProcess(models.Model):
     @property
     def classification_text_color(self):
         return self.CLASSIFICATION_TEXT_COLORS.get(self.classification, "#111827")
+
+
+class ForeignTenderProcess(models.Model):
+    PROCESS_TYPE_CHOICES = TenderProcess.PROCESS_TYPE_CHOICES
+    CURRENCY_CHOICES = [
+        ("USD", "Dolares"),
+        ("EUR", "Euros"),
+        ("ARS", "Pesos"),
+        ("OTRA", "Otra"),
+    ]
+    STATUS_CHOICES = [
+        ("INICIADO", "Iniciado"),
+        ("EN_EVALUACION", "En evaluacion"),
+        ("DICTAMEN_EMITIDO", "Dictamen emitido"),
+        ("PENDIENTE_ASIGNACION", "Pendiente de asignacion"),
+        ("ADJUDICADO", "Adjudicado"),
+        ("EN_RECEPCION", "En recepcion"),
+        ("FINALIZADO", "Finalizado"),
+        ("FRACASADO", "Fracasado"),
+        ("DEJADO_SIN_EFECTO", "Dejado sin efecto"),
+    ]
+
+    year = models.PositiveIntegerField(default=2026, verbose_name="Ejercicio / Año")
+    process_number = models.CharField(max_length=60, verbose_name="Licitacion")
+    process_type = models.CharField(
+        max_length=30,
+        choices=PROCESS_TYPE_CHOICES,
+        default="PUBLICA",
+        verbose_name="Tipo de proceso",
+    )
+    has_oca = models.BooleanField(blank=True, null=True, verbose_name="OCA")
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default="INICIADO",
+        verbose_name="Estado",
+    )
+    currency = models.CharField(
+        max_length=10,
+        choices=CURRENCY_CHOICES,
+        default="USD",
+        verbose_name="Moneda unica del proceso",
+    )
+    custom_currency = models.CharField(
+        max_length=30,
+        blank=True,
+        verbose_name="Nombre de otra moneda",
+    )
+    evaluation_amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name="Monto del dictamen de evaluacion",
+    )
+    awarded_amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name="Monto asignado en adjudicacion",
+    )
+    notes = models.TextField(blank=True, verbose_name="Observaciones generales")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="created_foreign_tender_processes",
+        verbose_name="Creado por",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado")
+
+    class Meta:
+        verbose_name = "Licitacion en el exterior"
+        verbose_name_plural = "Licitaciones en el exterior"
+        ordering = ["-year", "process_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["year", "process_number"],
+                name="unique_foreign_tender_year_number",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.process_number} ({self.year})"
+
+    def clean(self):
+        errors = {}
+        if self.currency == "OTRA" and not self.custom_currency.strip():
+            errors["custom_currency"] = "Indique el nombre de la moneda."
+        if self.currency != "OTRA":
+            self.custom_currency = ""
+        for field_name in ("evaluation_amount", "awarded_amount"):
+            value = getattr(self, field_name)
+            if value is not None and value < 0:
+                errors[field_name] = "El monto no puede ser negativo."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.process_number:
+            self.process_number = self.process_number.upper().strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse("licitaciones:foreign_detail", kwargs={"pk": self.pk})
+
+    @property
+    def currency_label(self):
+        if self.currency == "OTRA":
+            return self.custom_currency.upper()
+        return self.get_currency_display()
+
+    @property
+    def currency_symbol(self):
+        return {"USD": "USD", "EUR": "EUR", "ARS": "$"}.get(
+            self.currency,
+            self.custom_currency.upper() or "MON",
+        )
+
+    @property
+    def requested_amount(self):
+        return sum(
+            (requirement.requested_amount for requirement in self.requirements.all()),
+            start=0,
+        )
+
+    @property
+    def latest_update(self):
+        return self.updates.order_by("-event_date", "-created_at").first()
+
+
+class ForeignTenderRequirement(models.Model):
+    process = models.ForeignKey(
+        ForeignTenderProcess,
+        on_delete=models.CASCADE,
+        related_name="requirements",
+        verbose_name="Licitacion",
+    )
+    requirement_number = models.CharField(max_length=30, verbose_name="REQ")
+    requested_amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        verbose_name="Monto del requerimiento",
+    )
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        related_name="foreign_tender_requirements",
+        verbose_name="Taller / destino",
+        blank=True,
+        null=True,
+    )
+    workshop = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Taller alternativo",
+        help_text="Utilizar solo si el taller no existe entre las unidades.",
+    )
+    aircraft = models.CharField(max_length=100, blank=True, verbose_name="Aeronave / sistema")
+    description = models.TextField(verbose_name="Descripcion")
+    notes = models.TextField(blank=True, verbose_name="Observaciones")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Requerimiento exterior"
+        verbose_name_plural = "Requerimientos exteriores"
+        ordering = ["requirement_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["process", "requirement_number"],
+                name="unique_foreign_tender_requirement",
+            )
+        ]
+
+    def __str__(self):
+        return f"REQ {self.requirement_number} - {self.process.process_number}"
+
+    def clean(self):
+        errors = {}
+        if self.requested_amount is not None and self.requested_amount < 0:
+            errors["requested_amount"] = "El monto no puede ser negativo."
+        if not self.unit and not self.workshop.strip():
+            errors["workshop"] = "Seleccione una unidad o indique el taller."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if self.requirement_number:
+            self.requirement_number = self.requirement_number.upper().strip()
+        if self.workshop:
+            self.workshop = self.workshop.upper().strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def workshop_label(self):
+        return self.unit.name if self.unit else self.workshop
+
+
+class ForeignTenderUpdate(models.Model):
+    DOCUMENT_TYPE_CHOICES = [
+        ("GDE", "GDE"),
+        ("GFH", "GFH"),
+        ("NOTA", "Nota"),
+        ("DISPOSICION", "Disposicion"),
+        ("INFORME", "Informe"),
+        ("OTRO", "Otro"),
+    ]
+
+    process = models.ForeignKey(
+        ForeignTenderProcess,
+        on_delete=models.CASCADE,
+        related_name="updates",
+        verbose_name="Licitacion",
+    )
+    event_date = models.DateField(verbose_name="Fecha")
+    organization = models.CharField(max_length=120, blank=True, verbose_name="Organismo")
+    document_type = models.CharField(
+        max_length=20,
+        choices=DOCUMENT_TYPE_CHOICES,
+        default="GFH",
+        verbose_name="Tipo de documento",
+    )
+    document_number = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Numero de documento",
+    )
+    description = models.TextField(verbose_name="Novedad / estado informado")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="created_foreign_tender_updates",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Novedad de licitacion exterior"
+        verbose_name_plural = "Novedades de licitaciones exteriores"
+        ordering = ["-event_date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.event_date} - {self.process.process_number}"
+
+    def save(self, *args, **kwargs):
+        if self.organization:
+            self.organization = self.organization.upper().strip()
+        if self.document_number:
+            self.document_number = self.document_number.upper().strip()
+        super().save(*args, **kwargs)

@@ -1,0 +1,36 @@
+{% extends "licitaciones/base_foreign.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if child_type == "requirement" %}Requerimiento{% else %}Novedad documental{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-xl-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header text-white" style="background:#1f4b63;">
+                <h1 class="h4 mb-0">
+                    {% if child_type == "requirement" %}
+                        <i class="fa-solid fa-list-check me-2"></i>{% if object %}Editar requerimiento{% else %}Nuevo requerimiento{% endif %}
+                    {% else %}
+                        <i class="fa-solid fa-clock-rotate-left me-2"></i>Nueva novedad documental
+                    {% endif %}
+                </h1>
+            </div>
+            <div class="card-body">
+                <div class="mb-3"><strong>{{ process.process_number }}</strong> <span class="badge text-bg-light border">{{ process.currency_label }}</span></div>
+                {% if child_type == "requirement" %}
+                <div class="alert alert-light border">El monto del requerimiento se registra en {{ process.currency_label }}.</div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ process.get_absolute_url }}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1"></i> Volver</a>
+                        <button class="btn btn-primary" style="background:#1f4b63;border-color:#1f4b63;"><i class="fa-solid fa-floppy-disk me-1"></i> Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

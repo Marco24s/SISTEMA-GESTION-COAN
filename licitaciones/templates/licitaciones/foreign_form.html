@@ -1,0 +1,29 @@
+{% extends "licitaciones/base_foreign.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Licitacion en el Exterior{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-xl-9">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header text-white" style="background:#1f4b63;">
+                <h1 class="h4 mb-0"><i class="fa-solid fa-earth-americas me-2"></i>{% if object %}Editar licitacion{% else %}Nueva licitacion en el exterior{% endif %}</h1>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info border-0">
+                    La moneda seleccionada sera unica para el requerimiento, el dictamen y la adjudicacion.
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% if object %}{{ object.get_absolute_url }}{% else %}{% url 'licitaciones:foreign_dashboard' %}{% endif %}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1"></i> Volver</a>
+                        <button class="btn btn-primary" style="background:#1f4b63;border-color:#1f4b63;"><i class="fa-solid fa-floppy-disk me-1"></i> Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

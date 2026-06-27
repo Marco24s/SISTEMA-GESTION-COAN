@@ -38,6 +38,16 @@
 </div>
 
 <div class="card card-stats border-0 shadow-sm overflow-hidden">
+    <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
+        <div class="d-flex justify-content-end">
+            <div class="input-group" style="max-width: 420px;">
+                <span class="input-group-text bg-white border-end-0">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <input type="search" id="credit-table-search" class="form-control border-start-0" placeholder="Buscar en la tabla..." autocomplete="off">
+            </div>
+        </div>
+    </div>
     <form id="bulk-action-form" method="POST" action="{% url 'budget:credit_bulk_delete' %}">
         {% csrf_token %}
         <div class="table-responsive">
@@ -135,6 +145,14 @@
                         </td>
                     </tr>
                     {% endfor %}
+                    <tr id="credit-no-results-row" class="d-none">
+                        <td colspan="10" class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="fa-solid fa-magnifying-glass fa-2x mb-3 d-block opacity-25"></i>
+                                No se encontraron creditos con ese criterio.
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -192,6 +210,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnBulkDelete = document.getElementById('btn-bulk-delete');
     const btnCancel = document.getElementById('btn-cancel-selection');
     const form = document.getElementById('bulk-action-form');
+    const searchInput = document.getElementById('credit-table-search');
+    const noResultsRow = document.getElementById('credit-no-results-row');
+    const creditRows = document.querySelectorAll('.credit-row');
 
     function formatCurrency(value) {
         return new Intl.NumberFormat('es-AR', {
@@ -227,8 +248,43 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Update select all state
-        selectAll.checked = (count === selectItems.length && selectItems.length > 0);
-        selectAll.indeterminate = (count > 0 && count < selectItems.length);
+        const visibleItems = Array.from(selectItems).filter(item => item.closest('tr').style.display !== 'none');
+        selectAll.checked = (count === visibleItems.length && visibleItems.length > 0);
+        selectAll.indeterminate = (count > 0 && count < visibleItems.length);
+    }
+
+    function normalizeText(value) {
+        return (value || '')
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+    }
+
+    function filterCreditRows() {
+        const query = normalizeText(searchInput.value);
+        let visibleCount = 0;
+
+        creditRows.forEach(row => {
+            const matches = normalizeText(row.innerText).includes(query);
+            row.style.display = matches ? '' : 'none';
+
+            if (matches) {
+                visibleCount += 1;
+            } else {
+                const checkbox = row.querySelector('.select-item');
+                if (checkbox) {
+                    checkbox.checked = false;
+                }
+                row.classList.remove('selected');
+            }
+        });
+
+        if (noResultsRow) {
+            noResultsRow.classList.toggle('d-none', visibleCount > 0 || creditRows.length === 0);
+        }
+
+        updateBulkActions();
     }
 
     selectAll.addEventListener('change', function() {
@@ -265,6 +321,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 form.submit();
             }
         });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterCreditRows);
     }
 });
 </script>

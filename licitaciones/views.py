@@ -1,14 +1,30 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
+from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 
 from core.models import Unit
 
-from .forms import TenderProcessForm
-from .models import ProcurementDestination, TenderProcess
+from .forms import (
+    ForeignTenderProcessForm,
+    ForeignTenderRequirementForm,
+    ForeignTenderUpdateForm,
+    TenderProcessForm,
+)
+from .models import (
+    ForeignTenderProcess,
+    ForeignTenderRequirement,
+    ForeignTenderUpdate,
+    ProcurementDestination,
+    TenderProcess,
+)
+
+
+class TenderTypeSelectionView(LoginRequiredMixin, TemplateView):
+    template_name = "licitaciones/type_selection.html"
 
 
 def _clean_int(value):
@@ -316,3 +332,190 @@ class TenderProcessUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
         if self.object.is_active:
             return reverse_lazy("licitaciones:process_list")
         return reverse_lazy("licitaciones:process_history")
+
+
+class ForeignTenderDashboardView(LoginRequiredMixin, TemplateView):
+    template_name = "licitaciones/foreign_dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        years = list(
+            ForeignTenderProcess.objects.order_by("-year")
+            .values_list("year", flat=True)
+            .distinct()
+        )
+        selected_year = _clean_int(self.request.GET.get("year"))
+        if not selected_year and years:
+            selected_year = years[0]
+
+        processes = ForeignTenderProcess.objects.prefetch_related("requirements", "updates")
+        if selected_year:
+            processes = processes.filter(year=selected_year)
+
+        process_list = list(processes)
+        totals_by_currency = list(
+            ForeignTenderProcess.objects.filter(year=selected_year)
+            .values("currency", "custom_currency")
+            .annotate(
+                evaluation_total=Sum("evaluation_amount"),
+                awarded_total=Sum("awarded_amount"),
+                process_count=Count("id"),
+            )
+            .order_by("currency")
+        ) if selected_year else []
+
+        context.update(
+            {
+                "years": years,
+                "selected_year": selected_year,
+                "processes": process_list,
+                "total_count": len(process_list),
+                "active_count": len([p for p in process_list if p.is_active]),
+                "awarded_count": len([p for p in process_list if p.status == "ADJUDICADO"]),
+                "pending_count": len(
+                    [
+                        p
+                        for p in process_list
+                        if p.status
+                        not in {"ADJUDICADO", "FINALIZADO", "FRACASADO", "DEJADO_SIN_EFECTO"}
+                    ]
+                ),
+                "totals_by_currency": totals_by_currency,
+            }
+        )
+        return context
+
+
+class ForeignTenderProcessListView(LoginRequiredMixin, ListView):
+    model = ForeignTenderProcess
+    template_name = "licitaciones/foreign_list.html"
+    context_object_name = "processes"
+
+    def get_queryset(self):
+        queryset = ForeignTenderProcess.objects.prefetch_related("requirements", "updates")
+        year = _clean_int(self.request.GET.get("year"))
+        status = self.request.GET.get("status", "")
+        currency = self.request.GET.get("currency", "")
+        query = self.request.GET.get("q", "").strip()
+        if year:
+            queryset = queryset.filter(year=year)
+        if status:
+            queryset = queryset.filter(status=status)
+        if currency:
+            queryset = queryset.filter(currency=currency)
+        if query:
+            queryset = queryset.filter(
+                Q(process_number__icontains=query)
+                | Q(requirements__requirement_number__icontains=query)
+                | Q(requirements__description__icontains=query)
+            ).distinct()
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "years": ForeignTenderProcess.objects.order_by("-year")
+                .values_list("year", flat=True)
+                .distinct(),
+                "status_choices": ForeignTenderProcess.STATUS_CHOICES,
+                "currency_choices": ForeignTenderProcess.CURRENCY_CHOICES,
+                "selected_year": self.request.GET.get("year", ""),
+                "selected_status": self.request.GET.get("status", ""),
+                "selected_currency": self.request.GET.get("currency", ""),
+                "search_query": self.request.GET.get("q", ""),
+            }
+        )
+        return context
+
+
+class ForeignTenderProcessCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = ForeignTenderProcess
+    form_class = ForeignTenderProcessForm
+    template_name = "licitaciones/foreign_form.html"
+    success_message = "Licitacion en el exterior creada correctamente."
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
+
+
+class ForeignTenderProcessUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = ForeignTenderProcess
+    form_class = ForeignTenderProcessForm
+    template_name = "licitaciones/foreign_form.html"
+    success_message = "Licitacion en el exterior actualizada correctamente."
+
+
+class ForeignTenderProcessDetailView(LoginRequiredMixin, DetailView):
+    model = ForeignTenderProcess
+    template_name = "licitaciones/foreign_detail.html"
+    context_object_name = "process"
+
+    def get_queryset(self):
+        return ForeignTenderProcess.objects.select_related("created_by").prefetch_related(
+            "requirements__unit",
+            "updates__created_by",
+        )
+
+
+class ForeignTenderRequirementCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = ForeignTenderRequirement
+    form_class = ForeignTenderRequirementForm
+    template_name = "licitaciones/foreign_child_form.html"
+    success_message = "Requerimiento agregado correctamente."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.process = get_object_or_404(ForeignTenderProcess, pk=kwargs["process_pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.process = self.process
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({"process": self.process, "child_type": "requirement"})
+        return context
+
+    def get_success_url(self):
+        return self.process.get_absolute_url()
+
+
+class ForeignTenderRequirementUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = ForeignTenderRequirement
+    form_class = ForeignTenderRequirementForm
+    template_name = "licitaciones/foreign_child_form.html"
+    success_message = "Requerimiento actualizado correctamente."
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({"process": self.object.process, "child_type": "requirement"})
+        return context
+
+    def get_success_url(self):
+        return self.object.process.get_absolute_url()
+
+
+class ForeignTenderUpdateCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = ForeignTenderUpdate
+    form_class = ForeignTenderUpdateForm
+    template_name = "licitaciones/foreign_child_form.html"
+    success_message = "Novedad documental registrada correctamente."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.process = get_object_or_404(ForeignTenderProcess, pk=kwargs["process_pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.process = self.process
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({"process": self.process, "child_type": "update"})
+        return context
+
+    def get_success_url(self):
+        return self.process.get_absolute_url()

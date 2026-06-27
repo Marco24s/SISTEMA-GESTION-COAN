@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background:#1f4b63;">
+    <div class="container-fluid px-4">
+        <a href="{% url 'licitaciones:type_selection' %}" class="btn btn-sm text-white border-white me-3 d-inline-flex align-items-center justify-content-center"
+           style="border-radius:50%; width:34px; height:34px; padding:0;" title="Cambiar tipo de licitacion">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'licitaciones:foreign_dashboard' %}">
+            <i class="fa-solid fa-earth-americas me-2"></i>
+            <strong>Licitaciones en el Exterior</strong>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#foreignNavbar">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="foreignNavbar">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'foreign_dashboard' %}active fw-bold{% endif %}"
+                       href="{% url 'licitaciones:foreign_dashboard' %}">
+                        <i class="fa-solid fa-gauge-high me-1"></i> Resumen
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'foreign_list' %}active fw-bold{% endif %}"
+                       href="{% url 'licitaciones:foreign_list' %}">
+                        <i class="fa-solid fa-list-check me-1"></i> Procesos
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'foreign_create' %}active fw-bold{% endif %}"
+                       href="{% url 'licitaciones:foreign_create' %}">
+                        <i class="fa-solid fa-plus me-1"></i> Nueva licitacion
+                    </a>
+                </li>
+            </ul>
+            <span class="navbar-text text-white-50">
+                <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}
+            </span>
+        </div>
+    </div>
+</nav>
+{% endblock %}
