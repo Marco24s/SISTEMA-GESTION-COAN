@@ -1,5 +1,20 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+import csv
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect
+
+class GroupRequiredMixin(UserPassesTestMixin):
+    group_required = None
+
+    def test_func(self):
+        if self.request.user.is_superuser:
+            return True
+        if not self.group_required:
+            return True
+        groups = self.group_required if isinstance(self.group_required, list) else [self.group_required]
+        return self.request.user.groups.filter(name__in=groups).exists()
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -13,6 +28,7 @@ from .forms import (
     ForeignTenderRequirementForm,
     ForeignTenderUpdateForm,
     TenderProcessForm,
+    TenderStageUpdateForm,
 )
 from .models import (
     ForeignTenderProcess,
@@ -20,6 +36,7 @@ from .models import (
     ForeignTenderUpdate,
     ProcurementDestination,
     TenderProcess,
+    TenderStage,
 )
 
 
@@ -301,7 +318,8 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
         return context
 
 
-class TenderProcessCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class TenderProcessCreateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMessageMixin, CreateView):
+    group_required = ["Supervisor", "Capturista"]
     model = TenderProcess
     form_class = TenderProcessForm
     template_name = "licitaciones/process_form.html"
@@ -322,7 +340,8 @@ class TenderProcessDetailView(LoginRequiredMixin, DetailView):
         return TenderProcess.objects.select_related("unit", "destination", "created_by")
 
 
-class TenderProcessUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class TenderProcessUpdateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMessageMixin, UpdateView):
+    group_required = ["Supervisor", "Capturista"]
     model = TenderProcess
     form_class = TenderProcessForm
     template_name = "licitaciones/process_form.html"
@@ -429,7 +448,8 @@ class ForeignTenderProcessListView(LoginRequiredMixin, ListView):
         return context
 
 
-class ForeignTenderProcessCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class ForeignTenderProcessCreateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMessageMixin, CreateView):
+    group_required = ["Supervisor", "Capturista"]
     model = ForeignTenderProcess
     form_class = ForeignTenderProcessForm
     template_name = "licitaciones/foreign_form.html"
@@ -440,7 +460,8 @@ class ForeignTenderProcessCreateView(LoginRequiredMixin, SuccessMessageMixin, Cr
         return super().form_valid(form)
 
 
-class ForeignTenderProcessUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+class ForeignTenderProcessUpdateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMessageMixin, UpdateView):
+    group_required = ["Supervisor", "Capturista"]
     model = ForeignTenderProcess
     form_class = ForeignTenderProcessForm
     template_name = "licitaciones/foreign_form.html"
@@ -519,3 +540,62 @@ class ForeignTenderUpdateCreateView(LoginRequiredMixin, SuccessMessageMixin, Cre
 
     def get_success_url(self):
         return self.process.get_absolute_url()
+
+
+class TenderStageManageView(LoginRequiredMixin, GroupRequiredMixin, DetailView):
+    group_required = ["Supervisor", "Capturista"]
+    model = TenderProcess
+    template_name = "licitaciones/tender_stages.html"
+    context_object_name = "process"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["stages"] = self.object.stages.all().order_by("stage_number")
+        return context
+
+class TenderStageUpdateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMessageMixin, UpdateView):
+    group_required = ["Supervisor", "Capturista"]
+    model = TenderStage
+    form_class = TenderStageUpdateForm
+    template_name = "licitaciones/tender_stage_form.html"
+    success_message = "Etapa actualizada correctamente."
+
+    def get_success_url(self):
+        return reverse_lazy('licitaciones:tender_stages', kwargs={'pk': self.object.tender.pk})
+
+@login_required
+def export_national_tenders_csv(request):
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="licitaciones_nacionales.csv"'
+
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow(['Año', 'Unidad/Destino', 'Proceso', 'Expediente', 'Objeto', 'Clasificación', 'Estado', 'Monto Adjudicado (ARS)'])
+
+    processes = TenderProcess.objects.select_related("unit").all().order_by("-year", "unit__name", "-opening_date", "process_number")
+
+    for p in processes:
+        writer.writerow([
+            p.year,
+            p.unit.name if p.unit else "SIN UNIDAD",
+            p.process_number,
+            p.expediente,
+            p.name,
+            p.get_classification_display() if p.classification else "-",
+            p.get_status_display(),
+            p.amount_ars if p.amount_ars is not None else ""
+        ])
+
+    return response
+
+@login_required
+def mark_notification_read(request, pk):
+    from .models import Notification
+    try:
+        notification = Notification.objects.get(pk=pk, user=request.user)
+        notification.is_read = True
+        notification.save()
+        if notification.link:
+            return redirect(notification.link)
+    except Notification.DoesNotExist:
+        pass
+    return redirect('licitaciones:type_selection')

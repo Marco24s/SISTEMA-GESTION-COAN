@@ -100,8 +100,21 @@ ADMIN_DELETE_MODELS = {
     "physical": {
         "label": "Material fisico",
         "model": PyrotechnicPhysicalItem,
-        "search": ("catalog_item__nomenclature", "catalog_item__system", "serial_number", "lot_number"),
+        "search": (
+            "catalog_item__nomenclature",
+            "catalog_item__system",
+            "catalog_item__part_number",
+            "catalog_item__nsn",
+            "catalog_item__alternate_part_number",
+            "serial_number",
+            "lot_number",
+            "manufacturer",
+            "current_location",
+            "current_storage_location__code",
+            "current_storage_location__unit__name",
+        ),
         "order": ("expiration_date", "catalog_item__nomenclature"),
+        "select_related": ("catalog_item", "current_storage_location", "current_storage_location__unit"),
     },
     "location": {
         "label": "Ubicaciones",
@@ -230,6 +243,8 @@ class SupervivenciaAdminDeleteView(LoginRequiredMixin, TemplateView):
             selected_type = "medium"
         config = ADMIN_DELETE_MODELS[selected_type]
         queryset = config["model"].objects.all().order_by(*config["order"])
+        if config.get("select_related"):
+            queryset = queryset.select_related(*config["select_related"])
         q = self.request.GET.get("q", "").strip()
         if q:
             query = Q()

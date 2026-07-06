@@ -14,8 +14,14 @@
                     <div class="small text-muted text-uppercase">Tipo</div>
                     <div class="fw-bold mb-2">{{ model_label }}</div>
                     <div class="small text-muted text-uppercase">Registro</div>
-                    <div class="fw-bold">{{ object }}</div>
-                    <div class="text-muted">ID: {{ object.pk }}</div>
+                    <div class="mb-2">
+                        <span class="badge bg-dark fs-6">ID #{{ object.pk }}</span>
+                    </div>
+                    {% if model_type == "physical" %}
+                        {% include "supervivencia/_admin_physical_item_identity.html" %}
+                    {% else %}
+                        <div class="fw-bold">{{ object }}</div>
+                    {% endif %}
                 </div>
 
                 <form method="post">

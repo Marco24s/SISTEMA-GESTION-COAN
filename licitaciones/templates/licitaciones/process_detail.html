@@ -1,5 +1,6 @@
 {% extends "licitaciones/base_licitaciones.html" %}
 {% load humanize %}
+{% load auth_extras %}
 
 {% block title %}Detalle de Proceso{% endblock %}
 
@@ -63,9 +64,14 @@
         <p class="text-muted mb-0">{{ process.name }}</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-primary">
+        {% if request.user|has_any_group:"Supervisor,Capturista" %}
+        <a href="{% url 'licitaciones:tender_stages' process.id %}" class="btn btn-info text-white shadow-sm">
+            <i class="fa-solid fa-code-branch me-1"></i> Ver Etapas
+        </a>
+        <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-primary shadow-sm">
             <i class="fa-solid fa-pen-to-square me-1"></i> Editar
         </a>
+        {% endif %}
     </div>
 </div>
 

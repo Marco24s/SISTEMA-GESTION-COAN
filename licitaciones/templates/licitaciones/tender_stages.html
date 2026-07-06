@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load auth_extras %}
+
+{% block title %}Licitación | Etapas{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-dark shadow-sm" style="background: linear-gradient(135deg, #334155 0%, #0f766e 100%);">
+    <div class="container-fluid px-4">
+        <a href="{% url 'licitaciones:process_detail' process.pk %}" class="btn btn-sm text-white border-white me-3 d-inline-flex align-items-center justify-content-center"
+           style="border-radius: 50%; width: 36px; height: 36px; padding: 0; background: rgba(255,255,255,0.1);"
+           title="Volver a la Licitación">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <span class="navbar-brand d-flex align-items-center mb-0">
+            <i class="fa-solid fa-code-branch me-2"></i>
+            <strong>Flujo de Etapas</strong>
+        </span>
+        <span class="navbar-text text-white-50 ms-auto">
+            <i class="fa-solid fa-user-circle me-1"></i> {{ user.username }}
+        </span>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 3rem;
+        margin-top: 2rem;
+    }
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 1rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e2e8f0;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+    .timeline-badge {
+        position: absolute;
+        left: -2.7rem;
+        top: 0;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        color: white;
+        z-index: 1;
+    }
+    .status-PENDIENTE .timeline-badge { background: #94a3b8; }
+    .status-EN_CURSO .timeline-badge { background: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+    .status-COMPLETADA .timeline-badge { background: #10b981; }
+    .status-OMITIDA .timeline-badge { background: #f59e0b; }
+    
+    .timeline-card {
+        border-left: 4px solid transparent;
+        transition: all 0.2s ease;
+    }
+    .timeline-card:hover {
+        transform: translateX(5px);
+    }
+    .status-PENDIENTE .timeline-card { border-left-color: #94a3b8; opacity: 0.7; }
+    .status-EN_CURSO .timeline-card { border-left-color: #3b82f6; }
+    .status-COMPLETADA .timeline-card { border-left-color: #10b981; }
+    .status-OMITIDA .timeline-card { border-left-color: #f59e0b; }
+</style>
+
+<main class="container py-5">
+    <div class="mb-4">
+        <h2 class="fw-bold mb-1">Flujo de Etapas: {{ process.process_number }}</h2>
+        <p class="text-muted">{{ process.description }}</p>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="timeline">
+                {% for stage in stages %}
+                <div class="timeline-item status-{{ stage.status }}">
+                    <div class="timeline-badge">
+                        {% if stage.status == 'COMPLETADA' %}
+                            <i class="fa-solid fa-check"></i>
+                        {% elif stage.status == 'EN_CURSO' %}
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                        {% elif stage.status == 'OMITIDA' %}
+                            <i class="fa-solid fa-forward-step"></i>
+                        {% else %}
+                            {{ stage.stage_number }}
+                        {% endif %}
+                    </div>
+                    <div class="card timeline-card shadow-sm border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0 fw-bold">{{ stage.stage_number }}. {{ stage.name }}</h5>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge rounded-pill 
+                                        {% if stage.status == 'COMPLETADA' %}bg-success
+                                        {% elif stage.status == 'EN_CURSO' %}bg-primary
+                                        {% elif stage.status == 'OMITIDA' %}bg-warning text-dark
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ stage.get_status_display }}
+                                    </span>
+                                    {% if request.user|has_any_group:"Supervisor,Capturista" %}
+                                    <a href="{% url 'licitaciones:stage_update' stage.pk %}" class="btn btn-sm btn-outline-primary shadow-sm" style="padding: 0.1rem 0.4rem;" title="Editar Etapa">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row text-muted small">
+                                <div class="col-sm-6 mb-1">
+                                    <i class="fa-regular fa-calendar me-1"></i> 
+                                    {% if stage.start_date %}
+                                        Inicio: <strong>{{ stage.start_date|date:"d/m/Y" }}</strong>
+                                    {% else %}
+                                        Inicio estimado: {{ stage.estimated_date|date:"d/m/Y"|default:"-" }}
+                                    {% endif %}
+                                </div>
+                                <div class="col-sm-6 mb-1">
+                                    <i class="fa-regular fa-calendar-check me-1"></i> 
+                                    Fin: <strong>{{ stage.end_date|date:"d/m/Y"|default:"-" }}</strong>
+                                </div>
+                            </div>
+                            
+                            {% if stage.responsible %}
+                            <div class="mt-2 text-muted small">
+                                <i class="fa-regular fa-user me-1"></i> Responsable: <strong>{{ stage.responsible.username }}</strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="alert alert-info">
+                    <i class="fa-solid fa-info-circle me-2"></i> No se encontraron etapas para este proceso. (El proceso fue creado antes de implementar esta funcionalidad).
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

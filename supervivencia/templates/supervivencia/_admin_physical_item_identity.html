@@ -1,0 +1,53 @@
+<div class="fw-bold mb-2">{{ object.catalog_item.nomenclature }}</div>
+<div class="row g-2 small">
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">N/P:</span>
+        <strong>{{ object.catalog_item.part_number|default:"-" }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">NSN:</span>
+        <strong>{{ object.catalog_item.nsn|default:"-" }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Serie:</span>
+        <strong>{{ object.serial_number|default:"-" }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Lote:</span>
+        <strong>{{ object.lot_number|default:"-" }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Cantidad:</span>
+        <strong>{{ object.lot_quantity }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Vencimiento:</span>
+        <strong>{{ object.expiration_date|date:"d/m/Y" }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Ubicacion:</span>
+        <strong>
+            {% if object.current_storage_location %}
+                {{ object.current_storage_location }}
+            {% else %}
+                {{ object.current_location|default:"-" }}
+            {% endif %}
+        </strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Condicion:</span>
+        <strong>{{ object.get_condition_display }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Estado:</span>
+        <strong>{{ object.get_operational_status_display }}</strong>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <span class="text-muted">Registro:</span>
+        {% if object.is_active %}
+            <span class="badge bg-success">Activo</span>
+        {% else %}
+            <span class="badge bg-secondary">Inactivo</span>
+        {% endif %}
+    </div>
+</div>

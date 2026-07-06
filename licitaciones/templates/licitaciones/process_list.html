@@ -1,6 +1,7 @@
 {% extends "licitaciones/base_licitaciones.html" %}
 {% load humanize %}
 {% load l10n %}
+{% load auth_extras %}
 
 {% block title %}Procesos Licitatorios{% endblock %}
 
@@ -117,9 +118,14 @@
         {% endif %}
     </div>
     <div class="d-flex gap-2">
+        <a href="{% url 'licitaciones:process_export_csv' %}" class="btn btn-outline-secondary">
+            <i class="fa-solid fa-file-csv me-1"></i> Exportar CSV
+        </a>
+        {% if request.user|has_any_group:"Supervisor,Capturista" %}
         <a href="{% url 'licitaciones:process_create' %}" class="btn btn-success">
             <i class="fa-solid fa-plus me-1"></i> Nuevo proceso
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -264,9 +270,11 @@
                                 <a href="{% url 'licitaciones:process_detail' process.id %}" class="btn btn-sm btn-outline-secondary" title="Ver detalle">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
+                                {% if request.user|has_any_group:"Supervisor,Capturista" %}
                                 <a href="{% url 'licitaciones:process_update' process.id %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

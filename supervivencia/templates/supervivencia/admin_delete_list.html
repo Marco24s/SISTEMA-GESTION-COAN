@@ -28,7 +28,8 @@
             </div>
             <div class="col-md-6">
                 <label class="form-label small text-muted mb-1">Buscar</label>
-                <input type="search" name="q" value="{{ search_query }}" class="form-control" placeholder="Buscar registro">
+                <input type="search" name="q" value="{{ search_query }}" class="form-control"
+                       placeholder="{% if selected_type == 'physical' %}Nombre, N/P, NSN, serie, lote o ubicacion{% else %}Buscar registro{% endif %}">
             </div>
             <div class="col-md-2 d-grid">
                 <button type="submit" class="btn btn-outline-danger">
@@ -56,8 +57,14 @@
                 <tbody>
                     {% for object in objects %}
                     <tr>
-                        <td>{{ object.pk }}</td>
-                        <td><strong>{{ object }}</strong></td>
+                        <td class="fw-bold text-nowrap">#{{ object.pk }}</td>
+                        <td>
+                            {% if selected_type == "physical" %}
+                                {% include "supervivencia/_admin_physical_item_identity.html" %}
+                            {% else %}
+                                <strong>{{ object }}</strong>
+                            {% endif %}
+                        </td>
                         <td class="text-end">
                             <a href="{% url 'supervivencia:admin_delete_confirm' selected_type object.pk %}" class="btn btn-sm btn-outline-danger">
                                 <i class="fa-solid fa-trash-can me-1"></i> Eliminar definitivamente

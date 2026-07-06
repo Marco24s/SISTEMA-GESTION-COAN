@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.urls import reverse
 
 from core.models import Unit
@@ -457,3 +459,86 @@ class ForeignTenderUpdate(models.Model):
         if self.document_number:
             self.document_number = self.document_number.upper().strip()
         super().save(*args, **kwargs)
+
+
+class TenderStage(models.Model):
+    STATUS_CHOICES = [
+        ("PENDIENTE", "Pendiente"),
+        ("EN_CURSO", "En curso"),
+        ("COMPLETADA", "Completada"),
+        ("OMITIDA", "Omitida"),
+    ]
+
+    tender = models.ForeignKey(
+        TenderProcess,
+        on_delete=models.CASCADE,
+        related_name="stages",
+        verbose_name="Licitacion",
+    )
+    stage_number = models.PositiveIntegerField(verbose_name="Numero de etapa")
+    name = models.CharField(max_length=150, verbose_name="Nombre de etapa")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDIENTE", verbose_name="Estado")
+    estimated_date = models.DateField(blank=True, null=True, verbose_name="Fecha estimada")
+    start_date = models.DateField(blank=True, null=True, verbose_name="Fecha de inicio real")
+    end_date = models.DateField(blank=True, null=True, verbose_name="Fecha de fin real")
+    responsible = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="managed_tender_stages",
+        verbose_name="Usuario responsable",
+    )
+    notes = models.TextField(blank=True, verbose_name="Observaciones")
+
+    class Meta:
+        verbose_name = "Etapa de licitacion"
+        verbose_name_plural = "Etapas de licitacion"
+        ordering = ["stage_number"]
+        unique_together = ("tender", "stage_number")
+
+    def __str__(self):
+        return f"Etapa {self.stage_number}: {self.name} - {self.tender.process_number}"
+
+
+@receiver(post_save, sender=TenderProcess)
+def create_tender_stages(sender, instance, created, **kwargs):
+    if created:
+        default_stages = [
+            "Solicitud de Contratacion",
+            "Afectacion Preventiva",
+            "Elaboracion de Pliego",
+            "Aprobacion de Pliego",
+            "Llamado y Publicacion",
+            "Consultas y Circulares",
+            "Acto de Apertura",
+            "Analisis de Ofertas",
+            "Dictamen de Evaluacion",
+            "Impugnaciones",
+            "Adjudicacion",
+            "Notificacion a Oferentes",
+            "Firma de Contrato / Orden de Compra",
+        ]
+        stages_to_create = [
+            TenderStage(
+                tender=instance,
+                stage_number=idx,
+                name=name,
+                status="PENDIENTE"
+            )
+            for idx, name in enumerate(default_stages, start=1)
+        ]
+        TenderStage.objects.bulk_create(stages_to_create)
+
+class Notification(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
+    message = models.CharField(max_length=255)
+    link = models.CharField(max_length=255, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Notification for {self.user.username}: {self.message}"

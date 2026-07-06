@@ -7,6 +7,7 @@ from .models import (
     ForeignTenderRequirement,
     ForeignTenderUpdate,
     TenderProcess,
+    TenderStage,
 )
 
 
@@ -14,6 +15,7 @@ class TenderProcessForm(forms.ModelForm):
     is_active = forms.BooleanField(
         label="Mostrar en procesos activos",
         required=False,
+        initial=True,
         help_text="Si se desmarca, queda guardado en el historial.",
     )
     unit = forms.ModelChoiceField(
@@ -127,4 +129,16 @@ class ForeignTenderUpdateForm(forms.ModelForm):
         ]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
+        }
+
+
+class TenderStageUpdateForm(forms.ModelForm):
+    class Meta:
+        model = TenderStage
+        fields = ["status", "start_date", "end_date", "responsible"]
+        widgets = {
+            "status": forms.Select(attrs={"class": "form-select"}),
+            "start_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "end_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "responsible": forms.Select(attrs={"class": "form-select"}),
         }
