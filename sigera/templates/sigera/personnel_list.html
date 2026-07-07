@@ -41,64 +41,118 @@
 </div>
 
 <div class="card shadow-sm border-0 mb-5" style="border-radius: 15px; overflow: hidden;">
-    <div class="card-header bg-white border-bottom py-3">
-        <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Listado de Personal Registrado</h5>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover table-striped align-middle mb-0">
-                <thead style="background-color: #f8f9fa;">
-                    <tr>
-                        <th scope="col" class="py-3 px-4 text-muted">Ape. y Nombres</th>
-                        <th scope="col" class="py-3 text-muted text-center">Jerarquía/Rango</th>
-                        <th scope="col" class="py-3 text-muted text-center">Matrícula de Revista</th>
-                        <th scope="col" class="py-3 text-muted">Unidad Asignada</th>
-                        <th scope="col" class="py-3 text-muted text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody class="border-top-0">
-                    {% for person in personnel_list %}
-                        <tr>
-                            <td class="px-4 py-3 fw-bold">{{ person.last_name }}, {{ person.first_name }}</td>
-                            <td class="py-3 text-center">
-                                <span class="badge border bg-light text-dark">{{ person.get_rank_display }}</span>
-                            </td>
-                            <td class="py-3 font-monospace text-center">{{ person.dni }}</td>
-                            <td class="py-3 text-muted">
-                                {% if person.assigned_unit %}
-                                    <i class="fa-solid fa-building-flag me-1" style="color: #6f42c1; opacity: 0.5;"></i> {{ person.assigned_unit.name }}
-                                {% else %}
-                                    <span class="text-muted fst-italic">Sin unidad</span>
-                                {% endif %}
-                            </td>
-                            <td class="py-3 text-center">
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="btn btn-sm btn-outline-success shadow-sm" title="Planilla de Medidas">
-                                        <i class="fa-solid fa-ruler-combined"></i>
-                                    </a>
-                                    <a href="{% url 'sigera:personnel_edit' person.pk %}" class="btn btn-sm btn-outline-primary shadow-sm" style="color: #6f42c1; border-color: #6f42c1;" title="Editar Datos">
-                                        <i class="fa-solid fa-user-pen"></i>
-                                    </a>
-                                    {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
-                                    <a href="{% url 'sigera:personnel_delete' person.pk %}" class="btn btn-sm btn-outline-danger shadow-sm" title="Eliminar Registro">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
-                                <i class="fa-solid fa-users-slash fa-3x mb-3" style="color: #e0cffc;"></i>
-                                <h5>No se encontraron resultados</h5>
-                                <p>Pruebe con otros términos de búsqueda o agregue personal nuevo.</p>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <div class="card-header bg-white border-bottom py-3 d-flex flex-column flex-md-row justify-content-between gap-2">
+        <div>
+            <h5 class="mb-0 fw-bold" style="color: #6f42c1;">Listado de Personal Registrado</h5>
+            <small class="text-muted">Agrupado por unidad asignada y jerarquía/rango.</small>
         </div>
+        <span class="badge rounded-pill align-self-start align-self-md-center" style="background-color: #e0cffc; color: #462880;">
+            {{ personnel_list|length }} registros
+        </span>
+    </div>
+    <div class="card-body p-3 p-md-4">
+        {% if grouped_personnel %}
+            <div class="accordion" id="personnelUnitAccordion">
+                {% for unit_group in grouped_personnel %}
+                    <div class="accordion-item border-0 shadow-sm mb-3" style="border-radius: 14px; overflow: hidden;">
+                        <h2 class="accordion-header" id="unit-heading-{{ forloop.counter }}">
+                            <button class="accordion-button collapsed py-3" type="button" data-bs-toggle="collapse" data-bs-target="#unit-collapse-{{ forloop.counter }}" aria-expanded="false" aria-controls="unit-collapse-{{ forloop.counter }}" style="background-color: #f8f5ff; color: #462880;">
+                                <span class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between w-100 gap-2 me-3">
+                                    <span class="fw-bold">
+                                        <i class="fa-solid fa-building-flag me-2"></i>{{ unit_group.name }}
+                                    </span>
+                                    <span class="badge rounded-pill" style="background-color: #6f42c1;">
+                                        {{ unit_group.count }} persona{% if unit_group.count != 1 %}s{% endif %}
+                                    </span>
+                                    <span class="d-flex flex-wrap gap-1">
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">{{ unit_group.complete_measure_count }} completos</span>
+                                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle">{{ unit_group.partial_measure_count }} parciales</span>
+                                        <span class="badge bg-light text-muted border">{{ unit_group.empty_measure_count }} sin cargar</span>
+                                    </span>
+                                </span>
+                            </button>
+                        </h2>
+                        <div id="unit-collapse-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="unit-heading-{{ forloop.counter }}" data-bs-parent="#personnelUnitAccordion">
+                            <div class="accordion-body bg-white p-3">
+                                <div class="accordion" id="rankAccordion-{{ forloop.counter }}">
+                                    {% for rank_group in unit_group.ranks %}
+                                        <div class="accordion-item border mb-2" style="border-radius: 12px; overflow: hidden;">
+                                            <h3 class="accordion-header" id="rank-heading-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#rank-collapse-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" aria-expanded="false" aria-controls="rank-collapse-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                                    <span class="d-flex align-items-center justify-content-between w-100 me-3">
+                                                        <span>
+                                                            <i class="fa-solid fa-ranking-star me-2" style="color: #6f42c1;"></i>{{ rank_group.name }}
+                                                        </span>
+                                                        <span class="badge bg-light text-dark border">
+                                                            {{ rank_group.people|length }} persona{% if rank_group.people|length != 1 %}s{% endif %}
+                                                        </span>
+                                                        <span class="d-none d-md-inline-flex gap-1">
+                                                            <span class="badge bg-success-subtle text-success border border-success-subtle">{{ rank_group.complete_measure_count }}</span>
+                                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">{{ rank_group.partial_measure_count }}</span>
+                                                            <span class="badge bg-light text-muted border">{{ rank_group.empty_measure_count }}</span>
+                                                        </span>
+                                                    </span>
+                                                </button>
+                                            </h3>
+                                            <div id="rank-collapse-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="rank-heading-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" data-bs-parent="#rankAccordion-{{ forloop.parentloop.counter }}">
+                                                <div class="accordion-body p-0">
+                                                    <div class="table-responsive">
+                                                        <table class="table table-hover table-striped align-middle mb-0" data-disable-table-tools="true">
+                                                            <thead style="background-color: #f8f9fa;">
+                                                                <tr>
+                                                                    <th scope="col" class="py-3 px-4 text-muted">Ape. y Nombres</th>
+                                                                    <th scope="col" class="py-3 text-muted text-center">Matrícula de Revista</th>
+                                                                    <th scope="col" class="py-3 text-muted text-center">Talles</th>
+                                                                    <th scope="col" class="py-3 text-muted text-center">Acciones</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody class="border-top-0">
+                                                                {% for person in rank_group.people %}
+                                                                    <tr>
+                                                                        <td class="px-4 py-3 fw-bold">{{ person.last_name }}, {{ person.first_name }}</td>
+                                                                        <td class="py-3 font-monospace text-center">{{ person.dni }}</td>
+                                                                        <td class="py-3 text-center">
+                                                                            <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="badge text-decoration-none px-3 py-2 {{ person.measure_badge_class }}" title="Ver o cargar planilla de talles">
+                                                                                <i class="fa-solid fa-ruler-combined me-1"></i>{{ person.measure_badge_label }}
+                                                                            </a>
+                                                                        </td>
+                                                                        <td class="py-3 text-center">
+                                                                            <div class="d-flex justify-content-center gap-1">
+                                                                                <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="btn btn-sm btn-outline-success shadow-sm" title="Planilla de Medidas">
+                                                                                    <i class="fa-solid fa-ruler-combined"></i>
+                                                                                </a>
+                                                                                <a href="{% url 'sigera:personnel_edit' person.pk %}" class="btn btn-sm btn-outline-primary shadow-sm" style="color: #6f42c1; border-color: #6f42c1;" title="Editar Datos">
+                                                                                    <i class="fa-solid fa-user-pen"></i>
+                                                                                </a>
+                                                                                {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
+                                                                                    <a href="{% url 'sigera:personnel_delete' person.pk %}" class="btn btn-sm btn-outline-danger shadow-sm" title="Eliminar Registro">
+                                                                                        <i class="fa-solid fa-trash"></i>
+                                                                                    </a>
+                                                                                {% endif %}
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fa-solid fa-users-slash fa-3x mb-3" style="color: #e0cffc;"></i>
+                <h5>No se encontraron resultados</h5>
+                <p>Pruebe con otros términos de búsqueda o agregue personal nuevo.</p>
+            </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

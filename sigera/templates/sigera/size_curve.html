@@ -15,31 +15,190 @@
 
 <div class="row g-3 mb-4">
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+        <button class="card border-0 shadow-sm h-100 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#detailMeasuredPersonnel" aria-expanded="false" aria-controls="detailMeasuredPersonnel" style="border-radius: 15px; background: #fff;">
             <div class="card-body">
                 <div class="text-muted small text-uppercase">Personal con medidas</div>
                 <div class="display-6 fw-bold" style="color: #462880;">{{ measured_personnel_count }}</div>
+                <small class="text-muted"><i class="fa-solid fa-circle-info me-1"></i>Click para ver detalle</small>
             </div>
-        </div>
+        </button>
     </div>
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+        <button class="card border-0 shadow-sm h-100 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#detailTotalRequired" aria-expanded="false" aria-controls="detailTotalRequired" style="border-radius: 15px; background: #fff;">
             <div class="card-body">
                 <div class="text-muted small text-uppercase">Necesidad total</div>
                 <div class="display-6 fw-bold text-primary">{{ total_required }}</div>
+                <small class="text-muted"><i class="fa-solid fa-circle-info me-1"></i>Click para ver detalle</small>
             </div>
-        </div>
+        </button>
     </div>
     <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+        <button class="card border-0 shadow-sm h-100 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#detailTotalMissing" aria-expanded="false" aria-controls="detailTotalMissing" style="border-radius: 15px; background: #fff;">
             <div class="card-body">
                 <div class="text-muted small text-uppercase">Faltante estimado</div>
                 <div class="display-6 fw-bold {% if total_missing %}text-danger{% else %}text-success{% endif %}">{{ total_missing }}</div>
+                <small class="text-muted"><i class="fa-solid fa-circle-info me-1"></i>Click para ver detalle</small>
+            </div>
+        </button>
+    </div>
+</div>
+
+<div class="collapse mb-4 size-curve-detail-panel" id="detailMeasuredPersonnel">
+    <div class="card border-0 shadow-sm" style="border-radius: 15px; overflow: hidden;">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-bold" style="color: #462880;">Detalle: Personal con medidas</h5>
+            <small class="text-muted">Personal incluido en la curva según los filtros actuales.</small>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th class="py-3 px-4 text-muted">Personal</th>
+                            <th class="py-3 text-muted">Unidad</th>
+                            <th class="py-3 text-center text-muted">Medidas cargadas</th>
+                            <th class="py-3 text-center text-muted">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in measured_personnel_details %}
+                        <tr>
+                            <td class="px-4 py-3 fw-bold">{{ item.person.last_name }}, {{ item.person.first_name }}</td>
+                            <td class="py-3 text-muted">{{ item.person.assigned_unit.name|default:"Sin unidad" }}</td>
+                            <td class="py-3 text-center"><span class="badge bg-light text-dark border">{{ item.measure_count }}</span></td>
+                            <td class="py-3 text-center">
+                                <a href="{% url 'sigera:personnel_measure_sheet' item.person.pk %}" class="btn btn-sm btn-outline-success rounded-pill px-3">
+                                    <i class="fa-solid fa-ruler-combined me-1"></i>Ver planilla
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">No hay personal con medidas para los filtros seleccionados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
+<div class="collapse mb-4 size-curve-detail-panel" id="detailTotalRequired">
+    <div class="card border-0 shadow-sm" style="border-radius: 15px; overflow: hidden;">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-bold text-primary">Detalle: Necesidad total</h5>
+            <small class="text-muted">Cada fila indica cuántas personas demandan esa prenda y talle.</small>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th class="py-3 px-4 text-muted">Prenda</th>
+                            <th class="py-3 text-muted">Talle / Medida</th>
+                            <th class="py-3 text-center text-muted">Necesario</th>
+                            <th class="py-3 text-muted">Personal involucrado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in curve_rows %}
+                        <tr>
+                            <td class="px-4 py-3 fw-bold">{{ row.clothing_type.name }}</td>
+                            <td class="py-3">{{ row.size_label }}{% if not row.size_id %}<small class="text-muted ms-2">manual</small>{% endif %}</td>
+                            <td class="py-3 text-center"><span class="badge bg-primary rounded-pill px-3">{{ row.required_quantity }}</span></td>
+                            <td class="py-3">
+                                <button class="btn btn-sm btn-outline-primary rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#required-people-{{ forloop.counter }}" aria-expanded="false" aria-controls="required-people-{{ forloop.counter }}">
+                                    Ver {{ row.people|length }} persona{% if row.people|length != 1 %}s{% endif %}
+                                </button>
+                                <div class="collapse mt-2" id="required-people-{{ forloop.counter }}">
+                                    <div class="border rounded-3 p-2 bg-light">
+                                        {% for item in row.people %}
+                                            <div class="small">
+                                                <strong>{{ item.person.last_name }}, {{ item.person.first_name }}</strong>
+                                                <span class="text-muted">({{ item.person.assigned_unit.name|default:"Sin unidad" }})</span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">No hay necesidades calculadas para los filtros seleccionados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="collapse mb-4 size-curve-detail-panel" id="detailTotalMissing">
+    <div class="card border-0 shadow-sm" style="border-radius: 15px; overflow: hidden;">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0 fw-bold {% if total_missing %}text-danger{% else %}text-success{% endif %}">Detalle: Faltante estimado</h5>
+            <small class="text-muted">El faltante se calcula como necesidad menos stock disponible; el personal listado es el que demanda cada talle.</small>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead style="background-color: #f8f9fa;">
+                        <tr>
+                            <th class="py-3 px-4 text-muted">Prenda</th>
+                            <th class="py-3 text-muted">Talle / Medida</th>
+                            <th class="py-3 text-center text-muted">Necesario</th>
+                            <th class="py-3 text-center text-muted">Stock</th>
+                            <th class="py-3 text-center text-muted">Faltante</th>
+                            <th class="py-3 text-muted">Personal que lo demanda</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in missing_detail_rows %}
+                        <tr>
+                            <td class="px-4 py-3 fw-bold">{{ row.clothing_type.name }}</td>
+                            <td class="py-3">{{ row.size_label }}{% if not row.size_id %}<small class="text-muted ms-2">manual</small>{% endif %}</td>
+                            <td class="py-3 text-center"><span class="badge bg-primary rounded-pill px-3">{{ row.required_quantity }}</span></td>
+                            <td class="py-3 text-center">
+                                {% if row.stock_available is None %}
+                                    <span class="text-muted">Sin talle de catálogo</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark border rounded-pill px-3">{{ row.stock_available }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-center"><span class="badge bg-danger rounded-pill px-3">{{ row.missing_quantity }}</span></td>
+                            <td class="py-3">
+                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#missing-people-{{ forloop.counter }}" aria-expanded="false" aria-controls="missing-people-{{ forloop.counter }}">
+                                    Ver {{ row.people|length }} persona{% if row.people|length != 1 %}s{% endif %}
+                                </button>
+                                <div class="collapse mt-2" id="missing-people-{{ forloop.counter }}">
+                                    <div class="border rounded-3 p-2 bg-light">
+                                        {% for item in row.people %}
+                                            <div class="small">
+                                                <strong>{{ item.person.last_name }}, {{ item.person.first_name }}</strong>
+                                                <span class="text-muted">({{ item.person.assigned_unit.name|default:"Sin unidad" }})</span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="fa-solid fa-circle-check text-success me-2"></i>No hay faltantes estimados para los filtros seleccionados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="sizeCurveMainContent">
 <div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
     <div class="card-body">
         <form method="get" class="row g-2 align-items-end">
@@ -143,4 +302,44 @@
     </div>
 </div>
 {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const mainContent = document.getElementById('sizeCurveMainContent');
+    const detailPanels = document.querySelectorAll('.size-curve-detail-panel');
+
+    function hasOpenDetailPanel() {
+        return Array.from(detailPanels).some(panel => panel.classList.contains('show'));
+    }
+
+    detailPanels.forEach(panel => {
+        panel.addEventListener('show.bs.collapse', function (event) {
+            if (event.target !== panel) return;
+
+            detailPanels.forEach(otherPanel => {
+                if (otherPanel !== panel) {
+                    otherPanel.classList.add('d-none');
+
+                    if (otherPanel.classList.contains('show')) {
+                        bootstrap.Collapse.getOrCreateInstance(otherPanel, { toggle: false }).hide();
+                    }
+                }
+            });
+
+            panel.classList.remove('d-none');
+            mainContent.classList.add('d-none');
+        });
+
+        panel.addEventListener('hidden.bs.collapse', function (event) {
+            if (event.target !== panel) return;
+
+            if (!hasOpenDetailPanel()) {
+                detailPanels.forEach(otherPanel => otherPanel.classList.remove('d-none'));
+                mainContent.classList.remove('d-none');
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

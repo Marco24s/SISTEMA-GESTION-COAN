@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Q
+from django.db.models import Count, Sum, Q
 from django.db import transaction
 from django.contrib import messages
 from django.http import HttpResponse
@@ -215,7 +215,14 @@ def personnel_list(request):
     Vista de listado de personal con búsqueda (Q objects)
     """
     query = request.GET.get('q', '')
-    personnel = Personnel.objects.select_related('assigned_unit')
+    required_measure_count = ClothingType.objects.filter(show_in_measure_sheet=True).count()
+    personnel = Personnel.objects.select_related('assigned_unit').annotate(
+        loaded_measure_count=Count(
+            'clothing_measures',
+            filter=Q(clothing_measures__clothing_type__show_in_measure_sheet=True),
+            distinct=True,
+        )
+    )
     
     user = request.user
     is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
@@ -233,11 +240,77 @@ def personnel_list(request):
             Q(dni__icontains=query)
         )
         
-    personnel = personnel.order_by('last_name', 'first_name')
+    personnel = personnel.order_by('assigned_unit__name', 'last_name', 'first_name')
+    rank_labels = dict(Personnel.RANK_CHOICES)
+    rank_order = {rank_key: index for index, (rank_key, _label) in enumerate(Personnel.RANK_CHOICES)}
+    grouped_personnel_map = {}
+
+    for person in personnel:
+        unit_key = person.assigned_unit_id or 'sin-unidad'
+        if unit_key not in grouped_personnel_map:
+            grouped_personnel_map[unit_key] = {
+                'id': unit_key,
+                'name': person.assigned_unit.name if person.assigned_unit else 'Sin unidad asignada',
+                'is_unassigned': person.assigned_unit_id is None,
+                'count': 0,
+                'complete_measure_count': 0,
+                'partial_measure_count': 0,
+                'empty_measure_count': 0,
+                'rank_map': {},
+            }
+
+        unit_group = grouped_personnel_map[unit_key]
+        unit_group['count'] += 1
+
+        person.loaded_measure_count = person.loaded_measure_count or 0
+        if required_measure_count and person.loaded_measure_count >= required_measure_count:
+            person.measure_badge_label = f"Completo ({person.loaded_measure_count}/{required_measure_count})"
+            person.measure_badge_class = "bg-success-subtle text-success border border-success-subtle"
+            unit_group['complete_measure_count'] += 1
+        elif person.loaded_measure_count:
+            person.measure_badge_label = f"Parcial ({person.loaded_measure_count}/{required_measure_count})"
+            person.measure_badge_class = "bg-warning-subtle text-warning border border-warning-subtle"
+            unit_group['partial_measure_count'] += 1
+        else:
+            person.measure_badge_label = "Sin cargar"
+            person.measure_badge_class = "bg-light text-muted border"
+            unit_group['empty_measure_count'] += 1
+
+        if person.rank not in unit_group['rank_map']:
+            unit_group['rank_map'][person.rank] = {
+                'id': person.rank,
+                'name': rank_labels.get(person.rank, person.rank),
+                'order': rank_order.get(person.rank, 999),
+                'people': [],
+                'complete_measure_count': 0,
+                'partial_measure_count': 0,
+                'empty_measure_count': 0,
+            }
+        rank_group = unit_group['rank_map'][person.rank]
+        rank_group['people'].append(person)
+        if required_measure_count and person.loaded_measure_count >= required_measure_count:
+            rank_group['complete_measure_count'] += 1
+        elif person.loaded_measure_count:
+            rank_group['partial_measure_count'] += 1
+        else:
+            rank_group['empty_measure_count'] += 1
+
+    grouped_personnel = sorted(
+        grouped_personnel_map.values(),
+        key=lambda group: (group['is_unassigned'], group['name'])
+    )
+    for unit_group in grouped_personnel:
+        unit_group['ranks'] = sorted(
+            unit_group['rank_map'].values(),
+            key=lambda rank_group: rank_group['order']
+        )
     
     context = {
         'personnel_list': personnel,
+        'grouped_personnel': grouped_personnel,
+        'required_measure_count': required_measure_count,
         'search_query': query,
+        'is_admin': is_admin,
     }
     return render(request, 'sigera/personnel_list.html', context)
 
@@ -616,8 +689,13 @@ def size_curve(request):
                 'required_quantity': 0,
                 'stock_available': stock_available,
                 'sort_value': sort_value,
+                'people': [],
             }
         curve_map[key]['required_quantity'] += 1
+        curve_map[key]['people'].append({
+            'person': measure.personnel,
+            'measure': measure,
+        })
 
     curve_rows = []
     for row in curve_map.values():
@@ -625,6 +703,7 @@ def size_curve(request):
             row['missing_quantity'] = row['required_quantity']
         else:
             row['missing_quantity'] = max(row['required_quantity'] - row['stock_available'], 0)
+        row['people'].sort(key=lambda item: (item['person'].last_name, item['person'].first_name))
         curve_rows.append(row)
 
     curve_rows.sort(key=lambda row: (row['clothing_type'].name, row['sort_value']))
@@ -649,8 +728,31 @@ def size_curve(request):
     if current_group:
         grouped_curve.append(current_group)
 
+    measured_personnel_map = {}
+    for measure in measures:
+        person = measure.personnel
+        if person.id not in measured_personnel_map:
+            measured_personnel_map[person.id] = {
+                'person': person,
+                'measure_count': 0,
+            }
+        measured_personnel_map[person.id]['measure_count'] += 1
+
+    measured_personnel_details = sorted(
+        measured_personnel_map.values(),
+        key=lambda item: (
+            item['person'].assigned_unit.name if item['person'].assigned_unit else '',
+            item['person'].last_name,
+            item['person'].first_name,
+        )
+    )
+    missing_detail_rows = [row for row in curve_rows if row['missing_quantity']]
+
     context = {
         'grouped_curve': grouped_curve,
+        'curve_rows': curve_rows,
+        'missing_detail_rows': missing_detail_rows,
+        'measured_personnel_details': measured_personnel_details,
         'clothing_types': ClothingType.objects.order_by('name'),
         'units': Unit.objects.order_by('name') if is_admin else Unit.objects.filter(pk=getattr(user, 'unit_id', None)),
         'selected_clothing_type': selected_clothing_type,
@@ -658,7 +760,7 @@ def size_curve(request):
         'is_admin': is_admin,
         'total_required': sum(row['required_quantity'] for row in curve_rows),
         'total_missing': sum(row['missing_quantity'] for row in curve_rows),
-        'measured_personnel_count': measures.values('personnel_id').distinct().count(),
+        'measured_personnel_count': len(measured_personnel_details),
     }
     return render(request, 'sigera/size_curve.html', context)
 

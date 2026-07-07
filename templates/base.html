@@ -233,6 +233,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             const tables = document.querySelectorAll('table.table');
             tables.forEach((table, tableIndex) => {
+                if (table.dataset.disableTableTools === 'true') return;
+
                 const thead = table.querySelector('thead');
                 const tbody = table.querySelector('tbody');
                 if (!thead || !tbody) return;
