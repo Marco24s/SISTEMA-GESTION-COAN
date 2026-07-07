@@ -237,6 +237,38 @@
                 const tbody = table.querySelector('tbody');
                 if (!thead || !tbody) return;
 
+                // 1. Agregar buscador global arriba de la tabla
+                const searchContainer = document.createElement('div');
+                searchContainer.className = 'mb-2 d-flex justify-content-end';
+                searchContainer.innerHTML = `
+                    <div class="input-group input-group-sm" style="max-width: 300px;">
+                        <span class="input-group-text bg-white"><i class="fa-solid fa-search"></i></span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Buscar en la tabla..." id="globalSearch${tableIndex}">
+                    </div>
+                `;
+                table.parentNode.insertBefore(searchContainer, table);
+
+                const searchInput = searchContainer.querySelector('input');
+                searchInput.addEventListener('input', function() {
+                    const filterValue = this.value.toLowerCase();
+                    const rows = tbody.querySelectorAll('tr');
+
+                    rows.forEach(row => {
+                        // Ignorar filas de estado vacío que usan colspan
+                        if (row.cells.length === 1 && row.cells[0].colSpan > 1) return;
+
+                        let showRow = false;
+                        for (let i = 0; i < row.cells.length; i++) {
+                            const cellText = row.cells[i].textContent.toLowerCase();
+                            if (cellText.includes(filterValue)) {
+                                showRow = true;
+                                break;
+                            }
+                        }
+                        row.style.display = showRow ? '' : 'none';
+                    });
+                });
+
 
                 // 2. Hacer columnas ordenables
                 const headers = thead.querySelectorAll('tr:first-child th');
