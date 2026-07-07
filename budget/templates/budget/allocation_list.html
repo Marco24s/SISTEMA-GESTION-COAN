@@ -48,7 +48,7 @@
     <form id="bulk-action-form" method="POST" action="{% url 'budget:allocation_bulk_delete' %}">
         {% csrf_token %}
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 allocation-compact-table">
+            <table class="table table-hover align-middle mb-0 allocation-compact-table" data-disable-table-tools="true">
                 <thead class="bg-light">
                     <tr class="small text-uppercase text-muted border-bottom-0">
                         <th class="ps-4" style="width: 40px;">
