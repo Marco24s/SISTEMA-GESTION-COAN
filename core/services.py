@@ -30,6 +30,48 @@ def update_batch_statuses():
 
 
 @transaction.atomic
+def incorporate_batch_stock(
+    target_batch,
+    user,
+    container_count=None,
+    container_size=None,
+    quantity=None,
+    **_legacy_kwargs,
+):
+    """Suma una cantidad al stock de una casamata sin alterar su presentacion."""
+    # Compatibilidad con un proceso de desarrollo que conserve en memoria la
+    # vista anterior, que enviaba cantidad de envases y contenido por envase.
+    if quantity is None and container_count is not None and container_size is not None:
+        quantity = container_size * container_count
+
+    if quantity is None:
+        raise ValidationError("Debe indicar la cantidad a agregar.")
+    if quantity <= 0:
+        raise ValidationError("La cantidad a agregar debe ser mayor a cero.")
+
+    target = GreaseBatch.objects.select_for_update().select_related('grease_type').get(pk=target_batch.pk)
+    if target.is_archived:
+        raise ValidationError("No se puede incorporar stock a una casamata archivada.")
+    if target.status == 'REJECTED':
+        raise ValidationError("No se puede incorporar stock a una casamata rechazada.")
+
+    # initial_quantity representa el total historicamente ingresado en esta
+    # ubicacion; available_quantity representa lo que aun queda disponible.
+    target.initial_quantity += quantity
+    target.available_quantity += quantity
+    target.save(update_fields=['initial_quantity', 'available_quantity'])
+    StockMovement.objects.create(
+        batch=target,
+        movement_type='INCOMING',
+        quantity_changed=quantity,
+        user=user,
+        reason=f"Ingreso adicional de {quantity} {target.grease_type.unidad}.",
+    )
+
+    return target
+
+
+@transaction.atomic
 def consume_grease(grease_type, quantity_to_consume, user, reference="", reason="", location=None, specific_batch=None):
     """
     Consume grasa aplicando lógica estricta de vencimiento.

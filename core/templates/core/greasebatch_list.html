@@ -1,6 +1,32 @@
 {% extends 'base.html' %}
 {% load core_filters %}
 
+{% block extra_css %}
+<style>
+    .stock-table-wrapper { overflow-x: auto; }
+    .stock-actions-cell { width: 1%; min-width: 88px; }
+    .stock-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: .3rem;
+        width: 148px;
+        margin-left: auto;
+    }
+    .stock-actions .action-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        margin: 0;
+        flex: 0 0 34px;
+    }
+    .stock-actions form { display: inline-flex; margin: 0; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
     <h2><i class="fa-solid fa-boxes-stacked me-2"></i> Casamatas (Stock Actual)</h2>
@@ -17,7 +43,7 @@
 </div>
 
 <div class="card shadow-sm">
-    <div class="card-body p-0">
+    <div class="card-body p-0 stock-table-wrapper">
         <table class="table table-hover mb-0">
             <thead class="table-light">
                 <tr>
@@ -28,7 +54,7 @@
                     <th>Disponibilidad</th>
                     <th>Valor Unit. / Total</th>
                     <th>Ubicación</th>
-                    <th class="text-end">Auditoría</th>
+                    <th class="text-end stock-actions-cell">Auditoría</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,7 +84,7 @@
                                 {{ batch.available_quantity|smart_number }} <small class="text-muted fw-normal">{{ batch.grease_type.unidad }} disp.</small>
                             </span>
                             <span class="text-muted" style="font-size: 0.85em;">
-                                de {{ batch.initial_quantity|smart_number }} {{ batch.grease_type.unidad }} iniciales
+                                de {{ batch.initial_quantity|smart_number }} {{ batch.grease_type.unidad }} cargados en total
                                 {% if batch.container_size and batch.container_count %}
                                     <br>({{ batch.container_count }} × {{ batch.container_size|smart_number }} {{ batch.grease_type.unidad }})
                                 {% endif %}
@@ -74,27 +100,32 @@
                         {% endif %}
                     </td>
                     <td>{{ batch.storage_location }}</td>
-                    <td class="text-end text-nowrap">
-                        <a href="{% url 'batch_detail' batch.id %}" class="btn btn-sm btn-outline-info"><i class="fa-solid fa-list-ul"></i> Movimientos</a>
+                    <td class="text-end stock-actions-cell">
+                        <div class="stock-actions">
+                        <a href="{% url 'batch_detail' batch.id %}" class="btn btn-sm btn-outline-info action-icon" title="Ver movimientos" aria-label="Ver movimientos"><i class="fa-solid fa-list-ul"></i></a>
+                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' or user.unit %}
+                        <a href="{% url 'batch_incorporate' batch.id %}" class="btn btn-sm btn-outline-success action-icon" title="Agregar cantidad" aria-label="Agregar cantidad"><i class="fa-solid fa-plus"></i></a>
+                        {% endif %}
                         {% if batch.available_quantity <= 0 or batch.status == 'REJECTED' %}
-                        <form action="{% url 'batch_archive' batch.id %}" method="post" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas archivar esta casamata? Se moverá al historial.');">
+                        <form action="{% url 'batch_archive' batch.id %}" method="post" onsubmit="return confirm('¿Estás seguro de que deseas archivar esta casamata? Se moverá al historial.');">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-secondary ms-1" title="Archivar al Historial">
-                                <i class="fa-solid fa-box-archive"></i> Archivar
+                            <button type="submit" class="btn btn-sm btn-outline-secondary action-icon" title="Archivar al historial" aria-label="Archivar al historial">
+                                <i class="fa-solid fa-box-archive"></i>
                             </button>
                         </form>
                         {% endif %}
                         {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
-                        <a href="{% url 'batch_update' batch.id %}" class="btn btn-sm btn-outline-primary ms-1" title="Editar"><i class="fa-solid fa-pen"></i></a>
+                        <a href="{% url 'batch_update' batch.id %}" class="btn btn-sm btn-outline-primary action-icon" title="Editar" aria-label="Editar"><i class="fa-solid fa-pen"></i></a>
                         {% endif %}
                         {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
-                        <a href="{% url 'batch_delete' batch.id %}" class="btn btn-sm btn-outline-danger ms-1" title="Eliminar"><i class="fa-solid fa-trash"></i></a>
+                        <a href="{% url 'batch_delete' batch.id %}" class="btn btn-sm btn-outline-danger action-icon" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></a>
                         {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center py-4 text-muted">No hay casamatas registradas en stock.</td>
+                    <td colspan="8" class="text-center py-4 text-muted">No hay casamatas registradas en stock.</td>
                 </tr>
                 {% endfor %}
             </tbody>

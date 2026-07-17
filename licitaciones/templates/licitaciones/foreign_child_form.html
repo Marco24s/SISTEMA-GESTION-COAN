@@ -1,7 +1,7 @@
 {% extends "licitaciones/base_foreign.html" %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% if child_type == "requirement" %}Requerimiento{% else %}Novedad documental{% endif %}{% endblock %}
+{% block title %}{% if child_type == "requirement" %}Requerimiento{% elif child_type == "purchase_order" %}Orden de compra{% else %}Novedad documental{% endif %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center mt-4">
@@ -11,6 +11,8 @@
                 <h1 class="h4 mb-0">
                     {% if child_type == "requirement" %}
                         <i class="fa-solid fa-list-check me-2"></i>{% if object %}Editar requerimiento{% else %}Nuevo requerimiento{% endif %}
+                    {% elif child_type == "purchase_order" %}
+                        <i class="fa-solid fa-file-invoice-dollar me-2"></i>{% if object %}Editar orden de compra{% else %}Nueva orden de compra{% endif %}
                     {% else %}
                         <i class="fa-solid fa-clock-rotate-left me-2"></i>Nueva novedad documental
                     {% endif %}
@@ -20,6 +22,8 @@
                 <div class="mb-3"><strong>{{ process.process_number }}</strong> <span class="badge text-bg-light border">{{ process.currency_label }}</span></div>
                 {% if child_type == "requirement" %}
                 <div class="alert alert-light border">El monto del requerimiento se registra en {{ process.currency_label }}.</div>
+                {% elif child_type == "purchase_order" %}
+                <div class="alert alert-light border">El monto de la orden se registra en {{ process.currency_label }}.</div>
                 {% endif %}
                 <form method="post">
                     {% csrf_token %}

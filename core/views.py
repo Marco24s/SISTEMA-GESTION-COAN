@@ -13,8 +13,8 @@ import csv
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from .models import Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGrease, FlightPlan, GreaseBatch, StockMovement, GreaseReferencePrice, ProcurementRequirement, UserSystemPIN
-from .forms import UnitForm, MeasurementUnitForm, AircraftModelForm, GreaseTypeForm, AircraftGreaseForm, FlightPlanForm, GreaseBatchForm, ConsumeGreaseForm, GreaseReferencePriceForm, RetestBatchForm, ProcurementRequirementForm, ProcurementRequirementCreateForm
-from .services import update_batch_statuses, consume_grease
+from .forms import UnitForm, MeasurementUnitForm, AircraftModelForm, GreaseTypeForm, AircraftGreaseForm, FlightPlanForm, GreaseBatchForm, IncorporateBatchStockForm, ConsumeGreaseForm, GreaseReferencePriceForm, RetestBatchForm, ProcurementRequirementForm, ProcurementRequirementCreateForm
+from .services import update_batch_statuses, consume_grease, incorporate_batch_stock
 from django.db.models import ProtectedError
 from .decorators import pin_required
 
@@ -590,6 +590,21 @@ class GreaseBatchDetailView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         batch = GreaseBatch.objects.get(pk=self.kwargs['pk'])
         context['batch'] = batch
+        user = self.request.user
+        is_privileged = user.is_superuser or user.groups.filter(
+            name__in=['Administrador', 'Logistica', 'Editor']
+        ).exists()
+        context['can_incorporate_stock'] = (
+            not batch.is_archived
+            and batch.status != 'REJECTED'
+            and (
+                is_privileged
+                or (
+                    getattr(user, 'unit', None)
+                    and batch.storage_location == user.unit.name
+                )
+            )
+        )
         if batch.status == 'PENDING_RETEST':
             retest_movement = batch.movements.filter(movement_type='RETEST', reason__contains="enviada a laboratorio para retesteo").order_by('-movement_date').first()
             if retest_movement:
@@ -644,6 +659,63 @@ class GreaseBatchUpdateView(ActiveUserRequiredMixin, SuccessMessageMixin, Update
         response = super().form_valid(form)
         update_batch_statuses()
         return response
+
+
+class IncorporateBatchStockView(ActiveUserRequiredMixin, FormView):
+    form_class = IncorporateBatchStockForm
+    template_name = 'core/incorporate_batch_stock.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.target_batch = get_object_or_404(
+            GreaseBatch.objects.select_related('grease_type'),
+            pk=kwargs['pk'],
+            is_archived=False,
+        )
+        if self.target_batch.status == 'REJECTED':
+            messages.error(request, "No se puede incorporar stock a una casamata rechazada.")
+            return redirect('batch_detail', pk=self.target_batch.pk)
+        user = request.user
+        is_privileged = user.is_superuser or user.groups.filter(
+            name__in=['Administrador', 'Logistica', 'Editor']
+        ).exists()
+        if not is_privileged and (
+            not getattr(user, 'unit', None)
+            or self.target_batch.storage_location != user.unit.name
+        ):
+            messages.error(request, "No tienes permiso para incorporar stock en esa ubicacion.")
+            return redirect('batch_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['target_batch'] = self.target_batch
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['batch'] = self.target_batch
+        context['title'] = 'Agregar cantidad'
+        return context
+
+    def form_valid(self, form):
+        try:
+            updated_batch = incorporate_batch_stock(
+                target_batch=self.target_batch,
+                quantity=form.cleaned_data['quantity'],
+                user=self.request.user,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
+
+        update_batch_statuses()
+        messages.success(
+            self.request,
+            f"Se agregaron {form.cleaned_data['quantity']} "
+            f"{updated_batch.grease_type.unidad} al lote {updated_batch.batch_number}.",
+        )
+        return redirect('batch_detail', pk=updated_batch.pk)
 
 class ConsumeGreaseView(ActiveUserRequiredMixin, FormView):
     template_name = 'core/consume_grease.html'

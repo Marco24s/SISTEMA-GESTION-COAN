@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -215,6 +217,7 @@ class ForeignTenderProcess(models.Model):
         ("INICIADO", "Iniciado"),
         ("EN_EVALUACION", "En evaluacion"),
         ("DICTAMEN_EMITIDO", "Dictamen emitido"),
+        ("DISPONIBLE_PARA_ADJUDICAR", "Disponible para adjudicar"),
         ("PENDIENTE_ASIGNACION", "Pendiente de asignacion"),
         ("ADJUDICADO", "Adjudicado"),
         ("EN_RECEPCION", "En recepcion"),
@@ -222,9 +225,14 @@ class ForeignTenderProcess(models.Model):
         ("FRACASADO", "Fracasado"),
         ("DEJADO_SIN_EFECTO", "Dejado sin efecto"),
     ]
+    DELIVERY_DAY_TYPE_CHOICES = [
+        ("CORRIDOS", "Dias corridos"),
+        ("HABILES", "Dias habiles (lunes a viernes)"),
+    ]
 
     year = models.PositiveIntegerField(default=2026, verbose_name="Ejercicio / Año")
     process_number = models.CharField(max_length=60, verbose_name="Licitacion")
+    expediente = models.CharField(max_length=150, blank=True, verbose_name="Expediente")
     process_type = models.CharField(
         max_length=30,
         choices=PROCESS_TYPE_CHOICES,
@@ -263,6 +271,28 @@ class ForeignTenderProcess(models.Model):
         null=True,
         verbose_name="Monto asignado en adjudicacion",
     )
+    allocation_gfh = models.TextField(blank=True, verbose_name="GFH de asignacion")
+    incoterm = models.CharField(max_length=30, blank=True, verbose_name="Incoterm")
+    oca_expiration = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Fecha de vencimiento OCA",
+        help_text="Admite una fecha o una aclaracion, por ejemplo 'No aplica'.",
+    )
+    delivery_term_days = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name="Cantidad de dias del plazo de entrega",
+    )
+    delivery_term_day_type = models.CharField(
+        max_length=10,
+        choices=DELIVERY_DAY_TYPE_CHOICES,
+        blank=True,
+        verbose_name="Tipo de dias del plazo de entrega",
+    )
+    sp = models.CharField(max_length=30, blank=True, verbose_name="SP")
+    saimb_number = models.CharField(max_length=30, blank=True, verbose_name="SAIMB Nro.")
+    received = models.BooleanField(blank=True, null=True, verbose_name="Recibido")
     notes = models.TextField(blank=True, verbose_name="Observaciones generales")
     is_active = models.BooleanField(default=True, verbose_name="Activo")
     created_by = models.ForeignKey(
@@ -300,6 +330,24 @@ class ForeignTenderProcess(models.Model):
             value = getattr(self, field_name)
             if value is not None and value < 0:
                 errors[field_name] = "El monto no puede ser negativo."
+        if self.has_oca is False:
+            self.oca_expiration = ""
+            self.delivery_term_days = None
+            self.delivery_term_day_type = ""
+
+        expiration_date = self.oca_expiration_date
+        has_delivery_term = (
+            self.delivery_term_days is not None or bool(self.delivery_term_day_type)
+        )
+        if expiration_date:
+            if not self.delivery_term_days:
+                errors["delivery_term_days"] = "Indique una cantidad de dias mayor que cero."
+            if not self.delivery_term_day_type:
+                errors["delivery_term_day_type"] = "Indique si son dias habiles o corridos."
+        elif has_delivery_term:
+            errors["oca_expiration"] = (
+                "Para calcular el plazo de entrega, ingrese una fecha valida en formato DD/MM/AAAA."
+            )
         if errors:
             raise ValidationError(errors)
 
@@ -331,6 +379,39 @@ class ForeignTenderProcess(models.Model):
             (requirement.requested_amount for requirement in self.requirements.all()),
             start=0,
         )
+
+    @property
+    def remaining_amount(self):
+        if self.evaluation_amount is None or self.awarded_amount is None:
+            return None
+        return self.evaluation_amount - self.awarded_amount
+
+    @property
+    def oca_expiration_date(self):
+        value = (self.oca_expiration or "").strip()
+        for date_format in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(value, date_format).date()
+            except ValueError:
+                continue
+        return None
+
+    @property
+    def delivery_due_date(self):
+        base_date = self.oca_expiration_date
+        days = self.delivery_term_days
+        if not base_date or not days or not self.delivery_term_day_type:
+            return None
+        if self.delivery_term_day_type == "CORRIDOS":
+            return base_date + timedelta(days=days)
+
+        due_date = base_date
+        elapsed = 0
+        while elapsed < days:
+            due_date += timedelta(days=1)
+            if due_date.weekday() < 5:
+                elapsed += 1
+        return due_date
 
     @property
     def latest_update(self):
@@ -404,6 +485,48 @@ class ForeignTenderRequirement(models.Model):
     @property
     def workshop_label(self):
         return self.unit.name if self.unit else self.workshop
+
+
+class ForeignTenderPurchaseOrder(models.Model):
+    process = models.ForeignKey(
+        ForeignTenderProcess,
+        on_delete=models.CASCADE,
+        related_name="purchase_orders",
+        verbose_name="Licitacion",
+    )
+    order_number = models.CharField(max_length=40, verbose_name="Nro. OC / OCA")
+    amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        verbose_name="Monto OC / OCA",
+    )
+    issue_date = models.DateField(blank=True, null=True, verbose_name="Fecha de emision")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Orden de compra exterior"
+        verbose_name_plural = "Ordenes de compra exteriores"
+        ordering = ["issue_date", "order_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["process", "order_number"],
+                name="unique_foreign_purchase_order",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.order_number} - {self.process.process_number}"
+
+    def clean(self):
+        if self.amount is not None and self.amount < 0:
+            raise ValidationError({"amount": "El monto no puede ser negativo."})
+
+    def save(self, *args, **kwargs):
+        if self.order_number:
+            self.order_number = self.order_number.upper().strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class ForeignTenderUpdate(models.Model):

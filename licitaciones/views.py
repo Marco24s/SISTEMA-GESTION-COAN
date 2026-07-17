@@ -1,4 +1,5 @@
 import csv
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -20,11 +21,13 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
+from django.views import View
 
 from core.models import Unit
 
 from .forms import (
     ForeignTenderProcessForm,
+    ForeignTenderPurchaseOrderForm,
     ForeignTenderRequirementForm,
     ForeignTenderUpdateForm,
     TenderProcessForm,
@@ -32,6 +35,7 @@ from .forms import (
 )
 from .models import (
     ForeignTenderProcess,
+    ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
     ForeignTenderUpdate,
     ProcurementDestination,
@@ -359,7 +363,7 @@ class ForeignTenderDashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         years = list(
-            ForeignTenderProcess.objects.order_by("-year")
+            ForeignTenderProcess.objects.filter(is_active=True).order_by("-year")
             .values_list("year", flat=True)
             .distinct()
         )
@@ -367,13 +371,13 @@ class ForeignTenderDashboardView(LoginRequiredMixin, TemplateView):
         if not selected_year and years:
             selected_year = years[0]
 
-        processes = ForeignTenderProcess.objects.prefetch_related("requirements", "updates")
+        processes = ForeignTenderProcess.objects.filter(is_active=True).prefetch_related("requirements", "updates")
         if selected_year:
             processes = processes.filter(year=selected_year)
 
         process_list = list(processes)
         totals_by_currency = list(
-            ForeignTenderProcess.objects.filter(year=selected_year)
+            ForeignTenderProcess.objects.filter(year=selected_year, is_active=True)
             .values("currency", "custom_currency")
             .annotate(
                 evaluation_total=Sum("evaluation_amount"),
@@ -411,7 +415,7 @@ class ForeignTenderProcessListView(LoginRequiredMixin, ListView):
     context_object_name = "processes"
 
     def get_queryset(self):
-        queryset = ForeignTenderProcess.objects.prefetch_related("requirements", "updates")
+        queryset = ForeignTenderProcess.objects.filter(is_active=True).prefetch_related("requirements", "purchase_orders", "updates")
         year = _clean_int(self.request.GET.get("year"))
         status = self.request.GET.get("status", "")
         currency = self.request.GET.get("currency", "")
@@ -425,8 +429,10 @@ class ForeignTenderProcessListView(LoginRequiredMixin, ListView):
         if query:
             queryset = queryset.filter(
                 Q(process_number__icontains=query)
+                | Q(expediente__icontains=query)
                 | Q(requirements__requirement_number__icontains=query)
                 | Q(requirements__description__icontains=query)
+                | Q(purchase_orders__order_number__icontains=query)
             ).distinct()
         return queryset
 
@@ -434,7 +440,54 @@ class ForeignTenderProcessListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context.update(
             {
-                "years": ForeignTenderProcess.objects.order_by("-year")
+                "years": ForeignTenderProcess.objects.filter(is_active=True).order_by("-year")
+                .values_list("year", flat=True)
+                .distinct(),
+                "status_choices": ForeignTenderProcess.STATUS_CHOICES,
+                "currency_choices": ForeignTenderProcess.CURRENCY_CHOICES,
+                "selected_year": self.request.GET.get("year", ""),
+                "selected_status": self.request.GET.get("status", ""),
+                "selected_currency": self.request.GET.get("currency", ""),
+                "search_query": self.request.GET.get("q", ""),
+            }
+        )
+        return context
+
+
+class ForeignTenderProcessHistoryView(LoginRequiredMixin, ListView):
+    model = ForeignTenderProcess
+    template_name = "licitaciones/foreign_history.html"
+    context_object_name = "processes"
+
+    def get_queryset(self):
+        queryset = ForeignTenderProcess.objects.filter(is_active=False).prefetch_related(
+            "requirements", "purchase_orders", "updates"
+        )
+        year = _clean_int(self.request.GET.get("year"))
+        status = self.request.GET.get("status", "")
+        currency = self.request.GET.get("currency", "")
+        query = self.request.GET.get("q", "").strip()
+        if year:
+            queryset = queryset.filter(year=year)
+        if status:
+            queryset = queryset.filter(status=status)
+        if currency:
+            queryset = queryset.filter(currency=currency)
+        if query:
+            queryset = queryset.filter(
+                Q(process_number__icontains=query)
+                | Q(expediente__icontains=query)
+                | Q(requirements__requirement_number__icontains=query)
+                | Q(purchase_orders__order_number__icontains=query)
+            ).distinct()
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "years": ForeignTenderProcess.objects.filter(is_active=False)
+                .order_by("-year")
                 .values_list("year", flat=True)
                 .distinct(),
                 "status_choices": ForeignTenderProcess.STATUS_CHOICES,
@@ -476,8 +529,23 @@ class ForeignTenderProcessDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         return ForeignTenderProcess.objects.select_related("created_by").prefetch_related(
             "requirements__unit",
+            "purchase_orders",
             "updates__created_by",
         )
+
+
+class ForeignTenderArchiveToggleView(LoginRequiredMixin, GroupRequiredMixin, View):
+    group_required = ["Supervisor", "Capturista"]
+
+    def post(self, request, pk):
+        process = get_object_or_404(ForeignTenderProcess, pk=pk)
+        process.is_active = not process.is_active
+        process.save(update_fields=["is_active", "updated_at"])
+        if process.is_active:
+            messages.success(request, "Licitacion reactivada correctamente.")
+            return redirect(process.get_absolute_url())
+        messages.success(request, "Licitacion archivada correctamente.")
+        return redirect("licitaciones:foreign_history")
 
 
 class ForeignTenderRequirementCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
@@ -540,6 +608,44 @@ class ForeignTenderUpdateCreateView(LoginRequiredMixin, SuccessMessageMixin, Cre
 
     def get_success_url(self):
         return self.process.get_absolute_url()
+
+
+class ForeignTenderPurchaseOrderCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = ForeignTenderPurchaseOrder
+    form_class = ForeignTenderPurchaseOrderForm
+    template_name = "licitaciones/foreign_child_form.html"
+    success_message = "Orden de compra agregada correctamente."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.process = get_object_or_404(ForeignTenderProcess, pk=kwargs["process_pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.process = self.process
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({"process": self.process, "child_type": "purchase_order"})
+        return context
+
+    def get_success_url(self):
+        return self.process.get_absolute_url()
+
+
+class ForeignTenderPurchaseOrderUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = ForeignTenderPurchaseOrder
+    form_class = ForeignTenderPurchaseOrderForm
+    template_name = "licitaciones/foreign_child_form.html"
+    success_message = "Orden de compra actualizada correctamente."
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({"process": self.object.process, "child_type": "purchase_order"})
+        return context
+
+    def get_success_url(self):
+        return self.object.process.get_absolute_url()
 
 
 class TenderStageManageView(LoginRequiredMixin, GroupRequiredMixin, DetailView):

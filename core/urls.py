@@ -52,6 +52,7 @@ urlpatterns = [
     path('stock/add/', views.GreaseBatchCreateView.as_view(), name='batch_create'),
     path('stock/<int:pk>/movements/', views.GreaseBatchDetailView.as_view(), name='batch_detail'),
     path('stock/<int:pk>/edit/', views.GreaseBatchUpdateView.as_view(), name='batch_update'),
+    path('stock/<int:pk>/incorporate/', views.IncorporateBatchStockView.as_view(), name='batch_incorporate'),
     path('stock/<int:pk>/delete/', views.GreaseBatchDeleteView.as_view(), name='batch_delete'),
     path('stock/<int:pk>/start-retest/', views.StartRetestView.as_view(), name='batch_start_retest'),
     path('stock/<int:pk>/retest/', views.RetestBatchView.as_view(), name='batch_retest'),

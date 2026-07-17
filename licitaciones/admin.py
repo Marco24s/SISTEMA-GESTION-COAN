@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     ForeignTenderProcess,
+    ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
     ForeignTenderUpdate,
     ProcurementDestination,
@@ -45,10 +46,15 @@ class ForeignTenderUpdateInline(admin.TabularInline):
     extra = 0
 
 
+class ForeignTenderPurchaseOrderInline(admin.TabularInline):
+    model = ForeignTenderPurchaseOrder
+    extra = 0
+
+
 @admin.register(ForeignTenderProcess)
 class ForeignTenderProcessAdmin(admin.ModelAdmin):
-    list_display = ("process_number", "year", "currency", "status", "has_oca", "evaluation_amount", "awarded_amount")
+    list_display = ("process_number", "expediente", "year", "currency", "status", "has_oca", "evaluation_amount", "awarded_amount")
     list_filter = ("year", "currency", "status", "has_oca")
-    search_fields = ("process_number", "requirements__requirement_number", "requirements__description")
+    search_fields = ("process_number", "expediente", "requirements__requirement_number", "requirements__description")
     readonly_fields = ("created_at", "updated_at", "created_by")
-    inlines = (ForeignTenderRequirementInline, ForeignTenderUpdateInline)
+    inlines = (ForeignTenderRequirementInline, ForeignTenderPurchaseOrderInline, ForeignTenderUpdateInline)

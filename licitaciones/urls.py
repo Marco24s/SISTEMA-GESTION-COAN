@@ -17,9 +17,11 @@ urlpatterns = [
     path("etapas/<int:pk>/editar/", views.TenderStageUpdateView.as_view(), name="stage_update"),
     path("exterior/", views.ForeignTenderDashboardView.as_view(), name="foreign_dashboard"),
     path("exterior/procesos/", views.ForeignTenderProcessListView.as_view(), name="foreign_list"),
+    path("exterior/historial/", views.ForeignTenderProcessHistoryView.as_view(), name="foreign_history"),
     path("exterior/nuevo/", views.ForeignTenderProcessCreateView.as_view(), name="foreign_create"),
     path("exterior/<int:pk>/", views.ForeignTenderProcessDetailView.as_view(), name="foreign_detail"),
     path("exterior/<int:pk>/editar/", views.ForeignTenderProcessUpdateView.as_view(), name="foreign_update"),
+    path("exterior/<int:pk>/archivo/", views.ForeignTenderArchiveToggleView.as_view(), name="foreign_archive_toggle"),
     path(
         "exterior/<int:process_pk>/requerimientos/nuevo/",
         views.ForeignTenderRequirementCreateView.as_view(),
@@ -34,6 +36,16 @@ urlpatterns = [
         "exterior/<int:process_pk>/novedades/nueva/",
         views.ForeignTenderUpdateCreateView.as_view(),
         name="foreign_update_create",
+    ),
+    path(
+        "exterior/<int:process_pk>/ordenes/nueva/",
+        views.ForeignTenderPurchaseOrderCreateView.as_view(),
+        name="foreign_purchase_order_create",
+    ),
+    path(
+        "exterior/ordenes/<int:pk>/editar/",
+        views.ForeignTenderPurchaseOrderUpdateView.as_view(),
+        name="foreign_purchase_order_update",
     ),
     path("notificacion/<int:pk>/leer/", views.mark_notification_read, name="notification_read"),
 ]

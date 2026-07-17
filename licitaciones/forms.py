@@ -4,6 +4,7 @@ from core.models import Unit
 
 from .models import (
     ForeignTenderProcess,
+    ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
     ForeignTenderUpdate,
     TenderProcess,
@@ -64,11 +65,34 @@ class TenderProcessForm(forms.ModelForm):
 
 
 class ForeignTenderProcessForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["expediente"].required = True
+        self.fields["expediente"].label = "Expediente (obligatorio)"
+        self.fields["expediente"].help_text = (
+            "Se carga al crear la licitacion y puede corregirse luego desde Editar proceso."
+        )
+        self.fields["expediente"].widget.attrs.update(
+            {
+                "placeholder": "Ej.: EX-2025-73889265-APN-DEDGMA#ARA",
+                "class": "text-uppercase",
+            }
+        )
+        self.fields["sp"].label = "Solicitud de provisión (SP)"
+        self.fields["oca_expiration"].help_text = (
+            "Ingrese una fecha en formato DD/MM/AAAA para calcular el plazo, o una aclaracion como 'No aplica'."
+        )
+        self.fields["oca_expiration"].widget.attrs.update(
+            {"placeholder": "DD/MM/AAAA o No aplica", "autocomplete": "off"}
+        )
+        self.fields["delivery_term_days"].widget.attrs.update({"min": 1})
+
     class Meta:
         model = ForeignTenderProcess
         fields = [
             "year",
             "process_number",
+            "expediente",
             "process_type",
             "has_oca",
             "status",
@@ -76,10 +100,19 @@ class ForeignTenderProcessForm(forms.ModelForm):
             "custom_currency",
             "evaluation_amount",
             "awarded_amount",
+            "allocation_gfh",
+            "incoterm",
+            "oca_expiration",
+            "delivery_term_days",
+            "delivery_term_day_type",
+            "sp",
+            "saimb_number",
+            "received",
             "notes",
             "is_active",
         ]
         widgets = {
+            "allocation_gfh": forms.Textarea(attrs={"rows": 2}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
         help_texts = {
@@ -130,6 +163,19 @@ class ForeignTenderUpdateForm(forms.ModelForm):
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
         }
+
+
+class ForeignTenderPurchaseOrderForm(forms.ModelForm):
+    issue_date = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+        label="Fecha de emision",
+    )
+
+    class Meta:
+        model = ForeignTenderPurchaseOrder
+        fields = ["order_number", "amount", "issue_date"]
 
 
 class TenderStageUpdateForm(forms.ModelForm):

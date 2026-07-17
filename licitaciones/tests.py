@@ -4,13 +4,16 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
 from core.models import Unit, UserSystemPIN
+from licitaciones.forms import ForeignTenderProcessForm
 from licitaciones.models import (
     ForeignTenderProcess,
+    ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
     ForeignTenderUpdate,
 )
@@ -92,6 +95,79 @@ class ForeignTenderTests(TestCase):
         with self.assertRaises(ValidationError):
             process.full_clean()
 
+    def test_foreign_process_form_requires_expediente(self):
+        form = ForeignTenderProcessForm(
+            data={
+                "year": 2026,
+                "process_number": "LIC 01/26",
+                "process_type": "PUBLICA",
+                "status": "INICIADO",
+                "currency": "USD",
+                "is_active": True,
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("expediente", form.errors)
+        self.assertEqual(form.fields["sp"].label, "Solicitud de provisión (SP)")
+
+    def test_delivery_due_date_uses_calendar_or_business_days(self):
+        process = ForeignTenderProcess(
+            year=2026,
+            process_number="LIC 02/26",
+            currency="USD",
+            oca_expiration="17/07/2026",
+            delivery_term_days=3,
+            delivery_term_day_type="CORRIDOS",
+        )
+
+        self.assertEqual(process.delivery_due_date, date(2026, 7, 20))
+
+        process.delivery_term_day_type = "HABILES"
+        self.assertEqual(process.delivery_due_date, date(2026, 7, 22))
+
+    def test_delivery_term_is_required_when_oca_expiration_is_a_date(self):
+        form = ForeignTenderProcessForm(
+            data={
+                "year": 2026,
+                "process_number": "LIC 02/26",
+                "expediente": "EX-2026-123-APN-COAN#ARA",
+                "process_type": "PUBLICA",
+                "status": "INICIADO",
+                "currency": "USD",
+                "oca_expiration": "17/07/2026",
+                "is_active": True,
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("delivery_term_days", form.errors)
+        self.assertIn("delivery_term_day_type", form.errors)
+
+    def test_oca_no_clears_expiration_and_delivery_term(self):
+        form = ForeignTenderProcessForm(
+            data={
+                "year": 2026,
+                "process_number": "LIC 03/26",
+                "expediente": "EX-2026-456-APN-COAN#ARA",
+                "process_type": "PUBLICA",
+                "has_oca": False,
+                "status": "INICIADO",
+                "currency": "USD",
+                "oca_expiration": "17/07/2026",
+                "delivery_term_days": 10,
+                "delivery_term_day_type": "CORRIDOS",
+                "is_active": True,
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        process = form.save(commit=False)
+        self.assertEqual(process.oca_expiration, "")
+        self.assertIsNone(process.delivery_term_days)
+        self.assertEqual(process.delivery_term_day_type, "")
+        self.assertIsNone(process.delivery_due_date)
+
     def test_requirement_uses_process_currency_and_contributes_to_total(self):
         process = self.create_process()
         ForeignTenderRequirement.objects.create(
@@ -143,6 +219,88 @@ class ForeignTenderTests(TestCase):
         self.assertEqual(detail_response.status_code, 200)
         self.assertContains(detail_response, requirement.requirement_number)
         self.assertContains(detail_response, "GFH 071010 ENE 26")
+
+    def test_sitrep_fields_and_purchase_orders_are_available(self):
+        self.login_with_pin()
+        process = self.create_process()
+        process.expediente = "EX-2025-73889265-APN-DEDGMA#ARA"
+        process.allocation_gfh = "COAN 271054 FEB26"
+        process.incoterm = "DAP"
+        process.oca_expiration = "NO APLICA"
+        process.sp = "1"
+        process.saimb_number = "11/26"
+        process.received = False
+        process.evaluation_amount = Decimal("208538.74")
+        process.awarded_amount = Decimal("145689.95")
+        process.save()
+        order = ForeignTenderPurchaseOrder.objects.create(
+            process=process,
+            order_number="oca 14/26",
+            amount=Decimal("140854.95"),
+            issue_date=date(2026, 5, 15),
+        )
+
+        detail_response = self.client.get(
+            reverse("licitaciones:foreign_detail", args=[process.pk])
+        )
+        list_response = self.client.get(reverse("licitaciones:foreign_list"))
+
+        self.assertEqual(process.remaining_amount, Decimal("62848.79"))
+        self.assertEqual(order.order_number, "OCA 14/26")
+        self.assertContains(detail_response, process.expediente)
+        self.assertContains(detail_response, "OCA 14/26")
+        self.assertContains(detail_response, "62.848,79")
+        self.assertContains(list_response, "GFH DE")
+        self.assertContains(list_response, process.saimb_number)
+
+    def test_purchase_order_can_be_added_from_foreign_detail(self):
+        self.login_with_pin()
+        process = self.create_process()
+
+        response = self.client.post(
+            reverse("licitaciones:foreign_purchase_order_create", args=[process.pk]),
+            {
+                "order_number": "OC 15/26",
+                "amount": "4835.00",
+                "issue_date": "2026-05-15",
+            },
+        )
+
+        self.assertRedirects(response, process.get_absolute_url())
+        self.assertTrue(process.purchase_orders.filter(order_number="OC 15/26").exists())
+
+    def test_foreign_process_can_be_archived_and_reactivated(self):
+        self.login_with_pin()
+        self.user.groups.add(Group.objects.create(name="Supervisor"))
+        process = self.create_process()
+
+        archive_response = self.client.post(
+            reverse("licitaciones:foreign_archive_toggle", args=[process.pk])
+        )
+        process.refresh_from_db()
+
+        self.assertFalse(process.is_active)
+        self.assertRedirects(archive_response, reverse("licitaciones:foreign_history"))
+        self.assertNotContains(
+            self.client.get(reverse("licitaciones:foreign_list")),
+            process.process_number,
+        )
+        self.assertNotContains(
+            self.client.get(reverse("licitaciones:foreign_dashboard")),
+            process.process_number,
+        )
+        self.assertContains(
+            self.client.get(reverse("licitaciones:foreign_history")),
+            process.process_number,
+        )
+
+        reactivate_response = self.client.post(
+            reverse("licitaciones:foreign_archive_toggle", args=[process.pk])
+        )
+        process.refresh_from_db()
+
+        self.assertTrue(process.is_active)
+        self.assertRedirects(reactivate_response, process.get_absolute_url())
 
     def test_create_requirement_attaches_it_to_the_selected_process(self):
         self.login_with_pin()

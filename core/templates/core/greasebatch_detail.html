@@ -8,6 +8,11 @@
         <h2 class="mt-2"><i class="fa-solid fa-box-open me-2"></i> Detalle Casamata: {{ batch.batch_number }}</h2>
     </div>
     <div>
+        {% if can_incorporate_stock %}
+        <a href="{% url 'batch_incorporate' batch.id %}" class="btn btn-primary shadow-sm me-1">
+            <i class="fa-solid fa-plus me-1"></i> Agregar cantidad
+        </a>
+        {% endif %}
         {% if batch.can_be_retested %}
             {% if batch.status == 'PENDING_RETEST' %}
                 {% if retest_requested_by == user or user.is_superuser %}
@@ -60,7 +65,7 @@
                 <small class="text-muted fs-6">{{ batch.grease_type.unidad }} disponibles</small>
                 </p>
                 <p class="text-muted mt-1">
-                    <small>de {{ batch.initial_quantity|smart_number }} {{ batch.grease_type.unidad }} cargados inicialmente.</small>
+                    <small>de {{ batch.initial_quantity|smart_number }} {{ batch.grease_type.unidad }} cargados en total.</small>
                 </p>
                 {% if batch.unit_price %}
                 <h4 class="mt-4 text-success">Costo Unitario / Valor Total</h4>

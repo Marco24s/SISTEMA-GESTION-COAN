@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags core_filters %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fa-solid fa-boxes-packing me-2"></i>{{ title }}</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-light border mb-4">
+                    <div><strong>Lote:</strong> {{ batch.batch_number }}</div>
+                    <div><strong>Materia grasa:</strong> {{ batch.grease_type.nomenclatura }}</div>
+                    <div><strong>Destino:</strong> {{ batch.storage_location }}</div>
+                    <div><strong>Disponible actualmente:</strong> {{ batch.available_quantity|smart_number }} {{ batch.grease_type.unidad }}</div>
+                    <div><strong>Elaboracion:</strong> {{ batch.manufacturing_date|date:'d/m/Y' }} &mdash; <strong>Vencimiento:</strong> {{ batch.expiration_date|date:'d/m/Y' }}</div>
+                </div>
+
+                <p class="text-muted">
+                    Ingrese la cantidad total recibida. Se sumara directamente al stock de esta
+                    casamata y se mantendra la presentacion registrada para el lote.
+                </p>
+
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="mt-4 d-flex justify-content-between">
+                        <a href="{% url 'batch_detail' batch.id %}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fa-solid fa-plus me-1"></i> Agregar cantidad
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

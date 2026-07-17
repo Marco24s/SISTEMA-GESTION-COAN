@@ -2,7 +2,8 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth.hashers import make_password
 from core.models import CustomUser, Unit, AircraftModel, GreaseType, GreaseBatch, MeasurementUnit, AircraftGrease, FlightPlan, UserSystemPIN
-from core.services import optimize_grease_usage
+from core.forms import GreaseBatchForm, IncorporateBatchStockForm
+from core.services import optimize_grease_usage, incorporate_batch_stock
 from datetime import date, timedelta
 from decimal import Decimal
 import time
@@ -111,6 +112,70 @@ class CoreViewsBasicCharacterizationTests(TestCase):
         
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'core/form_base.html')
+
+    def test_batch_edit_preserves_existing_dates_in_html_date_inputs(self):
+        """Las fechas guardadas deben aparecer cargadas al editar una casamata."""
+        form = GreaseBatchForm(instance=self.batch, user=self.admin_user)
+
+        self.assertIn(
+            f'value="{self.batch.manufacturing_date:%Y-%m-%d}"',
+            str(form['manufacturing_date']),
+        )
+        self.assertIn(
+            f'value="{self.batch.expiration_date:%Y-%m-%d}"',
+            str(form['expiration_date']),
+        )
+
+    def test_add_quantity_increases_stock_without_changing_dates_or_packaging(self):
+        original_manufacturing_date = self.batch.manufacturing_date
+        original_expiration_date = self.batch.expiration_date
+        self.batch.container_count = 5
+        self.batch.container_size = Decimal('10.00')
+        self.batch.save(update_fields=['container_count', 'container_size'])
+
+        incorporate_batch_stock(
+            target_batch=self.batch,
+            quantity=Decimal('12.00'),
+            user=self.admin_user,
+        )
+
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.initial_quantity, Decimal('62.00'))
+        self.assertEqual(self.batch.available_quantity, Decimal('62.00'))
+        self.assertEqual(self.batch.container_count, 5)
+        self.assertEqual(self.batch.container_size, Decimal('10.00'))
+        self.assertEqual(self.batch.manufacturing_date, original_manufacturing_date)
+        self.assertEqual(self.batch.expiration_date, original_expiration_date)
+        self.assertTrue(
+            self.batch.movements.filter(
+                movement_type='INCOMING',
+                quantity_changed=Decimal('12.00'),
+            ).exists()
+        )
+
+    def test_add_quantity_form_only_asks_for_quantity_in_the_batch_unit(self):
+        form = IncorporateBatchStockForm(
+            data={'quantity': '12.00'},
+            target_batch=self.batch,
+            user=self.admin_user,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(list(form.fields), ['quantity'])
+        self.assertEqual(form.cleaned_data['quantity'], Decimal('12.00'))
+        self.assertIn(self.grease_type.unidad, form.fields['quantity'].label)
+
+    def test_add_quantity_accepts_container_data_from_a_stale_view_process(self):
+        incorporate_batch_stock(
+            target_batch=self.batch,
+            container_count=3,
+            container_size=Decimal('4.00'),
+            user=self.admin_user,
+        )
+
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.available_quantity, Decimal('62.00'))
+        self.assertIsNone(self.batch.container_size)
 
     def test_usage_optimizer_prioritizes_expiring_stock_without_moving_it(self):
         """El optimizador debe asesorar usando primero el lote que vence antes, sin alterar stock."""

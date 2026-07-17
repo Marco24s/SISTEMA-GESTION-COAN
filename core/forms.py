@@ -106,8 +106,11 @@ class GreaseBatchForm(forms.ModelForm):
         model = GreaseBatch
         fields = ['grease_type', 'batch_number', 'manufacturing_date', 'expiration_date', 'container_size', 'container_count', 'initial_quantity', 'storage_location']
         widgets = {
-            'manufacturing_date': forms.DateInput(attrs={'type': 'date'}),
-            'expiration_date': forms.DateInput(attrs={'type': 'date'}),
+            # Los inputs HTML de tipo date solo aceptan valores ISO. Sin un
+            # formato explicito, la localizacion puede renderizar las fechas
+            # existentes como dd/mm/aaaa y el navegador las muestra vacias.
+            'manufacturing_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+            'expiration_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -169,6 +172,23 @@ class GreaseBatchForm(forms.ModelForm):
         if final_qty and total_price is not None:
             self.instance.unit_price = total_price / final_qty
         return cleaned_data
+
+
+class IncorporateBatchStockForm(forms.Form):
+    quantity = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=0.01,
+        label="Cantidad a agregar",
+    )
+
+    def __init__(self, *args, target_batch=None, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.target_batch = target_batch
+        if target_batch:
+            self.fields['quantity'].label = (
+                f"Cantidad a agregar ({target_batch.grease_type.unidad})"
+            )
 
 class ConsumeGreaseForm(forms.Form):
     grease_type = forms.ModelChoiceField(queryset=GreaseType.objects.all(), label="Tipo de Grasa")

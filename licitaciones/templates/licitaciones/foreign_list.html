@@ -5,13 +5,13 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
-    <div><h1 class="h3 mb-1">Procesos en el exterior</h1><p class="text-muted mb-0">Consulta y seguimiento consolidado.</p></div>
+    <div><h1 class="h3 mb-1">Procesos en el exterior</h1><p class="text-muted mb-0">Consulta y seguimiento consolidado con los datos del SITREP.</p></div>
     <a href="{% url 'licitaciones:foreign_create' %}" class="btn btn-primary" style="background:#1f4b63;border-color:#1f4b63;"><i class="fa-solid fa-plus me-1"></i> Nueva licitacion</a>
 </div>
 
 <form method="get" class="card card-body border-0 shadow-sm mb-3">
     <div class="row g-2">
-        <div class="col-lg-4"><input name="q" value="{{ search_query }}" class="form-control" placeholder="Buscar licitacion, REQ o descripcion"></div>
+        <div class="col-lg-4"><input name="q" value="{{ search_query }}" class="form-control" placeholder="Buscar licitacion, expediente, REQ u OC"></div>
         <div class="col-sm-4 col-lg-2"><select name="year" class="form-select"><option value="">Todos los años</option>{% for year in years %}<option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>{% endfor %}</select></div>
         <div class="col-sm-4 col-lg-2"><select name="currency" class="form-select"><option value="">Todas las monedas</option>{% for value,label in currency_choices %}<option value="{{ value }}" {% if selected_currency == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
         <div class="col-sm-4 col-lg-2"><select name="status" class="form-select"><option value="">Todos los estados</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
@@ -21,117 +21,86 @@
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-bordered table-hover align-middle text-center mb-0" style="font-size: 0.85rem;">
+        <table class="table table-bordered table-hover align-middle text-center mb-0" style="font-size:.78rem; min-width:2800px;">
             <thead class="table-light align-middle">
                 <tr>
-                    <th colspan="3" class="text-center no-sort">DATOS INICIALES</th>
-                    <th rowspan="2" class="text-center no-sort">MONTO<br>REQUERIMIENTO</th>
-                    <th rowspan="2" class="text-center no-sort" style="background-color: #e2e3e5;">MONTO DICTAMEN<br>DE EVALUACIÓN</th>
-                    <th rowspan="2" class="text-center no-sort" style="background-color: #d1e7dd;">MONTO ASIGNADO<br>EN ADJUDICACIÓN</th>
-                    <th rowspan="2" class="text-center no-sort">TALLER</th>
-                    <th rowspan="2" class="text-center no-sort">AERONAVE</th>
-                    <th rowspan="2" class="text-center no-sort">DESCRIPCIÓN</th>
-                    <th rowspan="2" class="text-center no-sort">OBSERVACIONES / ULTIMO ESTADO POR GDE/GFH</th>
-                    <th rowspan="2" class="text-center no-sort">ACCIONES</th>
+                    <th colspan="4">DATOS INICIALES</th>
+                    <th rowspan="2">MONTO<br>REQUERIMIENTO</th>
+                    <th rowspan="2">MONTO DICTAMEN<br>DE EVALUACION</th>
+                    <th rowspan="2">TALLER</th>
+                    <th rowspan="2">AERONAVE</th>
+                    <th rowspan="2">DESCRIPCION</th>
+                    <th rowspan="2">ESTADO DE LA<br>CONTRATACION</th>
+                    <th rowspan="2">MONTO<br>ASIGNADO</th>
+                    <th rowspan="2">GFH DE<br>ASIGNACION</th>
+                    <th rowspan="2">INCOTERM</th>
+                    <th rowspan="2">NRO. OC</th>
+                    <th rowspan="2">MONTO OC</th>
+                    <th rowspan="2">FECHA DE<br>EMISION</th>
+                    <th rowspan="2">FECHA VTO OCA</th>
+                    <th rowspan="2">SOLICITUD DE<br>PROVISION (SP)</th>
+                    <th rowspan="2">MONTO<br>REMANENTE</th>
+                    <th rowspan="2">FECHA VENC./<br>PLAZO DE ENTREGA</th>
+                    <th rowspan="2">SAIMB NRO.</th>
+                    <th rowspan="2">RECIBIDO</th>
+                    <th rowspan="2">ULTIMO ESTADO<br>POR GDE/GFH</th>
+                    <th rowspan="2">ACCIONES</th>
                 </tr>
-                <tr>
-                    <th class="text-center">LICITACIÓN</th>
-                    <th class="text-center">OCA</th>
-                    <th class="text-center">REQ</th>
-                </tr>
+                <tr><th>LICITACION</th><th>OCA</th><th>REQ</th><th>EXPEDIENTE</th></tr>
             </thead>
             <tbody>
             {% for process in processes %}
                 {% with reqs=process.requirements.all %}
-                    {% if reqs %}
-                        {% for req in reqs %}
-                            <tr>
-                                {% if forloop.first %}
-                                <td rowspan="{{ reqs|length }}" class="align-middle">
-                                    <a href="{{ process.get_absolute_url }}" class="text-decoration-none fw-bold text-dark">
-                                        {{ process.process_number }}<br>
-                                        <small class="text-muted">{{ process.year }} - {{ process.get_process_type_display }}</small>
-                                    </a>
-                                </td>
-                                <td rowspan="{{ reqs|length }}" class="align-middle">
-                                    {% if process.has_oca is None %}-{% elif process.has_oca %}SI{% else %}NO{% endif %}
-                                </td>
-                                {% endif %}
-                                
-                                <td>{{ req.requirement_number }}</td>
-                                <td>{{ process.currency_symbol }} {{ req.requested_amount|floatformat:2|intcomma }}</td>
-                                
-                                {% if forloop.first %}
-                                <td rowspan="{{ reqs|length }}" class="align-middle" style="background-color: #f8f9fa;">
-                                    {% if process.evaluation_amount is not None %}
-                                        {{ process.currency_symbol }} {{ process.evaluation_amount|floatformat:2|intcomma }}
-                                    {% else %}-{% endif %}
-                                </td>
-                                <td rowspan="{{ reqs|length }}" class="align-middle" style="background-color: #e8f5e9;">
-                                    {% if process.awarded_amount is not None %}
-                                        {{ process.currency_symbol }} {{ process.awarded_amount|floatformat:2|intcomma }}
-                                    {% else %}-{% endif %}
-                                </td>
-                                {% endif %}
-                                
-                                <td>{{ req.workshop_label|default:"-" }}</td>
-                                <td>{{ req.aircraft|default:"-" }}</td>
-                                <td class="text-start">{{ req.description }}</td>
-                                
-                                {% if forloop.first %}
-                                <td rowspan="{{ reqs|length }}" class="align-middle text-start">
-                                    {% if process.latest_update %}
-                                        <small><strong>{{ process.latest_update.organization }}</strong> - {{ process.latest_update.description }} ({{ process.latest_update.document_type }} {{ process.latest_update.event_date|date:"dmy"|upper }} {{ process.latest_update.event_date|date:"M Y"|upper }})</small>
-                                    {% else %}
-                                        <small>{{ process.notes|default:"-" }}</small>
-                                    {% endif %}
-                                </td>
-                                <td rowspan="{{ reqs|length }}" class="align-middle text-nowrap">
-                                    <a href="{% url 'licitaciones:foreign_update' process.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa-solid fa-pen"></i></a>
-                                </td>
-                                {% endif %}
-                            </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td class="align-middle">
-                                <a href="{{ process.get_absolute_url }}" class="text-decoration-none fw-bold text-dark">
-                                    {{ process.process_number }}<br>
-                                    <small class="text-muted">{{ process.year }} - {{ process.get_process_type_display }}</small>
-                                </a>
-                            </td>
-                            <td class="align-middle">{% if process.has_oca is None %}-{% elif process.has_oca %}SI{% else %}NO{% endif %}</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td class="align-middle" style="background-color: #f8f9fa;">
-                                {% if process.evaluation_amount is not None %}
-                                    {{ process.currency_symbol }} {{ process.evaluation_amount|floatformat:2|intcomma }}
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="align-middle" style="background-color: #e8f5e9;">
-                                {% if process.awarded_amount is not None %}
-                                    {{ process.currency_symbol }} {{ process.awarded_amount|floatformat:2|intcomma }}
-                                {% else %}-{% endif %}
-                            </td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td class="align-middle text-start">
-                                {% if process.latest_update %}
-                                    <small><strong>{{ process.latest_update.organization }}</strong> - {{ process.latest_update.description }} ({{ process.latest_update.document_type }} {{ process.latest_update.event_date|date:"dmy"|upper }} {{ process.latest_update.event_date|date:"M Y"|upper }})</small>
-                                {% else %}
-                                    <small>{{ process.notes|default:"-" }}</small>
-                                {% endif %}
-                            </td>
-                            <td class="align-middle text-nowrap">
-                                <a href="{% url 'licitaciones:foreign_update' process.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa-solid fa-pen"></i></a>
-                            </td>
-                        </tr>
-                    {% endif %}
+                {% if reqs %}
+                    {% for req in reqs %}
+                    <tr>
+                        {% if forloop.first %}
+                        <td rowspan="{{ reqs|length }}"><a href="{{ process.get_absolute_url }}" class="text-decoration-none fw-bold text-dark">{{ process.process_number }}</a><br><small class="text-muted">{{ process.year }}</small></td>
+                        <td rowspan="{{ reqs|length }}">{% if process.has_oca is None %}-{% elif process.has_oca %}SI{% else %}NO{% endif %}</td>
+                        {% endif %}
+                        <td><strong>{{ req.requirement_number }}</strong></td>
+                        {% if forloop.first %}<td rowspan="{{ reqs|length }}">{{ process.expediente|default:"-" }}</td>{% endif %}
+                        <td class="text-nowrap">{{ process.currency_symbol }} {{ req.requested_amount|floatformat:2|intcomma }}</td>
+                        {% if forloop.first %}
+                        <td rowspan="{{ reqs|length }}" class="text-nowrap">{% if process.evaluation_amount is not None %}{{ process.currency_symbol }} {{ process.evaluation_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                        {% endif %}
+                        <td>{{ req.workshop_label|default:"-" }}</td><td>{{ req.aircraft|default:"-" }}</td><td class="text-start">{{ req.description }}</td>
+                        {% if forloop.first %}
+                        <td rowspan="{{ reqs|length }}">{{ process.get_status_display }}</td>
+                        <td rowspan="{{ reqs|length }}" class="text-nowrap">{% if process.awarded_amount is not None %}{{ process.currency_symbol }} {{ process.awarded_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                        <td rowspan="{{ reqs|length }}">{{ process.allocation_gfh|default:"-"|linebreaksbr }}</td>
+                        <td rowspan="{{ reqs|length }}">{{ process.incoterm|default:"-" }}</td>
+                        <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.order_number }}</div>{% empty %}-{% endfor %}</td>
+                        <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ process.currency_symbol }} {{ order.amount|floatformat:2|intcomma }}</div>{% empty %}-{% endfor %}</td>
+                        <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.issue_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
+                        <td rowspan="{{ reqs|length }}">{{ process.oca_expiration|default:"-" }}</td><td rowspan="{{ reqs|length }}">{{ process.sp|default:"-" }}</td>
+                        <td rowspan="{{ reqs|length }}" class="text-nowrap">{% if process.remaining_amount is not None %}{{ process.currency_symbol }} {{ process.remaining_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                        <td rowspan="{{ reqs|length }}" class="text-nowrap">{{ process.delivery_due_date|date:"d/m/Y"|default:"-" }}</td>
+                        <td rowspan="{{ reqs|length }}">{{ process.saimb_number|default:"-" }}</td>
+                        <td rowspan="{{ reqs|length }}">{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</td>
+                        <td rowspan="{{ reqs|length }}" class="text-start">{% if process.latest_update %}<small>{% if process.latest_update.organization %}<strong>{{ process.latest_update.organization }}</strong> - {% endif %}{{ process.latest_update.description }} ({{ process.latest_update.event_date|date:"d/m/Y" }})</small>{% else %}<small>{{ process.notes|default:"-" }}</small>{% endif %}</td>
+                        <td rowspan="{{ reqs|length }}"><a href="{% url 'licitaciones:foreign_update' process.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa-solid fa-pen"></i></a></td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td><a href="{{ process.get_absolute_url }}" class="text-decoration-none fw-bold text-dark">{{ process.process_number }}</a><br><small class="text-muted">{{ process.year }}</small></td>
+                        <td>{% if process.has_oca is None %}-{% elif process.has_oca %}SI{% else %}NO{% endif %}</td><td>-</td><td>{{ process.expediente|default:"-" }}</td><td>-</td>
+                        <td>{% if process.evaluation_amount is not None %}{{ process.currency_symbol }} {{ process.evaluation_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td><td>-</td><td>-</td><td>-</td>
+                        <td>{{ process.get_status_display }}</td><td>{% if process.awarded_amount is not None %}{{ process.currency_symbol }} {{ process.awarded_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                        <td>{{ process.allocation_gfh|default:"-"|linebreaksbr }}</td><td>{{ process.incoterm|default:"-" }}</td>
+                        <td>{% for order in process.purchase_orders.all %}<div>{{ order.order_number }}</div>{% empty %}-{% endfor %}</td>
+                        <td>{% for order in process.purchase_orders.all %}<div>{{ process.currency_symbol }} {{ order.amount|floatformat:2|intcomma }}</div>{% empty %}-{% endfor %}</td>
+                        <td>{% for order in process.purchase_orders.all %}<div>{{ order.issue_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
+                        <td>{{ process.oca_expiration|default:"-" }}</td><td>{{ process.sp|default:"-" }}</td><td>{% if process.remaining_amount is not None %}{{ process.currency_symbol }} {{ process.remaining_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td><td>{{ process.delivery_due_date|date:"d/m/Y"|default:"-" }}</td>
+                        <td>{{ process.saimb_number|default:"-" }}</td><td>{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</td>
+                        <td class="text-start">{% if process.latest_update %}{{ process.latest_update.description }}{% else %}{{ process.notes|default:"-" }}{% endif %}</td>
+                        <td><a href="{% url 'licitaciones:foreign_update' process.pk %}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen"></i></a></td>
+                    </tr>
+                {% endif %}
                 {% endwith %}
-            {% empty %}
-                <tr><td colspan="11" class="text-center text-muted py-4">No hay procesos para mostrar.</td></tr>
-            {% endfor %}
+            {% empty %}<tr><td colspan="24" class="text-center text-muted py-4">No hay procesos para mostrar.</td></tr>{% endfor %}
             </tbody>
         </table>
     </div>
