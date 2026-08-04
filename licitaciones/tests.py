@@ -1,5 +1,5 @@
 import time
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -8,6 +8,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from core.models import Unit, UserSystemPIN
 from licitaciones.forms import ForeignTenderProcessForm
@@ -16,6 +17,7 @@ from licitaciones.models import (
     ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
     ForeignTenderUpdate,
+    TenderProcess,
 )
 
 
@@ -54,6 +56,34 @@ class TenderTypeSelectionTests(TestCase):
 
     def test_national_dashboard_keeps_its_named_route(self):
         self.assertEqual(reverse("licitaciones:dashboard"), "/licitaciones/nacional/")
+
+    def test_national_process_pagination_preserves_filters(self):
+        self.login_with_licitaciones_pin()
+        unit = Unit.objects.create(name="FAE2")
+        base_date = timezone.make_aware(datetime(2026, 7, 1, 8, 0))
+        for index in range(28):
+            process_number = "38/25-0102-LPR26" if index == 26 else f"38/25-{index:04d}-LPR26"
+            TenderProcess.objects.create(
+                year=2026,
+                unit=unit,
+                process_number=process_number,
+                expediente=f"EX-2026-{index:04d}-APN-COAN#ARA",
+                name=f"Proceso FAE2 {index}",
+                process_type="PUBLICA",
+                opening_date=base_date - timedelta(days=index),
+                status="PUBLICADO",
+            )
+
+        response = self.client.get(
+            reverse("licitaciones:process_list"),
+            {"year": "2026", "unit": str(unit.pk)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f"year=2026&amp;unit={unit.pk}&amp;page=2",
+        )
 
 
 class ForeignTenderTests(TestCase):

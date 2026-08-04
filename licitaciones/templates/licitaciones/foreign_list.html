@@ -79,7 +79,7 @@
                         <td rowspan="{{ reqs|length }}">{{ process.saimb_number|default:"-" }}</td>
                         <td rowspan="{{ reqs|length }}">{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</td>
                         <td rowspan="{{ reqs|length }}" class="text-start">{% if process.latest_update %}<small>{% if process.latest_update.organization %}<strong>{{ process.latest_update.organization }}</strong> - {% endif %}{{ process.latest_update.description }} ({{ process.latest_update.event_date|date:"d/m/Y" }})</small>{% else %}<small>{{ process.notes|default:"-" }}</small>{% endif %}</td>
-                        <td rowspan="{{ reqs|length }}"><a href="{% url 'licitaciones:foreign_update' process.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa-solid fa-pen"></i></a></td>
+                        <td rowspan="{{ reqs|length }}"><a href="{{ process.get_absolute_url }}" class="btn btn-sm btn-outline-primary" title="Ver detalle"><i class="fa-solid fa-pen"></i></a></td>
                         {% endif %}
                     </tr>
                     {% endfor %}
@@ -96,7 +96,7 @@
                         <td>{{ process.oca_expiration|default:"-" }}</td><td>{{ process.sp|default:"-" }}</td><td>{% if process.remaining_amount is not None %}{{ process.currency_symbol }} {{ process.remaining_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td><td>{{ process.delivery_due_date|date:"d/m/Y"|default:"-" }}</td>
                         <td>{{ process.saimb_number|default:"-" }}</td><td>{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</td>
                         <td class="text-start">{% if process.latest_update %}{{ process.latest_update.description }}{% else %}{{ process.notes|default:"-" }}{% endif %}</td>
-                        <td><a href="{% url 'licitaciones:foreign_update' process.pk %}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen"></i></a></td>
+                        <td><a href="{{ process.get_absolute_url }}" class="btn btn-sm btn-outline-primary" title="Ver detalle"><i class="fa-solid fa-pen"></i></a></td>
                     </tr>
                 {% endif %}
                 {% endwith %}

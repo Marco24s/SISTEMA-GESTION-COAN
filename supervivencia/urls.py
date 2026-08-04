@@ -28,6 +28,11 @@ urlpatterns = [
     path("material/<int:pk>/movimiento/", views.PyrotechnicPhysicalItemMovementView.as_view(), name="physical_item_movement"),
     path("material/<int:pk>/editar/", views.PyrotechnicPhysicalItemUpdateView.as_view(), name="physical_item_update"),
     path("material/<int:pk>/eliminar/", views.physical_item_delete, name="physical_item_delete"),
+    path(
+        "administracion/material/<int:pk>/borrado-forzado/",
+        views.PyrotechnicPhysicalItemForceDeleteView.as_view(),
+        name="physical_item_force_delete",
+    ),
     path("asignaciones/", views.PyrotechnicAssignmentListView.as_view(), name="assignment_list"),
     path("asignaciones/nueva/", views.PyrotechnicAssignmentCreateView.as_view(), name="assignment_create"),
     path("asignaciones/<int:pk>/editar/", views.PyrotechnicAssignmentUpdateView.as_view(), name="assignment_update"),

@@ -266,6 +266,9 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
             .values_list("year", flat=True)
             .distinct()
         )
+        query_params = self.request.GET.copy()
+        query_params.pop("page", None)
+        context["pagination_query"] = query_params.urlencode()
         return context
 
 

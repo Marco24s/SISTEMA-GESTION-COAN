@@ -24,6 +24,44 @@
                     {% endif %}
                 </div>
 
+                {% if blockers %}
+                <div class="alert alert-warning border-0">
+                    <div class="fw-bold mb-2">
+                        <i class="fa-solid fa-lock me-1"></i> Este material tiene datos relacionados
+                    </div>
+                    {% for blocker in blockers %}
+                        <div class="mb-2">
+                            <strong>{{ blocker.label }}:</strong> {{ blocker.count }}
+                            <ul class="mb-0">
+                                {% for related in blocker.objects|slice:":5" %}
+                                    <li>{{ related }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% if blocker.count > 5 %}
+                                <small class="text-muted">Se muestran 5 de {{ blocker.count }} registros.</small>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <a href="{% url 'supervivencia:physical_item_force_delete' object.pk %}" class="btn btn-sm btn-danger mt-2">
+                        <i class="fa-solid fa-triangle-exclamation me-1"></i> Ir a borrado forzado del material
+                    </a>
+                </div>
+                {% endif %}
+
+                {% if protected_objects %}
+                <div class="alert alert-warning border-0">
+                    <div class="fw-bold mb-2">Objetos protegidos detectados</div>
+                    <ul class="mb-0">
+                        {% for protected in protected_objects|slice:":10" %}
+                            <li>{{ protected }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% if protected_objects|length > 10 %}
+                        <small class="text-muted">Se muestran 10 de {{ protected_objects|length }} registros.</small>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <form method="post">
                     {% csrf_token %}
                     <label class="form-label fw-bold">Escriba BORRAR para confirmar</label>

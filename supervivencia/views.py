@@ -78,6 +78,60 @@ def _item_location_reference(item):
     return item.current_location or ""
 
 
+def _physical_item_delete_blockers(item):
+    assignments = list(
+        PyrotechnicAssignment.objects.filter(physical_item=item)
+        .select_related("medium", "medium__unit")
+        .order_by("-is_active", "-installed_at", "-removed_at")
+    )
+    movements = list(
+        PyrotechnicMovement.objects.filter(physical_item=item)
+        .select_related("medium", "assignment", "created_by")
+        .order_by("-movement_date", "-created_at")
+    )
+    blockers = []
+    if assignments:
+        blockers.append(
+            {
+                "label": "Asignaciones / montajes",
+                "count": len(assignments),
+                "objects": assignments,
+            }
+        )
+    if movements:
+        blockers.append(
+            {
+                "label": "Movimientos",
+                "count": len(movements),
+                "objects": movements,
+            }
+        )
+    return blockers
+
+
+def _physical_item_force_delete(item, user):
+    object_repr = str(item)
+    object_id = str(item.pk)
+    assignment_count = PyrotechnicAssignment.objects.filter(physical_item=item).count()
+    movement_count = PyrotechnicMovement.objects.filter(physical_item=item).count()
+
+    with transaction.atomic():
+        PyrotechnicMovement.objects.filter(physical_item=item).delete()
+        PyrotechnicAssignment.objects.filter(physical_item=item).delete()
+        item.delete()
+        SupervivenciaDeletionLog.objects.create(
+            object_type="Material fisico (borrado forzado)",
+            object_id=object_id,
+            object_repr=(
+                f"{object_repr} | Movimientos eliminados: {movement_count} | "
+                f"Asignaciones eliminadas: {assignment_count}"
+            )[:300],
+            deleted_by=user,
+        )
+
+    return object_repr, movement_count, assignment_count
+
+
 ADMIN_DELETE_MODELS = {
     "medium": {
         "label": "Medios",
@@ -281,11 +335,14 @@ class SupervivenciaAdminDeleteConfirmView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        blockers = _physical_item_delete_blockers(self.object) if self.model_type == "physical" else []
         context.update(
             {
                 "model_type": self.model_type,
                 "model_label": self.config["label"],
                 "object": self.object,
+                "blockers": blockers,
+                "protected_objects": getattr(self, "protected_objects", []),
             }
         )
         return context
@@ -301,11 +358,13 @@ class SupervivenciaAdminDeleteConfirmView(LoginRequiredMixin, TemplateView):
         object_type = self.config["label"]
         try:
             self.object.delete()
-        except ProtectedError:
+        except ProtectedError as error:
+            protected_objects = list(error.protected_objects)
             messages.error(
                 request,
-                "No se pudo borrar porque tiene datos relacionados protegidos. Borre primero esos registros vinculados.",
+                "No se pudo borrar porque tiene datos relacionados protegidos. Revise el detalle listado abajo.",
             )
+            self.protected_objects = protected_objects
             return self.get(request, *args, **kwargs)
 
         SupervivenciaDeletionLog.objects.create(
@@ -764,6 +823,47 @@ class PyrotechnicPhysicalItemMovementView(LoginRequiredMixin, SuccessMessageMixi
         context["title"] = "Registrar movimiento de material"
         context["item"] = self.object
         return context
+
+
+class PyrotechnicPhysicalItemForceDeleteView(LoginRequiredMixin, TemplateView):
+    template_name = "supervivencia/physical_item_force_delete.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        forbidden = _superuser_required(request)
+        if forbidden:
+            return forbidden
+        self.item = get_object_or_404(
+            PyrotechnicPhysicalItem.objects.select_related("catalog_item", "current_storage_location"),
+            pk=kwargs.get("pk"),
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "item": self.item,
+                "blockers": _physical_item_delete_blockers(self.item),
+                "confirmation_text": "BORRAR MATERIAL",
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        confirmation = request.POST.get("confirmation", "").strip().upper()
+        if confirmation != "BORRAR MATERIAL":
+            messages.error(request, "Debe escribir BORRAR MATERIAL para confirmar el borrado forzado.")
+            return self.get(request, *args, **kwargs)
+
+        object_repr, movement_count, assignment_count = _physical_item_force_delete(self.item, request.user)
+        messages.success(
+            request,
+            (
+                f"Material eliminado definitivamente: {object_repr}. "
+                f"Tambien se eliminaron {movement_count} movimientos y {assignment_count} asignaciones."
+            ),
+        )
+        return redirect("supervivencia:physical_item_list")
 
 
 @login_required
