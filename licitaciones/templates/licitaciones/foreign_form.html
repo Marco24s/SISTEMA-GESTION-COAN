@@ -22,7 +22,6 @@
                 <form method="post">
                     {% csrf_token %}
                     {{ form|crispy }}
-                    <div id="delivery-date-preview" class="alert alert-success py-2 d-none" role="status"></div>
                     <div class="d-flex justify-content-between mt-4">
                         <a href="{% if object %}{{ object.get_absolute_url }}{% else %}{% url 'licitaciones:foreign_dashboard' %}{% endif %}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1"></i> Volver</a>
                         <button class="btn btn-primary" style="background:#1f4b63;border-color:#1f4b63;"><i class="fa-solid fa-floppy-disk me-1"></i> Guardar</button>
@@ -32,88 +31,4 @@
         </div>
     </div>
 </div>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const ocaInput = document.getElementById("id_has_oca");
-    const expirationInput = document.getElementById("id_oca_expiration");
-    const daysInput = document.getElementById("id_delivery_term_days");
-    const typeInput = document.getElementById("id_delivery_term_day_type");
-    const daysGroup = document.getElementById("div_id_delivery_term_days");
-    const typeGroup = document.getElementById("div_id_delivery_term_day_type");
-    const preview = document.getElementById("delivery-date-preview");
-    if (!ocaInput || !expirationInput || !daysInput || !typeInput || !daysGroup || !typeGroup) return;
-
-    function ocaIsNo() {
-        const selectedText = ocaInput.options[ocaInput.selectedIndex]?.text.trim().toLowerCase();
-        const value = String(ocaInput.value).trim().toLowerCase();
-        return selectedText === "no" || ["false", "0", "no"].includes(value);
-    }
-
-    function parseDate(value) {
-        let match = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if (!match) {
-            const isoMatch = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-            if (isoMatch) match = [isoMatch[0], isoMatch[3], isoMatch[2], isoMatch[1]];
-        }
-        if (!match) return null;
-        const date = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
-        if (date.getFullYear() !== Number(match[3]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[1])) return null;
-        return date;
-    }
-
-    function formatDate(date) {
-        return String(date.getDate()).padStart(2, "0") + "/" + String(date.getMonth() + 1).padStart(2, "0") + "/" + date.getFullYear();
-    }
-
-    function updateDeliveryFields() {
-        const disabledByOca = ocaIsNo();
-        expirationInput.disabled = disabledByOca;
-        if (disabledByOca) {
-            expirationInput.value = "";
-            daysInput.value = "";
-            typeInput.value = "";
-            daysInput.disabled = true;
-            typeInput.disabled = true;
-            daysGroup.classList.add("d-none");
-            typeGroup.classList.add("d-none");
-            preview.classList.add("d-none");
-            return;
-        }
-
-        daysInput.disabled = false;
-        typeInput.disabled = false;
-        const baseDate = parseDate(expirationInput.value);
-        const showTerm = baseDate !== null;
-        daysGroup.classList.toggle("d-none", !showTerm);
-        typeGroup.classList.toggle("d-none", !showTerm);
-        preview.classList.add("d-none");
-        if (!showTerm) {
-            daysInput.value = "";
-            typeInput.value = "";
-            return;
-        }
-
-        const days = Number(daysInput.value);
-        if (!Number.isInteger(days) || days < 1 || !typeInput.value) return;
-        const dueDate = new Date(baseDate);
-        if (typeInput.value === "CORRIDOS") {
-            dueDate.setDate(dueDate.getDate() + days);
-        } else {
-            let elapsed = 0;
-            while (elapsed < days) {
-                dueDate.setDate(dueDate.getDate() + 1);
-                if (dueDate.getDay() !== 0 && dueDate.getDay() !== 6) elapsed += 1;
-            }
-        }
-        preview.textContent = "Fecha venc./plazo de entrega calculada: " + formatDate(dueDate);
-        preview.classList.remove("d-none");
-    }
-
-    expirationInput.addEventListener("input", updateDeliveryFields);
-    ocaInput.addEventListener("change", updateDeliveryFields);
-    daysInput.addEventListener("input", updateDeliveryFields);
-    typeInput.addEventListener("change", updateDeliveryFields);
-    updateDeliveryFields();
-});
-</script>
 {% endblock %}

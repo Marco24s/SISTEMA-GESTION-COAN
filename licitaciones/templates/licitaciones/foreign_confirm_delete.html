@@ -1,0 +1,48 @@
+{% extends "licitaciones/base_foreign.html" %}
+
+{% block title %}Confirmar eliminación{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-7 col-md-9">
+        <div class="card shadow-sm border-danger">
+            <div class="card-header text-white bg-danger">
+                <h4 class="mb-0">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar borrado de {{ label }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    Esta acción eliminará de forma definitiva el registro de <strong>{{ label }}</strong> y no se podrá recuperar.
+                </p>
+
+                <div class="border rounded p-3 mb-3 bg-light">
+                    <div class="small text-muted text-uppercase fw-bold mb-1">{{ label }}</div>
+                    <div class="fs-5 fw-bold text-dark mb-1">{{ object }}</div>
+                    <div class="small text-muted">ID de Registro: #{{ object.pk }}</div>
+                </div>
+
+                <div class="alert alert-warning border-0">
+                    <i class="fa-solid fa-lock me-1"></i> Esta acción requiere ingresar su PIN de seguridad de <strong>Borrado de Compras</strong> y escribir la palabra de confirmación.
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Escriba <span class="text-danger">BORRAR</span> para confirmar:</label>
+                        <input type="text" name="confirmation" class="form-control" autocomplete="off" placeholder="BORRAR" required autofocus>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <a href="{{ redirect_url }}" class="btn btn-outline-secondary">
+                            <i class="fa-solid fa-arrow-left me-1"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fa-solid fa-trash me-1"></i> Confirmar y Eliminar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

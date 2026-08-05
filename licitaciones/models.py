@@ -168,7 +168,7 @@ class TenderProcess(models.Model):
         verbose_name = "Proceso licitatorio"
         verbose_name_plural = "Procesos licitatorios"
         ordering = ["-year", "unit__name", "-opening_date", "process_number"]
-        unique_together = ("year", "process_number")
+        unique_together = ("year", "process_type", "process_number")
 
     def __str__(self):
         destination_name = self.unit.name if self.unit else (self.destination.code if self.destination else "SIN_UNIDAD")
@@ -225,10 +225,6 @@ class ForeignTenderProcess(models.Model):
         ("FRACASADO", "Fracasado"),
         ("DEJADO_SIN_EFECTO", "Dejado sin efecto"),
     ]
-    DELIVERY_DAY_TYPE_CHOICES = [
-        ("CORRIDOS", "Dias corridos"),
-        ("HABILES", "Dias habiles (lunes a viernes)"),
-    ]
 
     year = models.PositiveIntegerField(default=2026, verbose_name="Ejercicio / Año")
     process_number = models.CharField(max_length=60, verbose_name="Licitacion")
@@ -273,24 +269,6 @@ class ForeignTenderProcess(models.Model):
     )
     allocation_gfh = models.TextField(blank=True, verbose_name="GFH de asignacion")
     incoterm = models.CharField(max_length=30, blank=True, verbose_name="Incoterm")
-    oca_expiration = models.CharField(
-        max_length=150,
-        blank=True,
-        verbose_name="Fecha de vencimiento OCA",
-        help_text="Admite una fecha o una aclaracion, por ejemplo 'No aplica'.",
-    )
-    delivery_term_days = models.PositiveIntegerField(
-        blank=True,
-        null=True,
-        verbose_name="Cantidad de dias del plazo de entrega",
-    )
-    delivery_term_day_type = models.CharField(
-        max_length=10,
-        choices=DELIVERY_DAY_TYPE_CHOICES,
-        blank=True,
-        verbose_name="Tipo de dias del plazo de entrega",
-    )
-    sp = models.CharField(max_length=30, blank=True, verbose_name="SP")
     saimb_number = models.CharField(max_length=30, blank=True, verbose_name="SAIMB Nro.")
     received = models.BooleanField(blank=True, null=True, verbose_name="Recibido")
     notes = models.TextField(blank=True, verbose_name="Observaciones generales")
@@ -312,8 +290,8 @@ class ForeignTenderProcess(models.Model):
         ordering = ["-year", "process_number"]
         constraints = [
             models.UniqueConstraint(
-                fields=["year", "process_number"],
-                name="unique_foreign_tender_year_number",
+                fields=["year", "process_type", "process_number"],
+                name="unique_foreign_tender_year_type_number",
             )
         ]
 
@@ -330,24 +308,6 @@ class ForeignTenderProcess(models.Model):
             value = getattr(self, field_name)
             if value is not None and value < 0:
                 errors[field_name] = "El monto no puede ser negativo."
-        if self.has_oca is False:
-            self.oca_expiration = ""
-            self.delivery_term_days = None
-            self.delivery_term_day_type = ""
-
-        expiration_date = self.oca_expiration_date
-        has_delivery_term = (
-            self.delivery_term_days is not None or bool(self.delivery_term_day_type)
-        )
-        if expiration_date:
-            if not self.delivery_term_days:
-                errors["delivery_term_days"] = "Indique una cantidad de dias mayor que cero."
-            if not self.delivery_term_day_type:
-                errors["delivery_term_day_type"] = "Indique si son dias habiles o corridos."
-        elif has_delivery_term:
-            errors["oca_expiration"] = (
-                "Para calcular el plazo de entrega, ingrese una fecha valida en formato DD/MM/AAAA."
-            )
         if errors:
             raise ValidationError(errors)
 
@@ -385,33 +345,6 @@ class ForeignTenderProcess(models.Model):
         if self.evaluation_amount is None or self.awarded_amount is None:
             return None
         return self.evaluation_amount - self.awarded_amount
-
-    @property
-    def oca_expiration_date(self):
-        value = (self.oca_expiration or "").strip()
-        for date_format in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
-            try:
-                return datetime.strptime(value, date_format).date()
-            except ValueError:
-                continue
-        return None
-
-    @property
-    def delivery_due_date(self):
-        base_date = self.oca_expiration_date
-        days = self.delivery_term_days
-        if not base_date or not days or not self.delivery_term_day_type:
-            return None
-        if self.delivery_term_day_type == "CORRIDOS":
-            return base_date + timedelta(days=days)
-
-        due_date = base_date
-        elapsed = 0
-        while elapsed < days:
-            due_date += timedelta(days=1)
-            if due_date.weekday() < 5:
-                elapsed += 1
-        return due_date
 
     @property
     def latest_update(self):
@@ -488,26 +421,51 @@ class ForeignTenderRequirement(models.Model):
 
 
 class ForeignTenderPurchaseOrder(models.Model):
+    ORDER_TYPE_CHOICES = [
+        ("OC", "Orden de Compra (OC)"),
+        ("OCA", "Orden de Compra Abierta (OCA)"),
+    ]
+
     process = models.ForeignKey(
         ForeignTenderProcess,
         on_delete=models.CASCADE,
         related_name="purchase_orders",
         verbose_name="Licitacion",
     )
-    order_number = models.CharField(max_length=40, verbose_name="Nro. OC / OCA")
+    order_type = models.CharField(
+        max_length=10,
+        choices=ORDER_TYPE_CHOICES,
+        default="OC",
+        verbose_name="Tipo",
+    )
+    order_number = models.CharField(max_length=40, verbose_name="Número de orden")
     amount = models.DecimalField(
         max_digits=18,
         decimal_places=2,
         verbose_name="Monto OC / OCA",
     )
-    issue_date = models.DateField(blank=True, null=True, verbose_name="Fecha de emision")
+    issue_date = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha de emision",
+    )
+    expiration_date = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha de vencimiento",
+    )
+    saimb_number = models.CharField(
+        max_length=60,
+        blank=True,
+        verbose_name="SAIMB Nro.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Orden de compra exterior"
         verbose_name_plural = "Ordenes de compra exteriores"
-        ordering = ["issue_date", "order_number"]
+        ordering = ["expiration_date", "order_number"]
         constraints = [
             models.UniqueConstraint(
                 fields=["process", "order_number"],
@@ -519,12 +477,87 @@ class ForeignTenderPurchaseOrder(models.Model):
         return f"{self.order_number} - {self.process.process_number}"
 
     def clean(self):
+        super().clean()
         if self.amount is not None and self.amount < 0:
             raise ValidationError({"amount": "El monto no puede ser negativo."})
+
+        if self.process_id and self.amount is not None:
+            awarded = self.process.awarded_amount
+            if awarded is not None:
+                qs = self.process.purchase_orders.all()
+                if self.pk:
+                    qs = qs.exclude(pk=self.pk)
+                total_other = sum(po.amount for po in qs if po.amount)
+                new_total = total_other + self.amount
+                if new_total > awarded:
+                    available = awarded - total_other
+                    if available < 0:
+                        available = 0
+                    raise ValidationError({
+                        "amount": f"La suma del monto de las Órdenes de Compra ({new_total}) supera el monto asignado en adjudicación ({awarded}). El disponible máximo para esta orden es {available}."
+                    })
 
     def save(self, *args, **kwargs):
         if self.order_number:
             self.order_number = self.order_number.upper().strip()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class ForeignProvisionRequest(models.Model):
+    purchase_order = models.ForeignKey(
+        ForeignTenderPurchaseOrder,
+        on_delete=models.CASCADE,
+        related_name="provision_requests",
+        verbose_name="Orden de Compra / OCA",
+    )
+    sp_number = models.CharField(max_length=40, verbose_name="Nro. SP")
+    amount = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        verbose_name="Monto SP",
+    )
+    issue_date = models.DateField(blank=True, null=True, verbose_name="Fecha de emision")
+    saimb_number = models.CharField(
+        max_length=60,
+        blank=True,
+        verbose_name="SAIMB Nro.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Solicitud de provision"
+        verbose_name_plural = "Solicitudes de provision"
+        ordering = ["issue_date", "sp_number"]
+
+    def __str__(self):
+        return f"SP {self.sp_number} - OC {self.purchase_order.order_number}"
+
+    def clean(self):
+        super().clean()
+        if self.amount is not None and self.amount < 0:
+            raise ValidationError({"amount": "El monto no puede ser negativo."})
+
+        if self.purchase_order_id and self.amount is not None:
+            po_amount = self.purchase_order.amount
+            if po_amount is not None:
+                qs = self.purchase_order.provision_requests.all()
+                if self.pk:
+                    qs = qs.exclude(pk=self.pk)
+                total_other = sum(sp.amount for sp in qs if sp.amount)
+                new_total = total_other + self.amount
+                if new_total > po_amount:
+                    available = po_amount - total_other
+                    if available < 0:
+                        available = 0
+                    raise ValidationError({
+                        "amount": f"La suma de las Solicitudes de Provisión ({new_total}) supera el monto de la Orden de Compra ({po_amount}). El saldo disponible para esta SP es {available}."
+                    })
+
+    def save(self, *args, **kwargs):
+        if self.sp_number:
+            self.sp_number = self.sp_number.upper().strip()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -665,3 +698,5 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.user.username}: {self.message}"
+
+# reload

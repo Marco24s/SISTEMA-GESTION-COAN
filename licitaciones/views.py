@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 
 class GroupRequiredMixin(UserPassesTestMixin):
     group_required = None
@@ -30,6 +30,7 @@ from .forms import (
     ForeignTenderPurchaseOrderForm,
     ForeignTenderRequirementForm,
     ForeignTenderUpdateForm,
+    ForeignProvisionRequestForm,
     TenderProcessForm,
     TenderStageUpdateForm,
 )
@@ -38,6 +39,7 @@ from .models import (
     ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
     ForeignTenderUpdate,
+    ForeignProvisionRequest,
     ProcurementDestination,
     TenderProcess,
     TenderStage,
@@ -613,6 +615,21 @@ class ForeignTenderUpdateCreateView(LoginRequiredMixin, SuccessMessageMixin, Cre
         return self.process.get_absolute_url()
 
 
+class ForeignTenderUpdateUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = ForeignTenderUpdate
+    form_class = ForeignTenderUpdateForm
+    template_name = "licitaciones/foreign_child_form.html"
+    success_message = "Novedad documental actualizada correctamente."
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({"process": self.object.process, "child_type": "update"})
+        return context
+
+    def get_success_url(self):
+        return self.object.process.get_absolute_url()
+
+
 class ForeignTenderPurchaseOrderCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = ForeignTenderPurchaseOrder
     form_class = ForeignTenderPurchaseOrderForm
@@ -626,6 +643,12 @@ class ForeignTenderPurchaseOrderCreateView(LoginRequiredMixin, SuccessMessageMix
     def form_valid(self, form):
         form.instance.process = self.process
         return super().form_valid(form)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if self.process.has_oca:
+            form.fields.pop("saimb_number", None)
+        return form
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -641,6 +664,12 @@ class ForeignTenderPurchaseOrderUpdateView(LoginRequiredMixin, SuccessMessageMix
     form_class = ForeignTenderPurchaseOrderForm
     template_name = "licitaciones/foreign_child_form.html"
     success_message = "Orden de compra actualizada correctamente."
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if self.object.process.has_oca:
+            form.fields.pop("saimb_number", None)
+        return form
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -708,3 +737,128 @@ def mark_notification_read(request, pk):
     except Notification.DoesNotExist:
         pass
     return redirect('licitaciones:type_selection')
+
+class ForeignProvisionRequestCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = ForeignProvisionRequest
+    form_class = ForeignProvisionRequestForm
+    template_name = 'licitaciones/foreign_child_form.html'
+    success_message = 'Solicitud de provisión agregada correctamente.'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.purchase_order = get_object_or_404(ForeignTenderPurchaseOrder, pk=kwargs['order_pk'])
+        if not self.purchase_order.process.has_oca:
+            messages.error(request, "Las Órdenes de Compra cerradas no admiten Solicitudes de Provisión.")
+            return redirect(self.purchase_order.process.get_absolute_url())
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.purchase_order = self.purchase_order
+        return super().form_valid(form)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if not self.purchase_order.process.has_oca:
+            form.fields.pop("saimb_number", None)
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({'process': self.purchase_order.process, 'child_type': 'provision_request'})
+        return context
+
+    def get_success_url(self):
+        return self.purchase_order.process.get_absolute_url()
+
+
+class ForeignProvisionRequestUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = ForeignProvisionRequest
+    form_class = ForeignProvisionRequestForm
+    template_name = 'licitaciones/foreign_child_form.html'
+    success_message = 'Solicitud de provisión actualizada correctamente.'
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if not self.object.purchase_order.process.has_oca:
+            form.fields.pop("saimb_number", None)
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({'process': self.object.purchase_order.process, 'child_type': 'provision_request'})
+        return context
+
+    def get_success_url(self):
+        return self.object.purchase_order.process.get_absolute_url()
+
+
+class ForeignTenderDeleteView(LoginRequiredMixin, View):
+    def dispatch(self, request, *args, **kwargs):
+        from core.decorators import pin_required
+        return pin_required("procurement_delete")(self._dispatch)(request, *args, **kwargs)
+
+    def _get_target_object(self, model_type, pk):
+        mapping = {
+            "process": (ForeignTenderProcess, "Licitación"),
+            "requirement": (ForeignTenderRequirement, "Requerimiento"),
+            "purchase_order": (ForeignTenderPurchaseOrder, "Orden de Compra"),
+            "provision_request": (ForeignProvisionRequest, "Solicitud de Provisión"),
+            "update": (ForeignTenderUpdate, "Novedad Documental"),
+        }
+        if model_type not in mapping:
+            return None, None
+        model_cls, label = mapping[model_type]
+        obj = get_object_or_404(model_cls, pk=pk)
+        return obj, label
+
+    def _get_redirect_url(self, obj, model_type):
+        if model_type == "process":
+            return reverse_lazy("licitaciones:foreign_list")
+        elif model_type in ("requirement", "purchase_order", "update"):
+            return obj.process.get_absolute_url()
+        elif model_type == "provision_request":
+            return obj.purchase_order.process.get_absolute_url()
+        return reverse_lazy("licitaciones:foreign_list")
+
+    def _dispatch(self, request, *args, **kwargs):
+        model_type = kwargs.get("model_type")
+        pk = kwargs.get("pk")
+        obj, label = self._get_target_object(model_type, pk)
+        if not obj:
+            messages.error(request, "Tipo de objeto no válido.")
+            return redirect("licitaciones:foreign_list")
+
+        redirect_url = self._get_redirect_url(obj, model_type)
+
+        if request.method == "GET":
+            return render(
+                request,
+                "licitaciones/foreign_confirm_delete.html",
+                {
+                    "object": obj,
+                    "label": label,
+                    "model_type": model_type,
+                    "redirect_url": redirect_url,
+                },
+            )
+        elif request.method == "POST":
+            confirmation = request.POST.get("confirmation", "").strip()
+            if confirmation.upper() != "BORRAR":
+                messages.error(request, 'Debe escribir "BORRAR" en mayúsculas para confirmar.')
+                return render(
+                    request,
+                    "licitaciones/foreign_confirm_delete.html",
+                    {
+                        "object": obj,
+                        "label": label,
+                        "model_type": model_type,
+                        "redirect_url": redirect_url,
+                    },
+                )
+            try:
+                obj_name = str(obj)
+                obj.delete()
+                messages.success(request, f"{label} '{obj_name}' eliminado/a correctamente.")
+            except Exception as e:
+                messages.error(request, f"No se pudo eliminar el registro: {e}")
+            return redirect(redirect_url)
+

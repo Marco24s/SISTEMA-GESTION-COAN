@@ -38,6 +38,11 @@ urlpatterns = [
         name="foreign_update_create",
     ),
     path(
+        "exterior/novedades/<int:pk>/editar/",
+        views.ForeignTenderUpdateUpdateView.as_view(),
+        name="foreign_update_update",
+    ),
+    path(
         "exterior/<int:process_pk>/ordenes/nueva/",
         views.ForeignTenderPurchaseOrderCreateView.as_view(),
         name="foreign_purchase_order_create",
@@ -46,6 +51,21 @@ urlpatterns = [
         "exterior/ordenes/<int:pk>/editar/",
         views.ForeignTenderPurchaseOrderUpdateView.as_view(),
         name="foreign_purchase_order_update",
+    ),
+    path(
+        "exterior/ordenes/<int:order_pk>/sp/nueva/",
+        views.ForeignProvisionRequestCreateView.as_view(),
+        name="foreign_provision_request_create",
+    ),
+    path(
+        "exterior/sp/<int:pk>/editar/",
+        views.ForeignProvisionRequestUpdateView.as_view(),
+        name="foreign_provision_request_update",
+    ),
+    path(
+        "exterior/borrar/<str:model_type>/<int:pk>/",
+        views.ForeignTenderDeleteView.as_view(),
+        name="foreign_delete",
     ),
     path("notificacion/<int:pk>/leer/", views.mark_notification_read, name="notification_read"),
 ]

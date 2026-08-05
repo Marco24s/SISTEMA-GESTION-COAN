@@ -30,6 +30,7 @@
                 {% if process.is_active %}Archivar{% else %}Reactivar{% endif %}
             </button>
         </form>
+        <a href="{% url 'licitaciones:foreign_delete' 'process' process.pk %}" class="btn btn-outline-danger" title="Eliminar licitación con PIN"><i class="fa-solid fa-trash me-1"></i> Eliminar</a>
     </div>
 </div>
 
@@ -46,25 +47,9 @@
         <div class="col-md-6"><div class="small text-muted">Expediente</div><strong>{{ process.expediente|default:"-" }}</strong></div>
         <div class="col-md-6"><div class="small text-muted">Estado de la contratacion</div><strong>{{ process.get_status_display }}</strong></div>
         <div class="col-md-6"><div class="small text-muted">GFH de asignacion</div>{{ process.allocation_gfh|default:"-"|linebreaksbr }}</div>
-        <div class="col-md-3"><div class="small text-muted">Incoterm</div>{{ process.incoterm|default:"-" }}</div>
-        <div class="col-md-3"><div class="small text-muted">Fecha vto. OCA</div>{{ process.oca_expiration|default:"-" }}</div>
-        <div class="col-md-3"><div class="small text-muted">Plazo de entrega</div>{% if process.delivery_term_days %}{{ process.delivery_term_days }} {{ process.get_delivery_term_day_type_display|lower }}{% else %}-{% endif %}</div>
-        <div class="col-md-3"><div class="small text-muted">Fecha venc./plazo de entrega</div><strong>{{ process.delivery_due_date|date:"d/m/Y"|default:"-" }}</strong></div>
-        <div class="col-md-3"><div class="small text-muted">Solicitud de provisión (SP)</div>{{ process.sp|default:"-" }}</div>
-        <div class="col-md-3"><div class="small text-muted">SAIMB Nro.</div>{{ process.saimb_number|default:"-" }}</div>
-        <div class="col-md-3"><div class="small text-muted">Recibido</div>{% if process.received is None %}-{% elif process.received %}Si{% else %}No{% endif %}</div>
+        <div class="col-md-6"><div class="small text-muted">Incoterm</div>{{ process.incoterm|default:"-" }}</div>
+        <div class="col-md-6"><div class="small text-muted">Recibido</div>{% if process.received is None %}-{% elif process.received %}Si{% else %}No{% endif %}</div>
     </div></div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h2 class="h5 mb-0"><i class="fa-solid fa-file-invoice-dollar me-2 text-primary"></i>Ordenes de compra</h2>
-        <a href="{% url 'licitaciones:foreign_purchase_order_create' process.pk %}" class="btn btn-sm btn-primary"><i class="fa-solid fa-plus me-1"></i> Agregar OC / OCA</a>
-    </div>
-    <div class="table-responsive"><table class="table table-hover align-middle mb-0">
-        <thead class="table-light"><tr><th>Nro. OC / OCA</th><th>Monto</th><th>Fecha de emision</th><th></th></tr></thead>
-        <tbody>{% for order in process.purchase_orders.all %}<tr><td><strong>{{ order.order_number }}</strong></td><td>{{ process.currency_symbol }} {{ order.amount|floatformat:2|intcomma }}</td><td>{{ order.issue_date|date:"d/m/Y"|default:"-" }}</td><td class="text-end"><a href="{% url 'licitaciones:foreign_purchase_order_update' order.pk %}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-pen"></i></a></td></tr>{% empty %}<tr><td colspan="4" class="text-center text-muted py-4">Todavia no se cargaron ordenes de compra.</td></tr>{% endfor %}</tbody>
-    </table></div>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -83,7 +68,10 @@
                     <td>{{ requirement.workshop_label }}</td>
                     <td>{{ requirement.aircraft|default:"-" }}</td>
                     <td>{{ requirement.description }}</td>
-                    <td class="text-end"><a href="{% url 'licitaciones:foreign_requirement_update' requirement.pk %}" class="btn btn-sm btn-outline-primary" title="Editar requerimiento"><i class="fa-solid fa-pen"></i></a></td>
+                    <td class="text-end">
+                        <a href="{% url 'licitaciones:foreign_requirement_update' requirement.pk %}" class="btn btn-sm btn-outline-primary me-1" title="Editar requerimiento"><i class="fa-solid fa-pen"></i></a>
+                        <a href="{% url 'licitaciones:foreign_delete' 'requirement' requirement.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar requerimiento con PIN"><i class="fa-solid fa-trash"></i></a>
+                    </td>
                 </tr>
             {% empty %}
                 <tr><td colspan="6" class="text-center text-muted py-4">Todavia no se cargaron requerimientos.</td></tr>
@@ -95,16 +83,67 @@
 
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h2 class="h5 mb-0"><i class="fa-solid fa-file-invoice-dollar me-2 text-primary"></i>Ordenes de compra</h2>
+        <a href="{% url 'licitaciones:foreign_purchase_order_create' process.pk %}" class="btn btn-sm btn-primary"><i class="fa-solid fa-plus me-1"></i> Agregar OC / OCA</a>
+    </div>
+    <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead class="table-light"><tr><th>Nro. Orden</th><th>Orden de compra</th><th>Monto</th><th>Fecha de emision</th><th>Fecha de vencimiento</th>{% if process.has_oca %}<th>SP asociadas</th>{% else %}<th>SAIMB Nro.</th>{% endif %}<th></th></tr></thead>
+            <tbody>
+            {% for order in process.purchase_orders.all %}
+                <tr>
+                    <td><strong>{{ order.order_number }}</strong></td>
+                    <td><span class="badge {% if process.has_oca %}text-bg-warning{% else %}text-bg-info{% endif %}">{% if process.has_oca %}OCA{% else %}OC{% endif %}</span></td>
+                    <td>{{ process.currency_symbol }} {{ order.amount|floatformat:2|intcomma }}</td>
+                    <td>{{ order.issue_date|date:"d/m/Y"|default:"-" }}</td>
+                    <td>{{ order.expiration_date|date:"d/m/Y"|default:"-" }}</td>
+                    {% if process.has_oca %}
+                    <td>
+                        {% for sp in order.provision_requests.all %}
+                            <div class="mb-1 d-flex align-items-center gap-1">
+                                <span class="badge bg-secondary">SP {{ sp.sp_number }}</span>
+                                <small class="text-muted">{{ process.currency_symbol }} {{ sp.amount|floatformat:2|intcomma }} ({{ sp.issue_date|date:"d/m/Y"|default:"-" }})</small>
+                                {% if sp.saimb_number %}<small class="badge text-bg-light border me-1">SAIMB: {{ sp.saimb_number }}</small>{% endif %}
+                                <a href="{% url 'licitaciones:foreign_provision_request_update' sp.pk %}" class="text-primary ms-1" title="Editar SP"><i class="fa-solid fa-pen" style="font-size:0.8em"></i></a>
+                                <a href="{% url 'licitaciones:foreign_delete' 'provision_request' sp.pk %}" class="text-danger ms-1" title="Eliminar SP con PIN"><i class="fa-solid fa-trash" style="font-size:0.8em"></i></a>
+                            </div>
+                        {% empty %}
+                            <span class="text-muted small">-</span>
+                        {% endfor %}
+                        <div class="mt-1"><a href="{% url 'licitaciones:foreign_provision_request_create' order.pk %}" class="btn btn-xs btn-outline-success" style="font-size: 0.75rem; padding: 0.1rem 0.3rem;"><i class="fa-solid fa-plus"></i> SP</a></div>
+                    </td>
+                    {% else %}
+                    <td>{{ order.saimb_number|default:"-" }}</td>
+                    {% endif %}
+                    <td class="text-end">
+                        <a href="{% url 'licitaciones:foreign_purchase_order_update' order.pk %}" class="btn btn-sm btn-outline-primary me-1" title="Editar OC"><i class="fa-solid fa-pen"></i></a>
+                        <a href="{% url 'licitaciones:foreign_delete' 'purchase_order' order.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar OC con PIN"><i class="fa-solid fa-trash"></i></a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">Todavia no se cargaron ordenes de compra.</td></tr>
+            {% endfor %}
+            </tbody>
+    </table></div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h2 class="h5 mb-0"><i class="fa-solid fa-clock-rotate-left me-2 text-primary"></i>Historial documental</h2>
         <a href="{% url 'licitaciones:foreign_update_create' process.pk %}" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-plus me-1"></i> Agregar novedad</a>
     </div>
     <div class="card-body">
         {% for update in process.updates.all %}
             <div class="timeline-item mb-4">
-                <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
-                    <strong>{{ update.event_date|date:"d/m/Y" }}</strong>
-                    <span class="badge text-bg-light border">{{ update.get_document_type_display }}</span>
-                    {% if update.organization %}<span class="text-muted">{{ update.organization }}</span>{% endif %}
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                        <strong>{{ update.event_date|date:"d/m/Y" }}</strong>
+                        <span class="badge text-bg-light border">{{ update.get_document_type_display }}</span>
+                        {% if update.organization %}<span class="text-muted">{{ update.organization }}</span>{% endif %}
+                    </div>
+                    <div>
+                        <a href="{% url 'licitaciones:foreign_update_update' update.pk %}" class="btn btn-sm btn-outline-primary me-1" title="Editar novedad"><i class="fa-solid fa-pen"></i></a>
+                        <a href="{% url 'licitaciones:foreign_delete' 'update' update.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar novedad con PIN"><i class="fa-solid fa-trash"></i></a>
+                    </div>
                 </div>
                 {% if update.document_number %}<div class="small text-muted mb-1">{{ update.document_number }}</div>{% endif %}
                 <div>{{ update.description|linebreaksbr }}</div>

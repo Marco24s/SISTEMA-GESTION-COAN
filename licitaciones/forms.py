@@ -3,6 +3,7 @@ from django import forms
 from core.models import Unit
 
 from .models import (
+    ForeignProvisionRequest,
     ForeignTenderProcess,
     ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
@@ -78,14 +79,6 @@ class ForeignTenderProcessForm(forms.ModelForm):
                 "class": "text-uppercase",
             }
         )
-        self.fields["sp"].label = "Solicitud de provisión (SP)"
-        self.fields["oca_expiration"].help_text = (
-            "Ingrese una fecha en formato DD/MM/AAAA para calcular el plazo, o una aclaracion como 'No aplica'."
-        )
-        self.fields["oca_expiration"].widget.attrs.update(
-            {"placeholder": "DD/MM/AAAA o No aplica", "autocomplete": "off"}
-        )
-        self.fields["delivery_term_days"].widget.attrs.update({"min": 1})
 
     class Meta:
         model = ForeignTenderProcess
@@ -102,11 +95,6 @@ class ForeignTenderProcessForm(forms.ModelForm):
             "awarded_amount",
             "allocation_gfh",
             "incoterm",
-            "oca_expiration",
-            "delivery_term_days",
-            "delivery_term_day_type",
-            "sp",
-            "saimb_number",
             "received",
             "notes",
             "is_active",
@@ -172,10 +160,22 @@ class ForeignTenderPurchaseOrderForm(forms.ModelForm):
         widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
         label="Fecha de emision",
     )
+    expiration_date = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+        label="Fecha de vencimiento",
+    )
 
     class Meta:
         model = ForeignTenderPurchaseOrder
-        fields = ["order_number", "amount", "issue_date"]
+        fields = [
+            "order_number",
+            "amount",
+            "issue_date",
+            "expiration_date",
+            "saimb_number",
+        ]
 
 
 class TenderStageUpdateForm(forms.ModelForm):
@@ -187,4 +187,13 @@ class TenderStageUpdateForm(forms.ModelForm):
             "start_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "end_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
             "responsible": forms.Select(attrs={"class": "form-select"}),
+        }
+
+
+class ForeignProvisionRequestForm(forms.ModelForm):
+    class Meta:
+        model = ForeignProvisionRequest
+        fields = ["sp_number", "amount", "issue_date", "saimb_number"]
+        widgets = {
+            "issue_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
         }
