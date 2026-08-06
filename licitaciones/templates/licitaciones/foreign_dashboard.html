@@ -15,15 +15,6 @@
         <p class="text-muted mb-0">Seguimiento de requerimientos, evaluacion, adjudicacion y novedades documentales.</p>
     </div>
     <div class="d-flex gap-2">
-        <form method="get">
-            <select name="year" class="form-select" onchange="this.form.submit()">
-                {% for year in years %}
-                    <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
-                {% empty %}
-                    <option value="">Sin datos</option>
-                {% endfor %}
-            </select>
-        </form>
         <a href="{% url 'licitaciones:foreign_create' %}" class="btn btn-primary" style="background:#1f4b63;border-color:#1f4b63;">
             <i class="fa-solid fa-plus me-1"></i> Nueva
         </a>
@@ -65,11 +56,12 @@
     </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Licitacion</th><th>Moneda</th><th>REQ</th><th>Estado</th><th>Ultima novedad</th><th></th></tr></thead>
+            <thead class="table-light"><tr><th>Licitación y Nro.</th><th>Objeto / Expediente</th><th>Moneda</th><th>REQ</th><th>Estado</th><th>Ultima novedad</th><th></th></tr></thead>
             <tbody>
-            {% for process in processes|slice:":8" %}
+            {% for process in processes %}
                 <tr>
-                    <td><strong>{{ process.process_number }}</strong><br><small class="text-muted">{{ process.year }}</small></td>
+                    <td><strong>{{ process.process_number }}</strong><br><small class="text-muted">{{ process.get_process_type_display }} - {{ process.year }}</small></td>
+                    <td>{{ process.expediente|default:"-" }}</td>
                     <td>{{ process.currency_label }}</td>
                     <td>{{ process.requirements.all|length }}</td>
                     <td>{{ process.get_status_display }}</td>
@@ -77,7 +69,7 @@
                     <td class="text-end"><a href="{{ process.get_absolute_url }}" class="btn btn-sm btn-outline-primary" title="Ver detalle"><i class="fa-solid fa-eye"></i></a></td>
                 </tr>
             {% empty %}
-                <tr><td colspan="6" class="text-center text-muted py-4">Sin procesos cargados.</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-4">Sin procesos cargados.</td></tr>
             {% endfor %}
             </tbody>
         </table>

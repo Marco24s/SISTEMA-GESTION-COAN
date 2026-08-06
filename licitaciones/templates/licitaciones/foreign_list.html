@@ -21,7 +21,7 @@
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
-        <table class="table table-bordered table-hover align-middle text-center mb-0" data-disable-table-tools="true" style="font-size:.78rem; min-width:2800px;">
+        <table class="table table-bordered table-hover align-middle text-center mb-0" data-disable-table-tools="true" style="font-size:.78rem; min-width:3200px;">
             <thead class="table-light align-middle">
                 <tr>
                     <th colspan="4">DATOS INICIALES</th>
@@ -40,13 +40,16 @@
                     <th rowspan="2">FECHA DE<br>EMISION</th>
                     <th rowspan="2">FECHA VTO OC</th>
                     <th rowspan="2">SOLICITUD DE<br>PROVISION (SP)</th>
+                    <th rowspan="2">MONTO SP</th>
+                    <th rowspan="2">FECHA EMISION<br>(SP)</th>
+                    <th rowspan="2">FECHA VTO<br>(SP)</th>
                     <th rowspan="2">MONTO<br>REMANENTE</th>
                     <th rowspan="2">SAIMB NRO.</th>
                     <th rowspan="2">RECIBIDO</th>
                     <th rowspan="2">ULTIMO ESTADO<br>POR GDE/GFH</th>
                     <th rowspan="2">ACCIONES</th>
                 </tr>
-                <tr><th>LICITACION</th><th>OCA</th><th>REQ</th><th>EXPEDIENTE</th></tr>
+                <tr><th>LICITACION</th><th>OCA</th><th>REQ</th><th>OBJETO / EXPEDIENTE</th></tr>
             </thead>
             <tbody>
             {% for process in processes %}
@@ -76,6 +79,9 @@
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.issue_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.expiration_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div class="text-nowrap">{{ sp.sp_number }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
+                        <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div class="text-nowrap">{{ process.currency_symbol }} {{ sp.amount|floatformat:2|intcomma }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
+                        <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div class="text-nowrap">{{ sp.issue_date|date:"d/m/Y"|default:"-" }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
+                        <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div class="text-nowrap">{{ sp.expiration_date|date:"d/m/Y"|default:"-" }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
                         <td rowspan="{{ reqs|length }}" class="text-nowrap">{% if process.remaining_amount is not None %}{{ process.currency_symbol }} {{ process.remaining_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
                         <td rowspan="{{ reqs|length }}">
                             {% if process.has_oca %}
@@ -94,7 +100,21 @@
                                 {% endfor %}
                             {% endif %}
                         </td>
-                        <td rowspan="{{ reqs|length }}">{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</td>
+                        <td rowspan="{{ reqs|length }}">
+                            {% if process.has_oca %}
+                                {% for order in process.purchase_orders.all %}
+                                    {% for sp in order.provision_requests.all %}
+                                        <div class="text-nowrap">
+                                            {% if sp.received is None %}-{% elif sp.received %}SI{% else %}NO{% endif %}
+                                        </div>
+                                    {% endfor %}
+                                {% empty %}
+                                    -
+                                {% endfor %}
+                            {% else %}
+                                <div>{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</div>
+                            {% endif %}
+                        </td>
                         <td rowspan="{{ reqs|length }}" class="text-start">{% if process.latest_update %}<small>{% if process.latest_update.organization %}<strong>{{ process.latest_update.organization }}</strong> - {% endif %}{{ process.latest_update.description }} ({{ process.latest_update.event_date|date:"d/m/Y" }})</small>{% else %}<small>{{ process.notes|default:"-" }}</small>{% endif %}</td>
                         <td rowspan="{{ reqs|length }}"><a href="{{ process.get_absolute_url }}" class="btn btn-sm btn-outline-primary" title="Ver detalle"><i class="fa-solid fa-pen"></i></a></td>
                         {% endif %}
@@ -113,6 +133,9 @@
                         <td>{% for order in process.purchase_orders.all %}<div>{{ order.issue_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td>{% for order in process.purchase_orders.all %}<div>{{ order.expiration_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td>{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div>{{ sp.sp_number }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
+                        <td>{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div>{{ process.currency_symbol }} {{ sp.amount|floatformat:2|intcomma }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
+                        <td>{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div>{{ sp.issue_date|date:"d/m/Y"|default:"-" }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
+                        <td>{% for order in process.purchase_orders.all %}{% for sp in order.provision_requests.all %}<div>{{ sp.expiration_date|date:"d/m/Y"|default:"-" }}</div>{% endfor %}{% empty %}-{% endfor %}</td>
                         <td>{% if process.remaining_amount is not None %}{{ process.currency_symbol }} {{ process.remaining_amount|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
                         <td>
                             {% if process.has_oca %}
@@ -130,13 +153,27 @@
                                     -
                                 {% endfor %}
                             {% endif %}
-                        </td><td>{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</td>
+                        </td><td>
+                            {% if process.has_oca %}
+                                {% for order in process.purchase_orders.all %}
+                                    {% for sp in order.provision_requests.all %}
+                                        <div class="text-nowrap">
+                                            {% if sp.received is None %}-{% elif sp.received %}SI{% else %}NO{% endif %}
+                                        </div>
+                                    {% endfor %}
+                                {% empty %}
+                                    -
+                                {% endfor %}
+                            {% else %}
+                                <div>{% if process.received is None %}-{% elif process.received %}SI{% else %}NO{% endif %}</div>
+                            {% endif %}
+                        </td>
                         <td class="text-start">{% if process.latest_update %}{{ process.latest_update.description }}{% else %}{{ process.notes|default:"-" }}{% endif %}</td>
                         <td><a href="{{ process.get_absolute_url }}" class="btn btn-sm btn-outline-primary" title="Ver detalle"><i class="fa-solid fa-pen"></i></a></td>
                     </tr>
                 {% endif %}
                 {% endwith %}
-            {% empty %}<tr><td colspan="23" class="text-center text-muted py-4">No hay procesos para mostrar.</td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="27" class="text-center text-muted py-4">No hay procesos para mostrar.</td></tr>{% endfor %}
             </tbody>
         </table>
     </div>

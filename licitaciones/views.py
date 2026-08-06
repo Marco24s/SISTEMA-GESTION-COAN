@@ -367,22 +367,10 @@ class ForeignTenderDashboardView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        years = list(
-            ForeignTenderProcess.objects.filter(is_active=True).order_by("-year")
-            .values_list("year", flat=True)
-            .distinct()
-        )
-        selected_year = _clean_int(self.request.GET.get("year"))
-        if not selected_year and years:
-            selected_year = years[0]
-
         processes = ForeignTenderProcess.objects.filter(is_active=True).prefetch_related("requirements", "updates")
-        if selected_year:
-            processes = processes.filter(year=selected_year)
-
         process_list = list(processes)
         totals_by_currency = list(
-            ForeignTenderProcess.objects.filter(year=selected_year, is_active=True)
+            ForeignTenderProcess.objects.filter(is_active=True)
             .values("currency", "custom_currency")
             .annotate(
                 evaluation_total=Sum("evaluation_amount"),
@@ -390,12 +378,10 @@ class ForeignTenderDashboardView(LoginRequiredMixin, TemplateView):
                 process_count=Count("id"),
             )
             .order_by("currency")
-        ) if selected_year else []
+        )
 
         context.update(
             {
-                "years": years,
-                "selected_year": selected_year,
                 "processes": process_list,
                 "total_count": len(process_list),
                 "active_count": len([p for p in process_list if p.is_active]),
@@ -793,8 +779,7 @@ class ForeignProvisionRequestUpdateView(LoginRequiredMixin, SuccessMessageMixin,
 
 class ForeignTenderDeleteView(LoginRequiredMixin, View):
     def dispatch(self, request, *args, **kwargs):
-        from core.decorators import pin_required
-        return pin_required("procurement_delete")(self._dispatch)(request, *args, **kwargs)
+        return self._dispatch(request, *args, **kwargs)
 
     def _get_target_object(self, model_type, pk):
         mapping = {
@@ -829,6 +814,11 @@ class ForeignTenderDeleteView(LoginRequiredMixin, View):
 
         redirect_url = self._get_redirect_url(obj, model_type)
 
+        from core.models import UserSystemPIN
+        if not UserSystemPIN.objects.filter(user=request.user, system_code="procurement_delete").exists():
+            messages.error(request, "No tiene configurado el PIN de Borrado de Compras.")
+            return redirect(redirect_url)
+
         if request.method == "GET":
             return render(
                 request,
@@ -842,6 +832,8 @@ class ForeignTenderDeleteView(LoginRequiredMixin, View):
             )
         elif request.method == "POST":
             confirmation = request.POST.get("confirmation", "").strip()
+            pin = request.POST.get("pin", "")
+
             if confirmation.upper() != "BORRAR":
                 messages.error(request, 'Debe escribir "BORRAR" en mayúsculas para confirmar.')
                 return render(
@@ -854,6 +846,27 @@ class ForeignTenderDeleteView(LoginRequiredMixin, View):
                         "redirect_url": redirect_url,
                     },
                 )
+
+            from django.contrib.auth.hashers import check_password
+            try:
+                access = UserSystemPIN.objects.get(user=request.user, system_code="procurement_delete")
+                pin_match = check_password(pin, access.pin_hash)
+            except UserSystemPIN.DoesNotExist:
+                pin_match = False
+
+            if not pin_match:
+                messages.error(request, "PIN incorrecto. No se realizó la eliminación.")
+                return render(
+                    request,
+                    "licitaciones/foreign_confirm_delete.html",
+                    {
+                        "object": obj,
+                        "label": label,
+                        "model_type": model_type,
+                        "redirect_url": redirect_url,
+                    },
+                )
+
             try:
                 obj_name = str(obj)
                 obj.delete()

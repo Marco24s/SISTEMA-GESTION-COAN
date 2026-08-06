@@ -228,7 +228,7 @@ class ForeignTenderProcess(models.Model):
 
     year = models.PositiveIntegerField(default=2026, verbose_name="Ejercicio / Año")
     process_number = models.CharField(max_length=60, verbose_name="Licitacion")
-    expediente = models.CharField(max_length=150, blank=True, verbose_name="Expediente")
+    expediente = models.CharField(max_length=150, blank=True, verbose_name="Objeto / Expediente")
     process_type = models.CharField(
         max_length=30,
         choices=PROCESS_TYPE_CHOICES,
@@ -308,6 +308,8 @@ class ForeignTenderProcess(models.Model):
             value = getattr(self, field_name)
             if value is not None and value < 0:
                 errors[field_name] = "El monto no puede ser negativo."
+        if self.has_oca:
+            self.received = None
         if errors:
             raise ValidationError(errors)
 
@@ -518,6 +520,16 @@ class ForeignProvisionRequest(models.Model):
         verbose_name="Monto SP",
     )
     issue_date = models.DateField(blank=True, null=True, verbose_name="Fecha de emision")
+    expiration_date = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha de vencimiento",
+    )
+    received = models.BooleanField(
+        blank=True,
+        null=True,
+        verbose_name="Recibido",
+    )
     saimb_number = models.CharField(
         max_length=60,
         blank=True,

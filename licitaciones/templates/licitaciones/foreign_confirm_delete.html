@@ -32,6 +32,10 @@
                         <label class="form-label fw-bold">Escriba <span class="text-danger">BORRAR</span> para confirmar:</label>
                         <input type="text" name="confirmation" class="form-control" autocomplete="off" placeholder="BORRAR" required autofocus>
                     </div>
+                    <div class="mb-3">
+                        <label for="pin" class="form-label fw-bold">PIN de seguridad</label>
+                        <input type="password" name="pin" id="pin" class="form-control form-control-lg text-center" maxlength="4" inputmode="numeric" pattern="[0-9]*" required>
+                    </div>
                     <div class="d-flex justify-content-between align-items-center mt-4">
                         <a href="{{ redirect_url }}" class="btn btn-outline-secondary">
                             <i class="fa-solid fa-arrow-left me-1"></i> Cancelar

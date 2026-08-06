@@ -68,8 +68,10 @@ class TenderProcessForm(forms.ModelForm):
 class ForeignTenderProcessForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.has_oca:
+            self.fields.pop("received", None)
         self.fields["expediente"].required = True
-        self.fields["expediente"].label = "Expediente (obligatorio)"
+        self.fields["expediente"].label = "Objeto / Expediente (obligatorio)"
         self.fields["expediente"].help_text = (
             "Se carga al crear la licitacion y puede corregirse luego desde Editar proceso."
         )
@@ -184,8 +186,8 @@ class TenderStageUpdateForm(forms.ModelForm):
         fields = ["status", "start_date", "end_date", "responsible"]
         widgets = {
             "status": forms.Select(attrs={"class": "form-select"}),
-            "start_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
-            "end_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+            "start_date": forms.DateInput(format="%Y-%m-%d", attrs={"class": "form-control", "type": "date"}),
+            "end_date": forms.DateInput(format="%Y-%m-%d", attrs={"class": "form-control", "type": "date"}),
             "responsible": forms.Select(attrs={"class": "form-select"}),
         }
 
@@ -193,7 +195,9 @@ class TenderStageUpdateForm(forms.ModelForm):
 class ForeignProvisionRequestForm(forms.ModelForm):
     class Meta:
         model = ForeignProvisionRequest
-        fields = ["sp_number", "amount", "issue_date", "saimb_number"]
+        fields = ["sp_number", "amount", "issue_date", "expiration_date", "saimb_number", "received"]
         widgets = {
-            "issue_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "issue_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+            "expiration_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+            "received": forms.Select(choices=[(None, "-"), (True, "SI"), (False, "NO")], attrs={"class": "form-select"}),
         }
