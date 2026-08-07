@@ -29,18 +29,28 @@ class ClothingType(models.Model):
 
 class ClothingSize(models.Model):
     clothing_type = models.ForeignKey(ClothingType, on_delete=models.CASCADE, related_name="sizes", verbose_name="Prenda")
+    size_system = models.CharField(
+        max_length=60,
+        blank=True,
+        verbose_name="Sistema de talles",
+        help_text="Ej: Europeo, Americano, Nacional",
+        default="",
+    )
     size = models.CharField(max_length=50, verbose_name="Talle", help_text="Ej: S, M, L, XL, 42, 44")
     
     class Meta:
         verbose_name = "Talle de Prenda"
         verbose_name_plural = "Talles de Prendas"
-        unique_together = ('clothing_type', 'size')
+        unique_together = ('clothing_type', 'size_system', 'size')
 
     def __str__(self):
+        if self.size_system:
+            return f"{self.clothing_type.name} - Talle {self.size} ({self.size_system})"
         return f"{self.clothing_type.name} - Talle {self.size}"
 
     def save(self, *args, **kwargs):
         if self.size: self.size = self.size.upper()
+        if self.size_system: self.size_system = self.size_system.upper()
         super().save(*args, **kwargs)
 
 class ClothingBatch(models.Model):
@@ -129,6 +139,12 @@ class PersonnelClothingMeasure(models.Model):
         related_name="personnel_measures",
         verbose_name="Talle / Medida",
     )
+    size_system = models.CharField(
+        max_length=60,
+        blank=True,
+        verbose_name="Sistema de talles",
+        default="",
+    )
     custom_measure = models.CharField(
         max_length=120,
         blank=True,
@@ -142,14 +158,20 @@ class PersonnelClothingMeasure(models.Model):
     class Meta:
         verbose_name = "Medida de ropa del personal"
         verbose_name_plural = "Medidas de ropa del personal"
-        unique_together = ("personnel", "clothing_type")
+        unique_together = ("personnel", "clothing_type", "size_system")
         ordering = ["clothing_type__name"]
 
     def __str__(self):
         value = self.clothing_size.size if self.clothing_size else (self.custom_measure or "SIN MEDIDA")
+        if self.clothing_size and self.clothing_size.size_system:
+            value = f"{value} ({self.clothing_size.size_system})"
         return f"{self.personnel} - {self.clothing_type.name}: {value}"
 
     def save(self, *args, **kwargs):
+        if self.clothing_size:
+            self.size_system = self.clothing_size.size_system
+        if self.size_system:
+            self.size_system = self.size_system.upper().strip()
         if self.custom_measure:
             self.custom_measure = self.custom_measure.upper().strip()
         if self.notes:

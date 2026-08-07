@@ -29,4 +29,5 @@ urlpatterns = [
     path('batch/new/', views.batch_create, name='batch_create'),
     path('batch/<int:pk>/movements/', views.batch_movements, name='batch_movements'),
     path('batch/<int:pk>/delete/', views.batch_delete, name='batch_delete'),
+    path('forecast/', views.purchase_forecast, name='purchase_forecast'),
 ]

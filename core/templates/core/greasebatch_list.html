@@ -34,7 +34,7 @@
         <a href="{% url 'export_grease_batches_csv' %}" class="btn btn-success"><i class="fa-solid fa-file-csv me-2"></i>Excel (CSV)</a>
         <a href="{% url 'export_grease_batches_pdf' %}" class="btn btn-danger"><i class="fa-solid fa-file-pdf me-2"></i>Imprimir (PDF)</a>
         
-        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' or user.unit %}
+        {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' or user.unit %}
         <a href="{% url 'consume_grease' %}" class="btn btn-warning"><i class="fa-solid fa-minus me-1"></i> Registrar Consumo</a>
         <a href="{% url 'batch_create' %}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Ingresar Casamata</a>
         {% endif %}
@@ -103,7 +103,7 @@
                     <td class="text-end stock-actions-cell">
                         <div class="stock-actions">
                         <a href="{% url 'batch_detail' batch.id %}" class="btn btn-sm btn-outline-info action-icon" title="Ver movimientos" aria-label="Ver movimientos"><i class="fa-solid fa-list-ul"></i></a>
-                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' or user.unit %}
+                        {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' or user.unit %}
                         <a href="{% url 'batch_incorporate' batch.id %}" class="btn btn-sm btn-outline-success action-icon" title="Agregar cantidad" aria-label="Agregar cantidad"><i class="fa-solid fa-plus"></i></a>
                         {% endif %}
                         {% if batch.available_quantity <= 0 or batch.status == 'REJECTED' %}
@@ -114,10 +114,10 @@
                             </button>
                         </form>
                         {% endif %}
-                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
+                        {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
                         <a href="{% url 'batch_update' batch.id %}" class="btn btn-sm btn-outline-primary action-icon" title="Editar" aria-label="Editar"><i class="fa-solid fa-pen"></i></a>
                         {% endif %}
-                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+                        {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
                         <a href="{% url 'batch_delete' batch.id %}" class="btn btn-sm btn-outline-danger action-icon" title="Eliminar" aria-label="Eliminar"><i class="fa-solid fa-trash"></i></a>
                         {% endif %}
                         </div>

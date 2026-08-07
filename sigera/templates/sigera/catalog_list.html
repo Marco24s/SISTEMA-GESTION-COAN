@@ -44,12 +44,22 @@
                             <td class="px-4 py-3 fw-bold">{{ item.name }}</td>
                             <td class="py-3 font-monospace text-muted">{{ item.nato_stock_number|default:"-" }}</td>
                             <td class="py-3">
-                                {% for size in item.sizes.all %}
-                                    {% if size.id in sizes_in_stock %}
-                                        <span class="badge bg-success text-white border me-1">{{ size.size }}</span>
-                                    {% else %}
-                                        <span class="badge bg-light text-dark border me-1">{{ size.size }}</span>
-                                    {% endif %}
+                                {% regroup item.sizes.all by size_system as system_list %}
+                                {% for system in system_list %}
+                                    <div class="mb-2">
+                                        <span class="text-muted small fw-bold text-uppercase d-block" style="font-size: 0.75em; letter-spacing: 0.5px;">
+                                            {% if system.grouper %}{{ system.grouper }}{% else %}GENERAL / SIN SISTEMA{% endif %}
+                                        </span>
+                                        <div class="mt-1">
+                                            {% for size in system.list %}
+                                                {% if size.id in sizes_in_stock %}
+                                                    <a href="{% url 'sigera:catalog_size_edit' size.pk %}" class="badge bg-success text-white border me-1 text-decoration-none" title="Editar talle">{{ size.size }}</a>
+                                                {% else %}
+                                                    <a href="{% url 'sigera:catalog_size_edit' size.pk %}" class="badge bg-light text-dark border me-1 text-decoration-none" title="Editar talle">{{ size.size }}</a>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
                                 {% empty %}
                                     <span class="text-muted small fst-italic">Sin talles definidos</span>
                                 {% endfor %}

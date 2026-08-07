@@ -22,6 +22,7 @@ class UserSystemPIN(models.Model):
         ('supervivencia', 'Supervivencia / Pirotecnia'),
         ('supervivencia_admin', 'Supervivencia / Administracion'),
         ('procurement_delete', 'Borrado de Compras'),
+        ('sigera_delete', 'Borrado de Ropa (SIGERA)'),
     ]
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='system_access')

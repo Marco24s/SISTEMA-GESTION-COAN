@@ -3,7 +3,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
     <h2><i class="fa-solid fa-gears me-2 text-secondary"></i> Configuración: Unidades de Medida</h2>
-    {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
+    {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
     <a href="{% url 'measurementunit_create' %}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Nueva Unidad de Medida</a>
     {% endif %}
 </div>
@@ -24,10 +24,10 @@
                         <tr>
                             <td><strong>{{ unit.name }}</strong></td>
                             <td class="text-end">
-                                {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
+                                {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
                                 <a href="{% url 'measurementunit_update' unit.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
                                 {% endif %}
-                                {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+                                {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
                                 <form action="{% url 'measurementunit_delete' unit.pk %}" method="post" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-outline-danger ms-1" onclick="return confirm('¿Seguro desea eliminar esta unidad de medida?')"><i class="fa-solid fa-trash"></i></button>

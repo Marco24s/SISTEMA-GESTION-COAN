@@ -62,20 +62,22 @@
                                     <small class="text-muted font-monospace">{{ row.clothing_type.nato_stock_number }}</small>
                                 {% endif %}
                             </td>
-                            <td class="py-3">
-                                {% if row.measure.clothing_size %}
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
-                                        Talle {{ row.measure.clothing_size.size }}
-                                    </span>
-                                {% elif row.measure.custom_measure %}
-                                    <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2">
-                                        {{ row.measure.custom_measure }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">Sin medida</span>
-                                {% endif %}
-                            </td>
-                            <td class="py-3 text-muted">{{ row.measure.notes|default:"-" }}</td>
+                             <td class="py-3">
+                                 {% for measure in row.measures %}
+                                     {% if measure.clothing_size %}
+                                         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 me-1">
+                                             Talle {{ measure.clothing_size.size }}{% if measure.clothing_size.size_system %} ({{ measure.clothing_size.size_system }}){% endif %}
+                                         </span>
+                                     {% elif measure.custom_measure %}
+                                         <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2 me-1">
+                                             {{ measure.custom_measure }}
+                                         </span>
+                                     {% endif %}
+                                 {% empty %}
+                                     <span class="text-muted">Sin medida</span>
+                                 {% endfor %}
+                             </td>
+                             <td class="py-3 text-muted">{{ row.notes|default:"-" }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -121,16 +123,25 @@
                         {% for row in rows %}
                         <tr>
                             <td class="px-4 py-3">
-                                <div class="fw-bold">{{ row.clothing_type.name }}</div>
-                                {% if row.clothing_type.nato_stock_number %}
-                                    <small class="text-muted font-monospace">{{ row.clothing_type.nato_stock_number }}</small>
-                                {% endif %}
-                                {% if row.sizes_count == 0 %}
-                                    <div><small class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>Sin talles cargados en catalogo</small></div>
-                                {% endif %}
+                                 <div class="fw-bold">{{ row.clothing_type.name }}</div>
+                                 {% if row.clothing_type.nato_stock_number %}
+                                     <small class="text-muted font-monospace">{{ row.clothing_type.nato_stock_number }}</small>
+                                 {% endif %}
+                                 {% if row.sizes_count == 0 %}
+                                     <div><small class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i>Sin talles cargados en catalogo</small></div>
+                                 {% endif %}
                             </td>
-                            <td class="py-3" style="min-width: 180px;">
-                                {{ row.form.clothing_size|as_crispy_field }}
+                            <td class="py-3" style="min-width: 200px;">
+                                {% for field in row.form %}
+                                    {% if field.name != "custom_measure" and field.name != "notes" %}
+                                        <div class="mb-3">
+                                            {% if field.label %}
+                                                <label class="form-label small fw-bold text-muted mb-1">{{ field.label }}</label>
+                                            {% endif %}
+                                            {{ field }}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
                             </td>
                             <td class="py-3" style="min-width: 180px;">
                                 {{ row.form.custom_measure|as_crispy_field }}

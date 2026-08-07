@@ -1,0 +1,274 @@
+{% extends 'sigera/base_sigera.html' %}
+{% load static %}
+
+{% block title %}SIGERA - Pronóstico de Abastecimiento de Ropa{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Encabezado principal -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 fw-bold text-dark mb-1">
+                <i class="fa-solid fa-calculator text-primary me-2"></i>Pronóstico de Abastecimiento
+            </h1>
+            <p class="text-muted">Calculadora logística para proyectar compras de indumentaria según personal activo, stock y vencimientos.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Panel lateral: Formulario de Parámetros -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-dark text-white py-3 rounded-top-3">
+                    <h5 class="card-title mb-0 fw-bold">
+                        <i class="fa-solid fa-sliders me-2"></i>Parámetros de Cálculo
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" id="forecast-form">
+                        {% csrf_token %}
+                        
+                        <!-- Destino / Unidad -->
+                        <div class="mb-3">
+                            <label for="unit_id" class="form-label fw-bold text-secondary">Unidad / Destino</label>
+                            <select name="unit_id" id="unit_id" class="form-select rounded-pill">
+                                <option value="">-- Todas las Unidades (Todo el COAN) --</option>
+                                {% for u in units %}
+                                <option value="{{ u.id }}" {% if u.id == selected_unit_id %}selected{% endif %}>{{ u.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Parámetros Numéricos (Horizonte y Margen) -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-6">
+                                <label for="horizon_months" class="form-label fw-bold text-secondary">Horizonte (Meses)</label>
+                                <div class="input-group">
+                                    <input type="number" name="horizon_months" id="horizon_months" min="0" max="60" value="{{ horizon_months }}" class="form-control rounded-start-pill text-center" required>
+                                    <span class="input-group-text rounded-end-pill bg-light text-muted">Meses</span>
+                                </div>
+                                <div class="form-text small">Proyecta vencimientos futuros.</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="safety_margin" class="form-label fw-bold text-secondary">Margen de Reserva</label>
+                                <div class="input-group">
+                                    <input type="number" name="safety_margin" id="safety_margin" min="0" max="100" value="{{ safety_margin|stringformat:'.0f' }}" class="form-control rounded-start-pill text-center" required>
+                                    <span class="input-group-text rounded-end-pill bg-light text-muted">%</span>
+                                </div>
+                                <div class="form-text small">Stock de seguridad extra.</div>
+                            </div>
+                        </div>
+
+                        <!-- Filtro por Jerarquías (Ranks) -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-secondary d-flex justify-content-between align-items-center">
+                                <span>Jerarquías / Rangos</span>
+                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="toggleCheckboxes('rank-checkbox')">Marcar/Desmarcar Todos</button>
+                            </label>
+                            <div class="border rounded-3 p-3 bg-light overflow-auto" style="max-height: 180px;">
+                                {% for code, label in ranks %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input rank-checkbox" type="checkbox" name="rank_codes" value="{{ code }}" id="rank_{{ code }}" {% if code in selected_rank_codes %}checked{% endif %}>
+                                    <label class="form-check-label text-dark small" for="rank_{{ code }}">
+                                        {{ label }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Filtro por Prendas (ClothingTypes) -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-secondary d-flex justify-content-between align-items-center">
+                                <span>Prendas a Analizar</span>
+                                <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" onclick="toggleCheckboxes('clothing-checkbox')">Marcar/Desmarcar Todas</button>
+                            </label>
+                            <div class="border rounded-3 p-3 bg-light overflow-auto" style="max-height: 180px;">
+                                {% for ct in clothing_types %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input clothing-checkbox" type="checkbox" name="clothing_ids" value="{{ ct.id }}" id="clothing_{{ ct.id }}" {% if ct.id in selected_clothing_ids %}checked{% endif %}>
+                                    <label class="form-check-label text-dark small" for="clothing_{{ ct.id }}">
+                                        {{ ct.name }}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Botón Calcular -->
+                        <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill shadow-sm">
+                            <i class="fa-solid fa-play me-2"></i>Calcular Pronóstico
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Resultados -->
+        <div class="col-lg-8">
+            {% if calculated %}
+                <!-- Tarjetas de KPIs -->
+                <div class="row g-3 mb-4">
+                    <!-- Cantidad a comprar -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm bg-primary text-white rounded-3 h-100 p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                                    <i class="fa-solid fa-boxes-stacked fs-3"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-white-50 text-uppercase fw-bold mb-1 small">Prendas a Adquirir</h6>
+                                    <h2 class="fw-bold mb-0">{{ results.total_suggested_qty }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Presupuesto Estimado -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm bg-success text-white rounded-3 h-100 p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                                    <i class="fa-solid fa-dollar-sign fs-3"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-white-50 text-uppercase fw-bold mb-1 small">Costo Est. Compra</h6>
+                                    <h2 class="fw-bold mb-0">${{ results.total_estimated_cost|floatformat:2 }}</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Talles Críticos -->
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm bg-warning text-dark rounded-3 h-100 p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-dark bg-opacity-10 rounded-circle p-3 me-3">
+                                    <i class="fa-solid fa-circle-exclamation fs-3"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-dark-50 text-uppercase fw-bold mb-1 small">Talles Críticos</h6>
+                                    <p class="mb-0 fw-bold small">
+                                        {% if results.top_critical %}
+                                            {{ results.top_critical|join:", " }}
+                                        {% else %}
+                                            Ninguno (Sin déficit)
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Desglose de Compra -->
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom border-light">
+                        <h5 class="mb-0 fw-bold text-dark"><i class="fa-solid fa-list-check text-secondary me-2"></i>Propuesta Desglosada por Talle</h5>
+                        <!-- Exportar a CSV -->
+                        <form method="post" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="unit_id" value="{{ selected_unit_id|default:'' }}">
+                            <input type="hidden" name="horizon_months" value="{{ horizon_months }}">
+                            <input type="hidden" name="safety_margin" value="{{ safety_margin }}">
+                            {% for code in selected_rank_codes %}
+                            <input type="hidden" name="rank_codes" value="{{ code }}">
+                            {% endfor %}
+                            {% for c_id in selected_clothing_ids %}
+                            <input type="hidden" name="clothing_ids" value="{{ c_id }}">
+                            {% endfor %}
+                            <input type="hidden" name="export" value="csv">
+                            <button type="submit" class="btn btn-sm btn-outline-success rounded-pill px-3">
+                                <i class="fa-solid fa-file-excel me-1"></i>Exportar a Excel (CSV)
+                            </button>
+                        </form>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light text-secondary small text-uppercase">
+                                    <tr>
+                                        <th class="ps-4">Prenda</th>
+                                        <th class="text-center">Talle</th>
+                                        <th class="text-center">Demanda (Personal)</th>
+                                        <th class="text-center">En Uso Vigente</th>
+                                        <th class="text-center">Vencido / Pendiente</th>
+                                        <th class="text-center">Stock Pañol</th>
+                                        <th class="text-center bg-light text-primary fw-bold">Compra Sugerida</th>
+                                        <th class="text-end pe-4">Costo Estimado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in results.breakdown %}
+                                    <tr {% if row.suggested_qty > 0 %}class="table-danger-hover" style="background-color: rgba(220, 53, 69, 0.03);"{% endif %}>
+                                        <td class="ps-4 fw-bold text-dark">{{ row.clothing_type_name }}</td>
+                                        <td class="text-center"><span class="badge bg-secondary rounded-pill px-2.5 py-1.5">{{ row.size_name }}</span></td>
+                                        <td class="text-center">{{ row.demand_count }}</td>
+                                        <td class="text-center text-success"><i class="fa-solid fa-circle-check me-1 small"></i>{{ row.active_count }}</td>
+                                        <td class="text-center {% if row.deficit_count > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">{{ row.deficit_count }}</td>
+                                        <td class="text-center">{{ row.stock_qty }}</td>
+                                        <td class="text-center bg-light fw-bold {% if row.suggested_qty > 0 %}text-danger fs-5{% else %}text-muted{% endif %}">
+                                            {{ row.suggested_qty }}
+                                        </td>
+                                        <td class="text-end pe-4 fw-bold {% if row.cost > 0 %}text-dark{% else %}text-muted{% endif %}">
+                                            {% if row.cost > 0 %}
+                                                ${{ row.cost|floatformat:2 }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="8" class="text-center py-5 text-muted">
+                                            <i class="fa-solid fa-folder-open fs-2 mb-3 d-block text-secondary opacity-50"></i>
+                                            No se encontraron requerimientos ni stock cargado para los parámetros seleccionados.
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <!-- Estado Inicial / Vacío -->
+                <div class="card border-0 shadow-sm rounded-3 py-5 text-center bg-white h-100 d-flex flex-column align-items-center justify-content-center">
+                    <div class="bg-light rounded-circle p-4 mb-3">
+                        <i class="fa-solid fa-chart-line fs-1 text-primary"></i>
+                    </div>
+                    <h4 class="fw-bold text-dark">Esperando Parámetros</h4>
+                    <p class="text-muted text-center px-5 max-width-500">
+                        Selecciona los filtros requeridos (Unidad, Jerarquías y Prendas) en el panel lateral y presiona <strong>Calcular Pronóstico</strong> para visualizar el plan de abastecimiento recomendado.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .max-width-500 {
+        max-width: 500px;
+    }
+    .table-danger-hover:hover {
+        background-color: rgba(220, 53, 69, 0.06) !important;
+    }
+</style>
+
+<script>
+    function toggleCheckboxes(className) {
+        const checkboxes = document.querySelectorAll('.' + className);
+        if (checkboxes.length === 0) return;
+        
+        // Comprobar si al menos uno está desmarcado
+        let allChecked = true;
+        checkboxes.forEach(cb => {
+            if (!cb.checked) allChecked = false;
+        });
+        
+        // Si todos están marcados, desmarcar todos. Si no, marcar todos.
+        checkboxes.forEach(cb => {
+            cb.checked = !allChecked;
+        });
+    }
+</script>
+{% endblock %}

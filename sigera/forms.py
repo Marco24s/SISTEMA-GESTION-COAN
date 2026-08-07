@@ -72,8 +72,9 @@ class ClothingTypeForm(forms.ModelForm):
 class ClothingSizeForm(forms.ModelForm):
     class Meta:
         model = ClothingSize
-        fields = ['clothing_type', 'size']
+        fields = ['clothing_type', 'size_system', 'size']
         widgets = {
+            'size_system': forms.TextInput(attrs={'placeholder': 'Ej: Europeo, Americano, Nacional', 'style': 'text-transform: uppercase;'}),
             'size': forms.TextInput(attrs={'placeholder': 'Ej: M, L, XL, 42, 44', 'style': 'text-transform: uppercase;'}),
         }
 
@@ -130,28 +131,63 @@ class ClothingBatchForm(forms.ModelForm):
         return cleaned_data
 
 
-class PersonnelClothingMeasureForm(forms.ModelForm):
-    class Meta:
-        model = PersonnelClothingMeasure
-        fields = ["clothing_size", "custom_measure", "notes"]
-        widgets = {
-            "custom_measure": forms.TextInput(attrs={"placeholder": "Medida manual", "style": "text-transform: uppercase;"}),
-            "notes": forms.TextInput(attrs={"placeholder": "Observaciones", "style": "text-transform: uppercase;"}),
-        }
+class ClothingTypeMeasuresForm(forms.Form):
+    custom_measure = forms.CharField(
+        max_length=120,
+        required=False,
+        label="Medida manual",
+        widget=forms.TextInput(attrs={"placeholder": "Medida manual", "style": "text-transform: uppercase;"})
+    )
+    notes = forms.CharField(
+        required=False,
+        label="Observaciones",
+        widget=forms.TextInput(attrs={"placeholder": "Observaciones", "style": "text-transform: uppercase;"})
+    )
 
-    def __init__(self, *args, clothing_type=None, **kwargs):
+    def __init__(self, *args, clothing_type=None, existing_measures=None, **kwargs):
         self.clothing_type = clothing_type
         super().__init__(*args, **kwargs)
-        self.fields["clothing_size"].required = False
-        self.fields["custom_measure"].required = False
-        self.fields["notes"].required = False
-        if clothing_type:
-            self.fields["clothing_size"].queryset = ClothingSize.objects.filter(clothing_type=clothing_type).order_by("size")
-            self.fields["clothing_size"].empty_label = "Sin medida"
+        
+        # Get unique systems for this clothing type
+        sizes = ClothingSize.objects.filter(clothing_type=clothing_type).order_by("size_system", "size")
+        systems = sorted(list(set(s.size_system for s in sizes)))
+        if not systems:
+            systems = [""]
+            
+        self.systems = systems
+        self.system_fields = []
 
-    def clean(self):
-        cleaned_data = super().clean()
-        clothing_size = cleaned_data.get("clothing_size")
-        if self.clothing_type and clothing_size and clothing_size.clothing_type_id != self.clothing_type.id:
-            self.add_error("clothing_size", "El talle seleccionado no corresponde a esta prenda.")
-        return cleaned_data
+        ordered_fields = {}
+        # For each system, add a ModelChoiceField
+        for sys in systems:
+            field_name = f"size_system_{sys}" if sys else "size_system_none"
+            label = sys if sys else "Talle"
+            queryset = sizes.filter(size_system=sys)
+            
+            # Find initial value
+            initial = None
+            if existing_measures:
+                match = existing_measures.filter(size_system=sys).first()
+                if match:
+                    initial = match.clothing_size
+                    # Populate custom_measure and notes initial values
+                    if match.custom_measure and not self.initial.get("custom_measure"):
+                        self.initial["custom_measure"] = match.custom_measure
+                    if match.notes and not self.initial.get("notes"):
+                        self.initial["notes"] = match.notes
+            
+            ordered_fields[field_name] = forms.ModelChoiceField(
+                queryset=queryset,
+                required=False,
+                label=label,
+                initial=initial,
+                empty_label="Sin talle",
+                widget=forms.Select(attrs={"class": "form-select"})
+            )
+            ordered_fields[field_name].label_from_instance = lambda obj: obj.size
+            self.system_fields.append((sys, field_name))
+            
+        # Add custom_measure and notes to the dict
+        ordered_fields["custom_measure"] = self.fields["custom_measure"]
+        ordered_fields["notes"] = self.fields["notes"]
+        self.fields = ordered_fields

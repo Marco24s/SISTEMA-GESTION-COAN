@@ -120,49 +120,9 @@
                 
                 <ul class="navbar-nav ms-auto align-items-center">
                     {% if user.is_authenticated %}
-                        <li class="nav-item dropdown me-3 d-flex align-items-center">
-                            <a class="nav-link dropdown-toggle position-relative text-white" href="#" id="notifDropdownBase" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="padding-top: 0.7rem; padding-bottom: 0.7rem;">
-                                <i class="fa-solid fa-bell fs-5"></i>
-                                {% if unread_notifications_count > 0 %}
-                                <span class="position-absolute top-25 start-75 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
-                                    {{ unread_notifications_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="notifDropdownBase" style="min-width: 300px;">
-                                <li><h6 class="dropdown-header">Notificaciones</h6></li>
-                                {% for n in recent_notifications %}
-                                <li>
-                                    <a class="dropdown-item {% if not n.is_read %}fw-bold bg-light{% endif %} text-wrap" href="{% url 'licitaciones:notification_read' n.pk %}" style="font-size: 0.9rem;">
-                                        {{ n.message }}<br>
-                                        <small class="text-muted">{{ n.created_at|timesince }}</small>
-                                    </a>
-                                </li>
-                                {% empty %}
-                                <li><span class="dropdown-item text-muted">No tienes notificaciones nuevas.</span></li>
-                                {% endfor %}
-                            </ul>
-                        </li>
+
+                        {% if user.is_superuser or user.is_staff or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
                         <li class="nav-item dropdown me-2">
-                            <a class="nav-link dropdown-toggle text-white d-flex align-items-center rounded-pill px-3 py-2 shadow-sm transition-all" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" style="background-color: rgba(255, 255, 255, 0.1);" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.1)'">
-                                <i class="fa-solid fa-circle-user fs-5 me-2 text-light"></i> 
-                                <span class="fw-bold">{{ user.username }}</span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3" aria-labelledby="navbarDropdown">
-                                {% if user.is_staff %}
-                                    <li><a class="dropdown-item py-2 fw-bold" href="/admin/"><i class="fa-solid fa-user-shield me-2 text-primary"></i> Administración</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                {% endif %}
-                                <li>
-                                    <form method="post" action="{% url 'logout' %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="dropdown-item py-2 text-danger fw-bold"><i class="fa-solid fa-right-from-bracket me-2"></i> Cerrar Sesión</button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </li>
-                        {% if user.is_staff or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' %}
-                        <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm transition-all" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown" style="width: 40px; height: 40px; padding: 0; background-color: rgba(255, 255, 255, 0.1);" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'; this.querySelector('i').classList.add('fa-spin')" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.1)'; this.querySelector('i').classList.remove('fa-spin')">
                                 <i class="fa-solid fa-gear fs-5 text-white"></i>
                             </a>
@@ -176,6 +136,24 @@
                             </ul>
                         </li>
                         {% endif %}
+                        <li class="nav-item dropdown me-2">
+                            <a class="nav-link dropdown-toggle text-white d-flex align-items-center rounded-pill px-3 py-2 shadow-sm transition-all" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" style="background-color: rgba(255, 255, 255, 0.1);" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.1)'">
+                                <i class="fa-solid fa-circle-user fs-5 me-2 text-light"></i> 
+                                <span class="fw-bold">{{ user.username }}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3" aria-labelledby="navbarDropdown">
+                                {% if user.is_superuser or user.is_staff %}
+                                    <li><a class="dropdown-item py-2 fw-bold" href="/admin/"><i class="fa-solid fa-user-shield me-2 text-primary"></i> Administración</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                {% endif %}
+                                <li>
+                                    <form method="post" action="{% url 'logout' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item py-2 text-danger fw-bold"><i class="fa-solid fa-right-from-bracket me-2"></i> Cerrar Sesión</button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
                     {% else %}
                         <li class="nav-item">
                             <a class="btn-login-pill" href="{% url 'login' %}">

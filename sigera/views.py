@@ -6,7 +6,7 @@ from django.db import transaction
 from django.contrib import messages
 from django.http import HttpResponse
 from .models import ClothingType, ClothingSize, ClothingBatch, Personnel, ClothingAssignment, PersonnelClothingMeasure, StockThreshold
-from .forms import PersonnelForm, ClothingAssignmentForm, PersonnelClothingMeasureForm
+from .forms import PersonnelForm, ClothingAssignmentForm, ClothingTypeMeasuresForm
 import pandas as pd
 import io
 from xml.sax.saxutils import escape
@@ -16,7 +16,17 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from core.models import Unit
-from core.decorators import pin_required
+def check_sigera_delete_pin(request):
+    from core.models import UserSystemPIN
+    from django.contrib.auth.hashers import check_password
+    pin = request.POST.get('pin', '')
+    try:
+        access = UserSystemPIN.objects.get(user=request.user, system_code='sigera_delete')
+    except UserSystemPIN.DoesNotExist:
+        return False, "No tiene configurado el PIN de Borrado para SIGERA."
+    if not check_password(pin, access.pin_hash):
+        return False, "PIN incorrecto. No se realizó la eliminación."
+    return True, ""
 
 @login_required
 def home(request):
@@ -557,21 +567,19 @@ def personnel_measure_sheet(request, pk):
         return redirect('sigera:personnel_list')
 
     clothing_types = ClothingType.objects.filter(show_in_measure_sheet=True).prefetch_related('sizes').order_by('name')
-    existing_measures = {
-        measure.clothing_type_id: measure
-        for measure in PersonnelClothingMeasure.objects.filter(personnel=person).select_related('clothing_type', 'clothing_size')
-    }
+    all_measures = PersonnelClothingMeasure.objects.filter(personnel=person).select_related('clothing_type', 'clothing_size')
     edit_mode = request.GET.get('edit') == '1' or request.method == 'POST'
 
     if request.method == 'POST':
         forms_by_type = []
         is_valid = True
         for clothing_type in clothing_types:
-            form = PersonnelClothingMeasureForm(
+            prefix = f"measure_{clothing_type.id}"
+            form = ClothingTypeMeasuresForm(
                 request.POST,
-                prefix=f"measure_{clothing_type.id}",
-                instance=existing_measures.get(clothing_type.id),
+                prefix=prefix,
                 clothing_type=clothing_type,
+                existing_measures=all_measures.filter(clothing_type=clothing_type),
             )
             forms_by_type.append((clothing_type, form))
             if not form.is_valid():
@@ -580,44 +588,69 @@ def personnel_measure_sheet(request, pk):
         if is_valid:
             with transaction.atomic():
                 for clothing_type, form in forms_by_type:
-                    clothing_size = form.cleaned_data.get('clothing_size')
                     custom_measure = form.cleaned_data.get('custom_measure')
                     notes = form.cleaned_data.get('notes')
-                    existing = existing_measures.get(clothing_type.id)
-
-                    if clothing_size or custom_measure or notes:
-                        measure = form.save(commit=False)
-                        measure.personnel = person
-                        measure.clothing_type = clothing_type
-                        measure.save()
-                    elif existing:
-                        existing.delete()
+                    
+                    for sys, field_name in form.system_fields:
+                        clothing_size = form.cleaned_data.get(field_name)
+                        existing = all_measures.filter(
+                            clothing_type=clothing_type,
+                            size_system=sys
+                        ).first()
+                        
+                        is_first_system = (sys == form.system_fields[0][0])
+                        
+                        if clothing_size or (is_first_system and (custom_measure or notes)):
+                            if not existing:
+                                existing = PersonnelClothingMeasure(
+                                    personnel=person,
+                                    clothing_type=clothing_type,
+                                    size_system=sys
+                                )
+                            existing.clothing_size = clothing_size
+                            existing.custom_measure = custom_measure
+                            existing.notes = notes
+                            existing.save()
+                        elif existing:
+                            existing.delete()
 
             messages.success(request, "Planilla de medidas actualizada correctamente.")
             return redirect('sigera:personnel_measure_sheet', pk=person.pk)
     else:
-        forms_by_type = [
-            (
-                clothing_type,
-                PersonnelClothingMeasureForm(
-                    prefix=f"measure_{clothing_type.id}",
-                    instance=existing_measures.get(clothing_type.id),
-                    clothing_type=clothing_type,
-                ),
+        forms_by_type = []
+        for clothing_type in clothing_types:
+            prefix = f"measure_{clothing_type.id}"
+            form = ClothingTypeMeasuresForm(
+                prefix=prefix,
+                clothing_type=clothing_type,
+                existing_measures=all_measures.filter(clothing_type=clothing_type),
             )
-            for clothing_type in clothing_types
-        ]
+            forms_by_type.append((clothing_type, form))
 
     rows = [
         {
             'clothing_type': clothing_type,
             'form': form,
             'sizes_count': clothing_type.sizes.count(),
-            'measure': existing_measures.get(clothing_type.id),
         }
         for clothing_type, form in forms_by_type
     ]
-    completed_rows = [row for row in rows if row['measure']]
+
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for measure in all_measures:
+        grouped[measure.clothing_type].append(measure)
+
+    completed_rows = []
+    for clothing_type, measures in grouped.items():
+        custom_measure = next((m.custom_measure for m in measures if m.custom_measure), "")
+        notes = next((m.notes for m in measures if m.notes), "")
+        completed_rows.append({
+            'clothing_type': clothing_type,
+            'measures': measures,
+            'custom_measure': custom_measure,
+            'notes': notes,
+        })
 
     return render(
         request,
@@ -774,6 +807,14 @@ def personnel_delete(request, pk):
         return redirect('sigera:personnel_list')
     person = get_object_or_404(Personnel, pk=pk)
     if request.method == 'POST':
+        ok, error_msg = check_sigera_delete_pin(request)
+        if not ok:
+            messages.error(request, error_msg)
+            return render(request, 'sigera/confirm_delete.html', {
+                'title': 'Eliminar Personal',
+                'message': f"¿Está seguro que desea eliminar a {person.last_name}, {person.first_name} ({person.dni})? Esta acción borrará permanentemente su legajo del sistema.",
+                'cancel_url': reverse('sigera:personnel_list'),
+            })
         name = f"{person.last_name}, {person.first_name}"
         person.delete()
         messages.success(request, f"¡Legajo de {name} eliminado correctamente!")
@@ -1016,7 +1057,10 @@ def catalog_list(request):
         messages.error(request, "Acceso denegado: Solo el superusuario puede acceder al Catálogo.")
         return redirect('sigera:home')
 
-    clothing_types = ClothingType.objects.prefetch_related('sizes').order_by('name')
+    from django.db.models import Prefetch
+    clothing_types = ClothingType.objects.prefetch_related(
+        Prefetch('sizes', queryset=ClothingSize.objects.order_by('size_system', 'size'))
+    ).order_by('name')
     sizes_in_stock = set(
         ClothingSize.objects.filter(batches__available_quantity__gt=0)
         .values_list('id', flat=True)
@@ -1071,6 +1115,14 @@ def catalog_delete(request, pk):
         
     item = get_object_or_404(ClothingType, pk=pk)
     if request.method == 'POST':
+        ok, error_msg = check_sigera_delete_pin(request)
+        if not ok:
+            messages.error(request, error_msg)
+            return render(request, 'sigera/confirm_delete.html', {
+                'title': 'Eliminar Modelo del Catálogo',
+                'message': f"¿Está seguro que desea borrar el modelo '{item.name}'? Si existen lotes o cargos asociados, no se podrá eliminar.",
+                'cancel_url': reverse('sigera:catalog_list'),
+            })
         try:
             name = item.name
             item.delete()
@@ -1117,7 +1169,7 @@ def catalog_size_edit(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f"Talle '{size.size}' actualizado correctamente.")
-            return redirect('sigera:stock_list')
+            return redirect('sigera:catalog_list')
     else:
         form = ClothingSizeForm(instance=size)
     return render(request, 'sigera/size_form.html', {'form': form, 'edit_mode': True, 'size': size})
@@ -1129,13 +1181,21 @@ def catalog_size_delete(request, pk):
         return redirect('sigera:home')
     size = get_object_or_404(ClothingSize, pk=pk)
     if request.method == 'POST':
+        ok, error_msg = check_sigera_delete_pin(request)
+        if not ok:
+            messages.error(request, error_msg)
+            return render(request, 'sigera/confirm_delete.html', {
+                'title': 'Eliminar Talle',
+                'message': f"¿Eliminar el talle {size.size} de {size.clothing_type.name}? Esto eliminará también los ingresos asociados.",
+                'cancel_url': reverse('sigera:catalog_list'),
+            })
         size.delete()
         messages.success(request, f"Talle {size.size} eliminado correctamente.")
-        return redirect('sigera:stock_list')
+        return redirect('sigera:catalog_list')
     return render(request, 'sigera/confirm_delete.html', {
         'title': 'Eliminar Talle',
         'message': f"¿Eliminar el talle {size.size} de {size.clothing_type.name}? Esto eliminará también los ingresos asociados.",
-        'cancel_url': reverse('sigera:stock_list'),
+        'cancel_url': reverse('sigera:catalog_list'),
     })
 
 @login_required
@@ -1161,7 +1221,15 @@ def batch_create(request):
     else:
         form = ClothingBatchForm()
         
-    sizes_by_type = list(ClothingSize.objects.order_by('clothing_type__name', 'size').values('id', 'clothing_type_id', 'size'))
+    sizes_qs = ClothingSize.objects.order_by('clothing_type__name', 'size_system', 'size')
+    sizes_by_type = []
+    for s in sizes_qs:
+        display_name = f"{s.size} ({s.size_system})" if s.size_system else s.size
+        sizes_by_type.append({
+            'id': s.id,
+            'clothing_type_id': s.clothing_type_id,
+            'size': display_name
+        })
     return render(request, 'sigera/batch_form.html', {'form': form, 'sizes_by_type': sizes_by_type})
 
 @login_required
@@ -1232,6 +1300,19 @@ def batch_delete(request, pk):
     batch = get_object_or_404(ClothingBatch, pk=pk)
     
     if request.method == 'POST':
+        ok, error_msg = check_sigera_delete_pin(request)
+        if not ok:
+            messages.error(request, error_msg)
+            assignments_count = batch.assignments.count()
+            warnings = []
+            if assignments_count > 0:
+                warnings.append(f"Este lote tiene {assignments_count} entregas (cargos) asociadas a personal. Si continuás, TODAS esas entregas también serán eliminadas irreversiblemente de la base de datos.")
+            return render(request, 'sigera/confirm_delete.html', {
+                'title': 'Eliminar Lote de Inventario',
+                'message': f"¿Está seguro que desea borrar de la base de datos el lote '{batch}'?",
+                'warnings': warnings,
+                'cancel_url': reverse('sigera:stock_list'),
+            })
         try:
             name = str(batch)
             # Como los cargos (ClothingAssignment) tienen on_delete=PROTECT,
@@ -1257,4 +1338,100 @@ def batch_delete(request, pk):
         'warnings': warnings,
         'cancel_url': reverse('sigera:stock_list'),
     })
+
+@login_required
+def purchase_forecast(request):
+    """
+    Vista de la Calculadora de Pronóstico de Abastecimiento de SIGERA.
+    """
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    if not is_admin:
+        messages.error(request, "Acceso denegado: No tienes permisos para acceder a la calculadora.")
+        return redirect('sigera:home')
+        
+    # Obtener modelos para el formulario
+    units = Unit.objects.all().order_by('name')
+    clothing_types = ClothingType.objects.all().order_by('name')
+    ranks = Personnel.RANK_CHOICES
+    
+    # Parámetros por defecto
+    selected_unit_id = None
+    selected_rank_codes = []
+    selected_clothing_ids = []
+    horizon_months = 0
+    safety_margin = 10.0 # 10% por defecto
+    calculated = False
+    results = {}
+    
+    if request.method == 'POST':
+        selected_unit_id_raw = request.POST.get('unit_id')
+        if selected_unit_id_raw:
+            selected_unit_id = int(selected_unit_id_raw)
+            
+        selected_rank_codes = request.POST.getlist('rank_codes')
+        selected_clothing_ids = [int(i) for i in request.POST.getlist('clothing_ids')]
+        
+        horizon_months_raw = request.POST.get('horizon_months')
+        if horizon_months_raw:
+            try:
+                horizon_months = int(horizon_months_raw)
+            except ValueError:
+                horizon_months = 0
+                
+        safety_margin_raw = request.POST.get('safety_margin')
+        if safety_margin_raw:
+            try:
+                safety_margin = float(safety_margin_raw)
+            except ValueError:
+                safety_margin = 0.0
+                
+        from .services import calculate_clothing_forecast
+        results = calculate_clothing_forecast(
+            unit_id=selected_unit_id,
+            rank_codes=selected_rank_codes,
+            clothing_ids=selected_clothing_ids,
+            horizon_months=horizon_months,
+            safety_margin=safety_margin
+        )
+        calculated = True
+        
+        # Si se solicita exportar a CSV
+        if request.POST.get('export') == 'csv':
+            import csv
+            response = HttpResponse(content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="pronostico_compra_ropa.csv"'
+            response.write('\ufeff') # BOM
+            writer = csv.writer(response, dialect='excel', delimiter=';')
+            writer.writerow([
+                'Prenda', 'Talle', 'Demanda (Personal)', 'En Uso (Vigente)', 
+                'Déficit (Pendiente/Vencido)', 'Stock Disponible', 'Sugerencia de Compra', 'Precio Ref. ($)', 'Costo Est. ($)'
+            ])
+            for row in results['breakdown']:
+                writer.writerow([
+                    row['clothing_type_name'],
+                    row['size_name'],
+                    row['demand_count'],
+                    row['active_count'],
+                    row['deficit_count'],
+                    row['stock_qty'],
+                    row['suggested_qty'],
+                    row['unit_price'],
+                    row['cost']
+                ])
+            return response
+            
+    context = {
+        'units': units,
+        'clothing_types': clothing_types,
+        'ranks': ranks,
+        'selected_unit_id': selected_unit_id,
+        'selected_rank_codes': selected_rank_codes,
+        'selected_clothing_ids': selected_clothing_ids,
+        'horizon_months': horizon_months,
+        'safety_margin': safety_margin,
+        'calculated': calculated,
+        'results': results,
+    }
+    return render(request, 'sigera/purchase_forecast.html', context)
 

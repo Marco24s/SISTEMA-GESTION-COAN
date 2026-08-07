@@ -3,7 +3,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
     <h2><i class="fa-solid fa-plane me-2"></i> Modelos de Aeronaves</h2>
-    {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
+    {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
     <a href="{% url 'aircraft_create' %}" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i> Nuevo Modelo</a>
     {% endif %}
 </div>
@@ -34,10 +34,10 @@
                         {% endif %}
                     </td>
                     <td class="text-end">
-                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
+                        {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
                         <a href="{% url 'aircraft_update' aircraft.id %}" class="btn btn-sm btn-outline-secondary">Editar</a>
                         {% endif %}
-                        {% if user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
+                        {% if user.is_superuser or user.is_staff or 'Logistica' in user.groups.all|join:',' or 'Administrador' in user.groups.all|join:',' %}
                         <a href="{% url 'aircraft_delete' aircraft.id %}" class="btn btn-sm btn-outline-danger ms-1" title="Eliminar"><i class="fa-solid fa-trash"></i></a>
                         {% endif %}
                     </td>

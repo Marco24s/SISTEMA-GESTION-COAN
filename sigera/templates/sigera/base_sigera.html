@@ -46,8 +46,19 @@
                 {% endif %}
                 {% endif %}
             </ul>
-            <ul class="navbar-nav ms-auto">
+            <ul class="navbar-nav ms-auto align-items-center">
                 {% if user.is_authenticated %}
+                    {% if user.is_superuser or 'Administrador' in user.groups.all|join:',' or 'Logistica' in user.groups.all|join:',' or 'Editor' in user.groups.all|join:',' %}
+                    <li class="nav-item dropdown me-2">
+                        <a class="nav-link dropdown-toggle text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm transition-all" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown" style="width: 40px; height: 40px; padding: 0; background-color: rgba(255, 255, 255, 0.1);" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'; this.querySelector('i').classList.add('fa-spin')" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.1)'; this.querySelector('i').classList.remove('fa-spin')">
+                            <i class="fa-solid fa-gear fs-5 text-white"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3" aria-labelledby="configDropdown">
+                            <li><h6 class="dropdown-header text-primary fw-bold text-uppercase small">Herramientas</h6></li>
+                            <li><a class="dropdown-item py-2" href="{% url 'sigera:purchase_forecast' %}"><i class="fa-solid fa-calculator me-2 text-secondary"></i>Pronóstico de Compra</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fa-solid fa-user me-1"></i> {{ user.username }}
