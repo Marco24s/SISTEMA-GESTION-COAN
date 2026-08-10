@@ -1,0 +1,383 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n static %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .consolidation-card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+    .consolidation-table {
+        font-size: 0.9rem;
+    }
+    .consolidation-table th {
+        font-weight: 700;
+        vertical-align: middle;
+        text-align: center;
+        background-color: #f8f9fa;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .consolidation-table td {
+        vertical-align: middle;
+    }
+    .font-monospace-num {
+        font-family: var(--bs-font-monospace);
+        font-size: 0.85rem;
+    }
+    .totals-row {
+        background-color: #e9ecef !important;
+        font-weight: bold;
+        border-top: 2px solid #6c757d;
+        border-bottom: 2px solid #6c757d;
+    }
+    .bg-light-blue {
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    .border-double-bottom {
+        border-bottom: 3px double #212529 !important;
+    }
+</style>
+{% endblock %}
+
+{% block budget_content %}
+<div class="mb-4 animate__animated animate__fadeIn">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 mb-1">Consolidado por Inciso / Subparcial</h1>
+            <p class="text-muted small mb-0">Resumen y monitoreo del Ejercicio Económico {{ fiscal_year.year }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'budget:export_consolidation_csv' %}" class="btn btn-success btn-sm rounded-pill px-3 shadow-sm">
+                <i class="fa-solid fa-file-excel me-1"></i> Exportar a Excel (CSV)
+            </a>
+            <a href="{% url 'budget:dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left me-1"></i> Volver al Panel
+            </a>
+        </div>
+    </div>
+
+    {% if fiscal_year %}
+    
+    <!-- Filtro de Destino y Botón de Editar Respaldos -->
+    <div class="row align-items-center mb-4">
+        <div class="col-md-4">
+            <label for="unitFilter" class="form-label small fw-bold text-muted text-uppercase mb-1">Filtrar por Destino (Unidad)</label>
+            <select id="unitFilter" class="form-select rounded-pill shadow-sm" onchange="filterByUnit(this.value)">
+                <option value="">-- Todos los Destinos (COAA Global) --</option>
+                {% for u in units %}
+                    <option value="{{ u.id }}" {% if selected_unit and selected_unit.id == u.id %}selected{% endif %}>{{ u.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-8 text-end pt-4">
+            {% if selected_unit %}
+                {% if is_admin %}
+                    <button type="button" class="btn btn-warning btn-sm rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#editBackupsModal">
+                        <i class="fa-solid fa-edit me-1"></i> Editar Respaldos
+                    </button>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card consolidation-card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle mb-0 consolidation-table">
+                    {% if selected_unit %}
+                        <thead>
+                            <tr>
+                                <th class="text-start ps-4" style="min-width: 200px;">Incisos / Subparcial</th>
+                                <th>Respaldo</th>
+                                <th>Asignación</th>
+                                <th>Com + Dev</th>
+                                <th>Saldo</th>
+                                <th>Falta Asignar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in rows %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark">{{ r.code }}</td>
+                                <!-- Respaldo -->
+                                <td class="text-end font-monospace-num bg-light">${{ r.respaldo|floatformat:0|localize }}</td>
+                                <!-- Asignación -->
+                                <td class="text-end font-monospace-num text-primary">${{ r.asignacion|floatformat:0|localize }}</td>
+                                <!-- Com + Dev -->
+                                <td class="text-end font-monospace-num text-danger">${{ r.com_dev|floatformat:0|localize }}</td>
+                                <!-- Saldo -->
+                                <td class="text-end font-monospace-num fw-bold {% if r.saldo < 0 %}text-danger{% else %}text-success{% endif %}">${{ r.saldo|floatformat:0|localize }}</td>
+                                <!-- Falta Asignar -->
+                                <td class="text-end font-monospace-num text-muted">${{ r.falta_asignar|floatformat:0|localize }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="fa-solid fa-folder-open fs-2 mb-3 d-block text-secondary opacity-50"></i>
+                                    No se encontraron movimientos presupuestarios para esta unidad en el ejercicio fiscal activo.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            
+                            <!-- Totales -->
+                            {% if rows %}
+                            <tr class="totals-row border-double-bottom">
+                                <td class="ps-4">Total General</td>
+                                <td class="text-end font-monospace-num">${{ totals.respaldo|floatformat:0|localize }}</td>
+                                <td class="text-end font-monospace-num">${{ totals.asignacion|floatformat:0|localize }}</td>
+                                <td class="text-end font-monospace-num">${{ totals.com_dev|floatformat:0|localize }}</td>
+                                <td class="text-end font-monospace-num">${{ totals.saldo|floatformat:0|localize }}</td>
+                                <td class="text-end font-monospace-num">${{ totals.falta_asignar|floatformat:0|localize }}</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    {% else %}
+                        <thead>
+                            <tr>
+                                <th rowspan="2" class="text-start ps-4" style="min-width: 200px;">Incisos / Subparcial</th>
+                                <th colspan="5" class="bg-light text-center border-bottom-0">Presupuesto Asignado por COAA</th>
+                                <th colspan="2" class="text-center border-bottom-0">Distribución y Reserva</th>
+                                <th colspan="2" class="text-center border-bottom-0">Ejecución UU.CC.</th>
+                            </tr>
+                            <tr>
+                                <th class="bg-light-blue">Foxtrot (FF11)</th>
+                                <th>Asignación Recibida</th>
+                                <th>Falta Asignar</th>
+                                <th>Refuerzo Recibido</th>
+                                <th class="bg-light">Total Asignado</th>
+                                <th>Asignación Dist.</th>
+                                <th>Reserva</th>
+                                <th>Com + Dev</th>
+                                <th>Saldo Disponible</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in rows %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark" 
+                                    data-bs-toggle="tooltip" 
+                                    data-bs-html="true" 
+                                    data-bs-placement="right" 
+                                    title="{{ r.allocations_tooltip }}" 
+                                    style="cursor: help; text-decoration: underline dashed #6c757d 1px;">
+                                    {{ r.code }}
+                                </td>
+                                <!-- Foxtrot (FF11) -->
+                                <td class="text-end font-monospace-num bg-light-blue">${{ r.foxtrot|floatformat:0|localize }}</td>
+                                <!-- Asignación Recibida -->
+                                <td class="text-end font-monospace-num">${{ r.asig_coaa|floatformat:0|localize }}</td>
+                                <!-- Falta Asignar -->
+                                <td class="text-end font-monospace-num text-muted">
+                                    {% if r.falta_asig > 0 %}
+                                        ${{ r.falta_asig|floatformat:0|localize }}
+                                    {% else %}
+                                        $0
+                                    {% endif %}
+                                </td>
+                                <!-- Refuerzo Recibido -->
+                                <td class="text-end font-monospace-num text-success">
+                                    {% if r.refuerzo > 0 %}
+                                        +${{ r.refuerzo|floatformat:0|localize }}
+                                    {% else %}
+                                        $0
+                                    {% endif %}
+                                </td>
+                                <!-- Total Asignado -->
+                                <td class="text-end font-monospace-num bg-light fw-bold">${{ r.total_asignado|floatformat:0|localize }}</td>
+                                <!-- Asignación Distribuida -->
+                                <td class="text-end font-monospace-num fw-bold text-primary">${{ r.distribuido|floatformat:0|localize }}</td>
+                                <!-- Reserva -->
+                                <td class="text-end font-monospace-num text-warning fw-bold">${{ r.reserva|floatformat:0|localize }}</td>
+                                <!-- Com + Dev -->
+                                <td class="text-end font-monospace-num text-danger fw-bold">${{ r.com_dev|floatformat:0|localize }}</td>
+                                <!-- Saldo Disponible -->
+                                <td class="text-end font-monospace-num text-success fw-bold">${{ r.saldo_disponible|floatformat:0|localize }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">
+                                    <i class="fa-solid fa-folder-open fs-2 mb-3 d-block text-secondary opacity-50"></i>
+                                    No se encontraron datos presupuestarios para el ejercicio fiscal activo.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            
+                            <!-- Totales -->
+                            {% if rows %}
+                            <tr class="totals-row border-double-bottom">
+                                <td class="ps-4">Total General</td>
+                                <!-- Foxtrot (FF11) -->
+                                <td class="text-end font-monospace-num">${{ totals.foxtrot|floatformat:0|localize }}</td>
+                                <!-- Asignación Recibida -->
+                                <td class="text-end font-monospace-num">${{ totals.asig_coaa|floatformat:0|localize }}</td>
+                                <!-- Falta Asignar -->
+                                <td class="text-end font-monospace-num">${{ totals.falta_asig|floatformat:0|localize }}</td>
+                                <!-- Refuerzo Recibido -->
+                                <td class="text-end font-monospace-num">${{ totals.refuerzo|floatformat:0|localize }}</td>
+                                <!-- Total Asignado -->
+                                <td class="text-end font-monospace-num">${{ totals.total_asignado|floatformat:0|localize }}</td>
+                                <!-- Asignación Distribuida -->
+                                <td class="text-end font-monospace-num">${{ totals.distribuido|floatformat:0|localize }}</td>
+                                <!-- Reserva -->
+                                <td class="text-end font-monospace-num">${{ totals.reserva|floatformat:0|localize }}</td>
+                                <!-- Com + Dev -->
+                                <td class="text-end font-monospace-num">${{ totals.com_dev|floatformat:0|localize }}</td>
+                                <!-- Saldo Disponible -->
+                                <td class="text-end font-monospace-num">${{ totals.saldo_disponible|floatformat:0|localize }}</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- RSM SALDOS (Solo para vista de Unidad) -->
+    {% if selected_unit and rsm_saldos %}
+    <div class="row mt-4 animate__animated animate__fadeInUp">
+        <div class="col-md-5">
+            <div class="card shadow-sm border-0" style="border-radius: 12px; background-color: #f8f9fa;">
+                <div class="card-body p-3">
+                    <h6 class="fw-bold border-bottom pb-2 mb-3 text-secondary text-uppercase" style="font-size: 0.8rem; letter-spacing: 0.5px;">
+                        <i class="fa-solid fa-chart-simple me-1 text-primary"></i> RSM SALDOS
+                    </h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-borderless mb-0 small align-middle">
+                            <tbody>
+                                <tr class="border-bottom" style="--bs-border-color: #e9ecef;">
+                                    <td class="fw-bold py-2 text-dark">2+3/PROM/RYC PAIS/GGOO</td>
+                                    <td class="text-end font-monospace-num fw-bold py-2" style="font-size: 0.95rem;">
+                                        ${{ rsm_saldos.group1|floatformat:0|localize }}
+                                    </td>
+                                </tr>
+                                <tr class="border-bottom" style="--bs-border-color: #e9ecef;">
+                                    <td class="fw-bold py-2 text-dark">RYC EXTERIOR</td>
+                                    <td class="text-end font-monospace-num fw-bold py-2" style="font-size: 0.95rem;">
+                                        ${{ rsm_saldos.group2|floatformat:0|localize }}
+                                    </td>
+                                </tr>
+                                <tr class="border-bottom" style="--bs-border-color: #e9ecef;">
+                                    <td class="fw-bold py-2 text-dark">4</td>
+                                    <td class="text-end font-monospace-num fw-bold py-2" style="font-size: 0.95rem;">
+                                        ${{ rsm_saldos.group3|floatformat:0|localize }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold py-2 text-dark">RREE</td>
+                                    <td class="text-end font-monospace-num fw-bold py-2 text-primary" style="font-size: 0.95rem;">
+                                        ${{ rsm_saldos.group4|floatformat:0|localize }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal Editar Respaldos (Solo si hay unidad y es admin) -->
+    {% if selected_unit and is_admin %}
+    <div class="modal fade" id="editBackupsModal" tabindex="-1" aria-labelledby="editBackupsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow" style="border-radius: 15px;">
+                <form method="POST" action="{% url 'budget:save_budget_backup' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="unit_id" value="{{ selected_unit.id }}">
+                    
+                    <div class="modal-header bg-dark text-white" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                        <h5 class="modal-title fw-bold fs-6" id="editBackupsModalLabel">
+                            <i class="fa-solid fa-edit me-1 text-warning"></i> Editar Respaldos: {{ selected_unit.name }}
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    
+                    <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+                        <p class="text-muted small mb-3">
+                            Ingrese los montos de respaldo anual (prometidos) para cada inciso. Deje vacío o ingrese 0 si no corresponde.
+                        </p>
+                        {% for r in modal_rows %}
+                        <div class="mb-3 row align-items-center">
+                            <label class="col-sm-4 col-form-label fw-bold text-dark">{{ r.code }}</label>
+                            <div class="col-sm-8">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    <input type="text" name="backup_pre_inc_{{ r.pre_inc_id }}" 
+                                           class="form-control font-monospace-num backup-input" 
+                                           value="{{ r.respaldo|floatformat:0|localize }}"
+                                           placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="modal-footer" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                        <button type="button" class="btn btn-outline-secondary btn-sm px-3 rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success btn-sm px-4 rounded-pill">
+                            <i class="fa-solid fa-save me-1"></i> Guardar Respaldos
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="card consolidation-card shadow-sm py-5 text-center bg-white h-100 d-flex flex-column align-items-center justify-content-center">
+        <div class="bg-light rounded-circle p-4 mb-3">
+            <i class="fa-solid fa-triangle-exclamation fs-1 text-warning"></i>
+        </div>
+        <h4 class="fw-bold text-dark">No hay un ejercicio activo</h4>
+        <p class="text-muted text-center px-5" style="max-width: 500px;">
+            Debe existir un ejercicio económico configurado en estado "Abierto" para poder visualizar y consolidar las partidas presupuestarias.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function filterByUnit(unitId) {
+        if (unitId) {
+            window.location.href = "?unit=" + unitId;
+        } else {
+            window.location.href = "?";
+        }
+    }
+
+    // Formatear números con puntos de miles mientras se escribe
+    document.querySelectorAll('.backup-input').forEach(input => {
+        input.addEventListener('input', function(e) {
+            let cursorPosition = this.selectionStart;
+            let originalLength = this.value.length;
+
+            // Limpiar todo excepto números
+            let cleanValue = this.value.replace(/\D/g, '');
+
+            if (cleanValue === '') {
+                this.value = '';
+                return;
+            }
+
+            // Formatear con puntos de miles según locale Argentina
+            let formattedValue = new Intl.NumberFormat('es-AR', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(parseInt(cleanValue, 10));
+
+            this.value = formattedValue;
+
+            // Reajustar la posición del cursor
+            let newLength = this.value.length;
+            cursorPosition = cursorPosition + (newLength - originalLength);
+            this.setSelectionRange(cursorPosition, cursorPosition);
+        });
+    });
+</script>
+{% endblock %}

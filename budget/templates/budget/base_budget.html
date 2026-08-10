@@ -104,6 +104,9 @@
         <a href="{% url 'budget:dashboard' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
             <i class="fa-solid fa-gauge"></i> Dashboard
         </a>
+        <a href="{% url 'budget:consolidation' %}" class="nav-link-sidebar {% if request.resolver_match.url_name == 'consolidation' %}active{% endif %}">
+            <i class="fa-solid fa-table-list"></i> Consolidado por Inciso
+        </a>
         <a href="{% url 'budget:fiscal_year_list' %}" class="nav-link-sidebar {% if 'fiscal_year' in request.resolver_match.url_name %}active{% endif %}">
             <i class="fa-solid fa-calendar"></i> Ejercicios
         </a>

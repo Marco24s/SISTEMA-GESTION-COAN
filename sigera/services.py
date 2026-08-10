@@ -6,14 +6,23 @@ from sigera.models import Personnel, PersonnelClothingMeasure, ClothingSize, Clo
 from core.models import Unit
 import math
 
-def calculate_clothing_forecast(unit_id=None, rank_codes=None, clothing_ids=None, horizon_months=0, safety_margin=0.0):
+def calculate_clothing_forecast(unit_ids=None, rank_codes=None, clothing_ids=None, horizon_months=0, safety_margin=0.0, unit_id=None):
     """
     Calcula la necesidad de compras de prendas para el personal activo en función de las medidas y vencimientos.
     """
+    # Mantener compatibilidad si se proporciona unit_id en vez de unit_ids
+    if unit_id is not None:
+        if unit_ids is None:
+            unit_ids = []
+        if isinstance(unit_id, list):
+            unit_ids.extend(unit_id)
+        else:
+            unit_ids.append(unit_id)
+
     # 1. Filtrar el personal activo
     personnel_qs = Personnel.objects.all()
-    if unit_id:
-        personnel_qs = personnel_qs.filter(assigned_unit_id=unit_id)
+    if unit_ids:
+        personnel_qs = personnel_qs.filter(assigned_unit_id__in=unit_ids)
     if rank_codes:
         personnel_qs = personnel_qs.filter(rank__in=rank_codes)
     

@@ -1356,7 +1356,7 @@ def purchase_forecast(request):
     ranks = Personnel.RANK_CHOICES
     
     # Parámetros por defecto
-    selected_unit_id = None
+    selected_unit_ids = []
     selected_rank_codes = []
     selected_clothing_ids = []
     horizon_months = 0
@@ -1365,9 +1365,13 @@ def purchase_forecast(request):
     results = {}
     
     if request.method == 'POST':
-        selected_unit_id_raw = request.POST.get('unit_id')
-        if selected_unit_id_raw:
-            selected_unit_id = int(selected_unit_id_raw)
+        selected_unit_ids_raw = request.POST.getlist('unit_ids')
+        if selected_unit_ids_raw:
+            selected_unit_ids = [int(i) for i in selected_unit_ids_raw if i]
+        else:
+            selected_unit_id_raw = request.POST.get('unit_id')
+            if selected_unit_id_raw:
+                selected_unit_ids = [int(selected_unit_id_raw)]
             
         selected_rank_codes = request.POST.getlist('rank_codes')
         selected_clothing_ids = [int(i) for i in request.POST.getlist('clothing_ids')]
@@ -1388,7 +1392,7 @@ def purchase_forecast(request):
                 
         from .services import calculate_clothing_forecast
         results = calculate_clothing_forecast(
-            unit_id=selected_unit_id,
+            unit_ids=selected_unit_ids,
             rank_codes=selected_rank_codes,
             clothing_ids=selected_clothing_ids,
             horizon_months=horizon_months,
@@ -1425,7 +1429,8 @@ def purchase_forecast(request):
         'units': units,
         'clothing_types': clothing_types,
         'ranks': ranks,
-        'selected_unit_id': selected_unit_id,
+        'selected_unit_ids': selected_unit_ids,
+        'selected_unit_id': selected_unit_ids[0] if selected_unit_ids else None,
         'selected_rank_codes': selected_rank_codes,
         'selected_clothing_ids': selected_clothing_ids,
         'horizon_months': horizon_months,

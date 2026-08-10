@@ -28,15 +28,33 @@
                     <form method="post" id="forecast-form">
                         {% csrf_token %}
                         
-                        <!-- Destino / Unidad -->
+                        <!-- Destino / Unidad (Selección Múltiple) -->
                         <div class="mb-3">
-                            <label for="unit_id" class="form-label fw-bold text-secondary">Unidad / Destino</label>
-                            <select name="unit_id" id="unit_id" class="form-select rounded-pill">
-                                <option value="">-- Todas las Unidades (Todo el COAN) --</option>
-                                {% for u in units %}
-                                <option value="{{ u.id }}" {% if u.id == selected_unit_id %}selected{% endif %}>{{ u.name }}</option>
-                                {% endfor %}
-                            </select>
+                            <label class="form-label fw-bold text-secondary">Unidad / Destino</label>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary w-100 text-start d-flex justify-content-between align-items-center rounded-pill bg-white border dropdown-toggle" type="button" id="destinyDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" style="color: #495057;">
+                                    <span id="destinyDropdownLabel" class="text-truncate">-- Todas las Unidades (Todo el COAN) --</span>
+                                </button>
+                                <div class="dropdown-menu w-100 p-3 shadow border-0 rounded-3" aria-labelledby="destinyDropdown" style="max-height: 250px; overflow-y: auto;">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input select-all-units" type="checkbox" id="all_units_checkbox">
+                                        <label class="form-check-label fw-bold text-dark small" for="all_units_checkbox">
+                                            -- Seleccionar Todas --
+                                        </label>
+                                    </div>
+                                    <hr class="dropdown-divider my-2">
+                                    <div class="unit-checkbox-list">
+                                        {% for u in units %}
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input unit-checkbox" type="checkbox" name="unit_ids" value="{{ u.id }}" id="unit_{{ u.id }}" {% if u.id in selected_unit_ids %}checked{% endif %}>
+                                            <label class="form-check-label text-dark small" for="unit_{{ u.id }}">
+                                                {{ u.name }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Parámetros Numéricos (Horizonte y Margen) -->
@@ -166,7 +184,9 @@
                         <!-- Exportar a CSV -->
                         <form method="post" class="d-inline">
                             {% csrf_token %}
-                            <input type="hidden" name="unit_id" value="{{ selected_unit_id|default:'' }}">
+                            {% for u_id in selected_unit_ids %}
+                            <input type="hidden" name="unit_ids" value="{{ u_id }}">
+                            {% endfor %}
                             <input type="hidden" name="horizon_months" value="{{ horizon_months }}">
                             <input type="hidden" name="safety_margin" value="{{ safety_margin }}">
                             {% for code in selected_rank_codes %}
@@ -270,5 +290,50 @@
             cb.checked = !allChecked;
         });
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkboxes = document.querySelectorAll('.unit-checkbox');
+        const allUnitsCheckbox = document.getElementById('all_units_checkbox');
+        const label = document.getElementById('destinyDropdownLabel');
+
+        function updateLabel() {
+            const checked = Array.from(checkboxes).filter(cb => cb.checked);
+            if (checked.length === 0) {
+                label.textContent = '-- Todas las Unidades (Todo el COAN) --';
+                if (allUnitsCheckbox) {
+                    allUnitsCheckbox.checked = false;
+                    allUnitsCheckbox.indeterminate = false;
+                }
+            } else if (checked.length === checkboxes.length) {
+                label.textContent = 'Todas las Unidades (Todo el COAN)';
+                if (allUnitsCheckbox) {
+                    allUnitsCheckbox.checked = true;
+                    allUnitsCheckbox.indeterminate = false;
+                }
+            } else {
+                label.textContent = `${checked.length} Unidad(es) seleccionada(s)`;
+                if (allUnitsCheckbox) {
+                    allUnitsCheckbox.checked = false;
+                    allUnitsCheckbox.indeterminate = true;
+                }
+            }
+        }
+
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', updateLabel);
+        });
+
+        if (allUnitsCheckbox) {
+            allUnitsCheckbox.addEventListener('change', function() {
+                checkboxes.forEach(cb => {
+                    cb.checked = allUnitsCheckbox.checked;
+                });
+                updateLabel();
+            });
+        }
+
+        // Ejecutar inicialmente
+        updateLabel();
+    });
 </script>
 {% endblock %}

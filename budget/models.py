@@ -432,3 +432,19 @@ class BudgetCreditAdjustment(models.Model):
     def get_q3_delta(self): return self.q3_new - self.q3_old
     @property
     def get_q4_delta(self): return self.q4_new - self.q4_old
+
+
+class BudgetUnitBackup(models.Model):
+    fiscal_year = models.ForeignKey(BudgetFiscalYear, on_delete=models.CASCADE, related_name="unit_backups", verbose_name="Ejercicio")
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name="budget_backups", verbose_name="Unidad Destino")
+    pre_inc = models.ForeignKey('BudgetPreInc', on_delete=models.CASCADE, related_name="unit_backups", verbose_name="SUBPC")
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Monto Respaldo")
+
+    class Meta:
+        unique_together = ('fiscal_year', 'unit', 'pre_inc')
+        verbose_name = "Respaldo de Unidad"
+        verbose_name_plural = "Respaldos de Unidades"
+
+    def __str__(self):
+        return f"{self.unit.name} - {self.pre_inc.code} (${self.amount})"
+

@@ -66,4 +66,8 @@ urlpatterns = [
     path('reclasificaciones/<int:pk>/approve/', views.allocation_reclassification_approve, name='allocation_reclassification_approve'),
     path('reclasificaciones/<int:pk>/execute/', views.allocation_reclassification_execute, name='allocation_reclassification_execute'),
     path('reclasificaciones/<int:pk>/reject/', views.allocation_reclassification_reject, name='allocation_reclassification_reject'),
+    
+    path('consolidation/', views.budget_consolidation, name='consolidation'),
+    path('consolidation/export/', views.export_consolidation_csv, name='export_consolidation_csv'),
+    path('consolidation/save-backup/', views.save_budget_backup, name='save_budget_backup'),
 ]
