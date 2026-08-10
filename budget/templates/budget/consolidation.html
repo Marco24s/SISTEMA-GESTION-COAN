@@ -19,6 +19,7 @@
         background-color: #f8f9fa;
         color: #495057;
         border-bottom: 2px solid #dee2e6;
+        padding: 6px 4px !important;
     }
     .consolidation-table td {
         vertical-align: middle;
@@ -39,6 +40,30 @@
     .border-double-bottom {
         border-bottom: 3px double #212529 !important;
     }
+    /* Fixed/sticky headers */
+    .table-responsive {
+        max-height: 72vh;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+    }
+    .consolidation-table thead tr:first-child th {
+        position: sticky;
+        top: 0;
+        z-index: 12;
+        background-color: #f8f9fa;
+        box-shadow: inset 0 -1px 0 #dee2e6, inset 0 1px 0 #dee2e6;
+        height: 42px;
+    }
+    .consolidation-table thead tr:nth-child(2) th {
+        position: sticky;
+        top: 42px;
+        z-index: 11;
+        background-color: #f8f9fa;
+        box-shadow: inset 0 -1px 0 #dee2e6;
+        height: 38px;
+    }
+
+
 </style>
 {% endblock %}
 
@@ -157,12 +182,10 @@
                         <tbody>
                             {% for r in rows %}
                             <tr>
-                                <td class="ps-4 fw-bold text-dark" 
-                                    data-bs-toggle="tooltip" 
-                                    data-bs-html="true" 
-                                    data-bs-placement="right" 
-                                    title="{{ r.allocations_tooltip }}" 
-                                    style="cursor: help; text-decoration: underline dashed #6c757d 1px;">
+                                <td class="ps-4 fw-bold text-dark inciso-link" 
+                                    data-code="{{ r.code }}"
+                                    data-breakdown="{{ r.breakdown_json }}"
+                                    style="cursor: pointer; text-decoration: underline dashed #6c757d 1px;">
                                     {{ r.code }}
                                 </td>
                                 <!-- Foxtrot (FF11) -->
@@ -188,7 +211,16 @@
                                 <!-- Total Asignado -->
                                 <td class="text-end font-monospace-num bg-light fw-bold">${{ r.total_asignado|floatformat:0|localize }}</td>
                                 <!-- Asignación Distribuida -->
-                                <td class="text-end font-monospace-num fw-bold text-primary">${{ r.distribuido|floatformat:0|localize }}</td>
+                                <td class="text-end font-monospace-num fw-bold text-primary inciso-link"
+                                    data-code="{{ r.code }}"
+                                    data-breakdown="{{ r.breakdown_json }}"
+                                    data-bs-toggle="tooltip" 
+                                    data-bs-html="true" 
+                                    data-bs-placement="right" 
+                                    title="{{ r.allocations_tooltip }}" 
+                                    style="cursor: pointer; text-decoration: underline dashed #0d6efd 1px;">
+                                    ${{ r.distribuido|floatformat:0|localize }}
+                                </td>
                                 <!-- Reserva -->
                                 <td class="text-end font-monospace-num text-warning fw-bold">${{ r.reserva|floatformat:0|localize }}</td>
                                 <!-- Com + Dev -->
@@ -340,6 +372,43 @@
         </p>
     </div>
     {% endif %}
+
+    <!-- Modal Desglose Inciso -->
+    <div class="modal fade" id="incisoBreakdownModal" tabindex="-1" aria-labelledby="incisoBreakdownModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow" style="border-radius: 15px;">
+                <div class="modal-header bg-dark text-white" style="border-top-left-radius: 15px; border-top-right-radius: 15px;">
+                    <h5 class="modal-title fw-bold fs-6" id="incisoBreakdownModalLabel">
+                        <i class="fa-solid fa-table me-1 text-info"></i> Desglose por Destino - Inciso: <span id="modalIncisoCode" class="badge bg-info text-dark font-monospace fs-6"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered align-middle mb-0">
+                            <thead class="table-light text-center small fw-bold">
+                                <tr>
+                                    <th class="text-start ps-3">Destino (Unidad)</th>
+                                    <th>Respaldo</th>
+                                    <th>Asignación</th>
+                                    <th>Com + Dev</th>
+                                    <th>Saldo</th>
+                                    <th>Falta Asignar</th>
+                                </tr>
+                            </thead>
+                            <tbody id="breakdownTableBody" class="font-monospace-num small text-center">
+                                <!-- Se llenará dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-bottom-left-radius: 15px; border-bottom-right-radius: 15px;">
+                    <button type="button" class="btn btn-secondary btn-sm px-4 rounded-pill" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -377,6 +446,89 @@
             let newLength = this.value.length;
             cursorPosition = cursorPosition + (newLength - originalLength);
             this.setSelectionRange(cursorPosition, cursorPosition);
+        });
+    });
+
+    // Mostrar desglose por destino al hacer click en el inciso
+    document.querySelectorAll('.inciso-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Ocultar cualquier tooltip abierto
+            let tooltipInstance = bootstrap.Tooltip.getInstance(this);
+            if (tooltipInstance) {
+                tooltipInstance.hide();
+            }
+
+            const code = this.getAttribute('data-code');
+            const rawData = this.getAttribute('data-breakdown');
+            
+            document.getElementById('modalIncisoCode').textContent = code;
+            
+            const tbody = document.getElementById('breakdownTableBody');
+            tbody.innerHTML = '';
+            
+            if (rawData) {
+                try {
+                    const data = JSON.parse(rawData);
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No hay movimientos presupuestarios para este inciso.</td></tr>';
+                    } else {
+                        // Formateador de dinero en ARS
+                        const formatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                        
+                        data.forEach(item => {
+                            const resVal = item.respaldo;
+                            const asigVal = item.asignacion;
+                            const spentVal = item.com_dev;
+                            const saldoVal = item.saldo;
+                            const faltaVal = item.falta_asignar;
+                            
+                            const tr = document.createElement('tr');
+                            
+                            const tdUnit = document.createElement('td');
+                            tdUnit.className = 'fw-bold text-start ps-3';
+                            tdUnit.textContent = item.unit_name;
+                            tr.appendChild(tdUnit);
+                            
+                            const tdRespaldo = document.createElement('td');
+                            tdRespaldo.className = 'text-end';
+                            tdRespaldo.textContent = formatter.format(resVal);
+                            tr.appendChild(tdRespaldo);
+                            
+                            const tdAsig = document.createElement('td');
+                            tdAsig.className = 'text-end text-primary fw-bold';
+                            tdAsig.textContent = formatter.format(asigVal);
+                            tr.appendChild(tdAsig);
+
+                            const tdSpent = document.createElement('td');
+                            tdSpent.className = 'text-end text-danger';
+                            tdSpent.textContent = formatter.format(spentVal);
+                            tr.appendChild(tdSpent);
+
+                            const tdSaldo = document.createElement('td');
+                            tdSaldo.className = `text-end fw-bold ${saldoVal < 0 ? 'text-danger' : 'text-success'}`;
+                            tdSaldo.textContent = formatter.format(saldoVal);
+                            tr.appendChild(tdSaldo);
+                            
+                            const tdFalta = document.createElement('td');
+                            tdFalta.className = 'text-end text-muted';
+                            tdFalta.textContent = formatter.format(faltaVal);
+                            tr.appendChild(tdFalta);
+                            
+                            tbody.appendChild(tr);
+                        });
+                    }
+                } catch(err) {
+                    console.error("Error parsing breakdown JSON:", err);
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Error al procesar el desglose.</td></tr>';
+                }
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Sin datos de desglose.</td></tr>';
+            }
+            
+            const modal = new bootstrap.Modal(document.getElementById('incisoBreakdownModal'));
+            modal.show();
         });
     });
 </script>

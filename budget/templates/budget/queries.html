@@ -1,0 +1,474 @@
+{% extends "budget/base_budget.html" %}
+{% load l10n static %}
+
+{% block budget_css %}
+<style>
+    .queries-card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+    .queries-table {
+        font-size: 0.9rem;
+    }
+    .queries-table th {
+        font-weight: 700;
+        vertical-align: middle;
+        text-align: center;
+        background-color: #f8f9fa;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        padding: 10px 8px;
+    }
+    .queries-table td {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .font-monospace-num {
+        font-family: var(--bs-font-monospace);
+        font-size: 0.85rem;
+    }
+    .totals-row {
+        background-color: #e9ecef !important;
+        font-weight: bold;
+        border-top: 2px solid #6c757d;
+        border-bottom: 2px solid #6c757d;
+    }
+    .card-kpi {
+        border-radius: 15px;
+        border: none;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card-kpi:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.08) !important;
+    }
+    /* Tooltip distribución destinos */
+    .queries-alloc-tooltip .tooltip-inner {
+        max-width: 340px;
+        text-align: left;
+        font-size: 0.8rem;
+        line-height: 1.6;
+        padding: 8px 12px;
+        background-color: #212529;
+    }
+    .queries-alloc-tooltip .tooltip-arrow::before {
+        border-left-color: #212529;
+    }
+    /* Multi-select dropdown personalizado */
+    .ms-dropdown {
+        position: relative;
+    }
+    .ms-toggle {
+        width: 100%;
+        text-align: left;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 50px;
+        padding: 4px 12px;
+        font-size: 0.825rem;
+        color: #495057;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: border-color 0.2s;
+    }
+    .ms-toggle:hover, .ms-toggle.active {
+        border-color: #0d6efd;
+        color: #0d6efd;
+    }
+    .ms-toggle .badge-count {
+        background: #0d6efd;
+        color: #fff;
+        border-radius: 50px;
+        padding: 1px 7px;
+        font-size: 0.72rem;
+        margin-left: 5px;
+    }
+    .ms-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        min-width: 180px;
+        max-width: 260px;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        z-index: 1050;
+        padding: 6px 0;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+    .ms-menu.open {
+        display: block;
+    }
+    .ms-menu label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        white-space: nowrap;
+    }
+    .ms-menu label:hover {
+        background: #f0f4ff;
+    }
+    .ms-menu label input[type=checkbox] {
+        accent-color: #0d6efd;
+        width: 15px;
+        height: 15px;
+        flex-shrink: 0;
+    }
+    .ms-apply {
+        display: block;
+        margin: 6px 10px 4px;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        padding: 4px 0;
+    }
+</style>
+{% endblock %}
+
+{% block budget_content %}
+<div class="mb-4 animate__animated animate__fadeIn">
+    <!-- Encabezado de la página -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="fa-solid fa-magnifying-glass-chart me-2 text-success"></i>Consulta de Partidas
+            </h2>
+            <p class="text-muted small mb-0">Búsqueda avanzada y balance consolidado del Ejercicio Económico {{ selected_year.year }}</p>
+        </div>
+        <div>
+            <a href="{% url 'budget:dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                <i class="fa-solid fa-arrow-left me-1"></i> Volver al Panel
+            </a>
+        </div>
+    </div>
+
+    <!-- Formulario de Filtros -->
+    <div class="card queries-card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <h6 class="text-uppercase text-muted fw-bold small mb-3"><i class="fa-solid fa-filter me-1"></i> Filtros de Búsqueda</h6>
+            <form method="get" action="" id="queries-filter-form">
+                <!-- Conservar ejercicio fiscal seleccionado -->
+                <input type="hidden" name="fiscal_year" value="{{ selected_year.id }}">
+                <div class="row g-2 align-items-end">
+
+                    <!-- Selector de Ejercicio (normal, única opción) -->
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Ejercicio Fiscal</label>
+                        <select name="fiscal_year" id="fiscal_year" class="form-select form-select-sm rounded-pill" onchange="this.form.submit()">
+                            {% for y in fiscal_years %}
+                                <option value="{{ y.id }}" {% if selected_year.id == y.id %}selected{% endif %}>
+                                    {{ y.year }}{% if y.status == 'OPEN' %} (Activo){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Multi-select FF -->
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Fuente (FF)</label>
+                        <div class="ms-dropdown" id="msd-ff">
+                            <button type="button" class="ms-toggle" onclick="toggleMsDropdown('msd-ff')">
+                                {% if selected_ff_ids %}{{ selected_ff_ids|length }} selec.<span class="badge-count">{{ selected_ff_ids|length }}</span>{% else %}-- Todas --{% endif %}
+                            </button>
+                            <div class="ms-menu" id="msd-ff-menu">
+                                {% for f in ffs %}
+                                <label>
+                                    <input type="checkbox" name="ff" value="{{ f.id }}"
+                                        {% if f.id|stringformat:"i" in selected_ff_ids %}checked{% endif %}>
+                                    {{ f.code }}
+                                </label>
+                                {% endfor %}
+                                <button type="button" class="btn btn-sm btn-primary ms-apply" onclick="submitMsForm()">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-select Programa -->
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Programa</label>
+                        <div class="ms-dropdown" id="msd-prog">
+                            <button type="button" class="ms-toggle" onclick="toggleMsDropdown('msd-prog')">
+                                {% if selected_prog_ids %}{{ selected_prog_ids|length }} selec.<span class="badge-count">{{ selected_prog_ids|length }}</span>{% else %}-- Todos --{% endif %}
+                            </button>
+                            <div class="ms-menu" id="msd-prog-menu">
+                                {% for p in programas %}
+                                <label>
+                                    <input type="checkbox" name="programa" value="{{ p.id }}"
+                                        {% if p.id|stringformat:"i" in selected_prog_ids %}checked{% endif %}>
+                                    {{ p.code }} - {{ p.name|truncatechars:30 }}
+                                </label>
+                                {% endfor %}
+                                <button type="button" class="btn btn-sm btn-primary ms-apply" onclick="submitMsForm()">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-select Subprograma -->
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Subprog.</label>
+                        <div class="ms-dropdown" id="msd-subprog">
+                            <button type="button" class="ms-toggle" onclick="toggleMsDropdown('msd-subprog')">
+                                {% if selected_subprog_ids %}{{ selected_subprog_ids|length }} selec.<span class="badge-count">{{ selected_subprog_ids|length }}</span>{% else %}-- Todos --{% endif %}
+                            </button>
+                            <div class="ms-menu" id="msd-subprog-menu">
+                                {% for sp in subprogramas %}
+                                <label>
+                                    <input type="checkbox" name="subprog" value="{{ sp.id }}"
+                                        {% if sp.id|stringformat:"i" in selected_subprog_ids %}checked{% endif %}>
+                                    {{ sp.code }} - {{ sp.name|truncatechars:28 }}
+                                </label>
+                                {% endfor %}
+                                <button type="button" class="btn btn-sm btn-primary ms-apply" onclick="submitMsForm()">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-select Inciso -->
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Inciso (INC)</label>
+                        <div class="ms-dropdown" id="msd-inc">
+                            <button type="button" class="ms-toggle" onclick="toggleMsDropdown('msd-inc')">
+                                {% if selected_inc_ids %}{{ selected_inc_ids|length }} selec.<span class="badge-count">{{ selected_inc_ids|length }}</span>{% else %}-- Todos --{% endif %}
+                            </button>
+                            <div class="ms-menu" id="msd-inc-menu">
+                                {% for i in incisos %}
+                                <label>
+                                    <input type="checkbox" name="inc" value="{{ i.id }}"
+                                        {% if i.id|stringformat:"i" in selected_inc_ids %}checked{% endif %}>
+                                    {{ i.code }} - {{ i.name|truncatechars:28 }}
+                                </label>
+                                {% endfor %}
+                                <button type="button" class="btn btn-sm btn-primary ms-apply" onclick="submitMsForm()">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multi-select Subparcial -->
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Subparcial (SUBPC)</label>
+                        <div class="ms-dropdown" id="msd-preinc">
+                            <button type="button" class="ms-toggle" onclick="toggleMsDropdown('msd-preinc')">
+                                {% if selected_pre_inc_ids %}{{ selected_pre_inc_ids|length }} selec.<span class="badge-count">{{ selected_pre_inc_ids|length }}</span>{% else %}-- Todos --{% endif %}
+                            </button>
+                            <div class="ms-menu" id="msd-preinc-menu">
+                                {% for pi in pre_incs %}
+                                <label>
+                                    <input type="checkbox" name="pre_inc" value="{{ pi.id }}"
+                                        {% if pi.id|stringformat:"i" in selected_pre_inc_ids %}checked{% endif %}>
+                                    {{ pi.code }} - {{ pi.name|truncatechars:24 }}
+                                </label>
+                                {% endfor %}
+                                <button type="button" class="btn btn-sm btn-primary ms-apply" onclick="submitMsForm()">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                {% if has_active_filters %}
+                <div class="d-flex justify-content-end mt-3">
+                    <a href="?" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                        <i class="fa-solid fa-filter-circle-xmark me-1"></i> Limpiar Filtros
+                    </a>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Tarjetas de Resumen KPI (Balances) -->
+    <div class="row g-3 mb-4">
+        <!-- Asignado COAA -->
+        <div class="col-md-4">
+            <div class="card card-kpi shadow-sm bg-white border-start border-success border-4 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-uppercase text-muted fw-bold small">Asignado COAA</span>
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle p-2">
+                            <i class="fa-solid fa-vault fs-5"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold text-success font-monospace-num mb-1">
+                        ${{ totals.asignado_coaa|floatformat:0|localize }}
+                    </h3>
+                    <p class="text-muted small mb-0">Crédito total asignado al organismo central</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Asignado Destinos -->
+        <div class="col-md-4">
+            <div class="card card-kpi shadow-sm bg-white border-start border-primary border-4 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-uppercase text-muted fw-bold small">Asignado a Destinos</span>
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2">
+                            <i class="fa-solid fa-diagram-project fs-5"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold text-primary font-monospace-num mb-1">
+                        ${{ totals.asignado_destinos|floatformat:0|localize }}
+                    </h3>
+                    <p class="text-muted small mb-0">Monto total distribuido a las unidades</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Falta Asignar -->
+        <div class="col-md-4">
+            <div class="card card-kpi shadow-sm bg-white border-start {% if totals.falta_asignar < 0 %}border-danger{% else %}border-warning{% endif %} border-4 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-uppercase text-muted fw-bold small">Falta Asignar</span>
+                        <div class="bg-warning bg-opacity-10 text-warning rounded-circle p-2">
+                            <i class="fa-solid fa-clock-rotate-left fs-5"></i>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold {% if totals.falta_asignar < 0 %}text-danger{% else %}text-warning{% endif %} font-monospace-num mb-1">
+                        ${{ totals.falta_asignar|floatformat:0|localize }}
+                    </h3>
+                    <p class="text-muted small mb-0">Fondo de reserva remanente en COAA</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Resultados -->
+    <div class="card queries-card shadow-sm border-0 overflow-hidden">
+        <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list me-1"></i> Partidas Encontradas</h5>
+                <div class="input-group" style="max-width: 320px;">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                    </span>
+                    <input type="search" id="queries-table-search" class="form-control border-start-0 rounded-end-pill" placeholder="Buscar en resultados..." autocomplete="off">
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-responsive" style="max-height: 55vh; overflow-y: auto;">
+            <table class="table table-hover align-middle mb-0 queries-table" id="queries-table">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-start ps-3">Fuente (FF)</th>
+                        <th class="text-start">Prog.</th>
+                        <th class="text-start">Subprog.</th>
+                        <th class="text-start">Inciso</th>
+                        <th class="text-start">Subparcial (SUBPC)</th>
+                        <th class="text-end">Asignado COAA</th>
+                        <th class="text-end">Asignado Destinos</th>
+                        <th class="text-end pe-3">Falta Asignar</th>
+                    </tr>
+                </thead>
+                <tbody class="font-monospace-num">
+                    {% for r in rows %}
+                    <tr class="searchable-row">
+                        <td class="text-start ps-3"><span class="badge bg-light text-dark border">{{ r.ff_code }}</span> <span class="text-muted small d-none d-lg-inline">{{ r.ff_name }}</span></td>
+                        <td class="text-start fw-bold text-secondary" title="{{ r.prog_name }}">{{ r.prog_code }}</td>
+                        <td class="text-start text-secondary" title="{{ r.subprog_name }}">{{ r.subprog_code }}</td>
+                        <td class="text-start fw-bold text-dark" title="{{ r.inc_name }}">{{ r.inc_code }}</td>
+                        <td class="text-start fw-bold text-dark">{{ r.pre_inc_code }} - <span class="text-muted small">{{ r.pre_inc_name }}</span></td>
+                        <td class="text-end fw-bold text-success">${{ r.asignado_coaa|floatformat:0|localize }}</td>
+                        <td class="text-end fw-bold text-primary"
+                            data-bs-toggle="tooltip" 
+                            data-bs-html="true" 
+                            data-bs-placement="left" 
+                            title="{{ r.allocations_tooltip }}" 
+                            style="cursor: help; text-decoration: underline dashed #0d6efd 1px;">
+                            ${{ r.asignado_destinos|floatformat:0|localize }}
+                        </td>
+                        <td class="text-end pe-3 fw-bold {% if r.falta_asignar < 0 %}text-danger{% else %}text-warning{% endif %}">${{ r.falta_asignar|floatformat:0|localize }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-ban fs-2 mb-2 text-opacity-25"></i>
+                            <p class="mb-0">No se encontraron partidas para la combinación de filtros seleccionada.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if rows %}
+                <tfoot class="totals-row font-monospace-num">
+                    <tr>
+                        <td colspan="5" class="text-end ps-3 border-0">TOTALES GENERALES:</td>
+                        <td class="text-end border-0 text-success">${{ totals.asignado_coaa|floatformat:0|localize }}</td>
+                        <td class="text-end border-0 text-primary">${{ totals.asignado_destinos|floatformat:0|localize }}</td>
+                        <td class="text-end pe-3 border-0 {% if totals.falta_asignar < 0 %}text-danger{% else %}text-warning{% endif %}">${{ totals.falta_asignar|floatformat:0|localize }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Buscador interactivo local en la tabla
+    document.getElementById('queries-table-search').addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#queries-table tbody .searchable-row');
+        
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            if (text.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    // Inicializar tooltips de Bootstrap en la columna Asignado Destinos
+    const tooltipEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipEls.forEach(el => {
+        new bootstrap.Tooltip(el, {
+            trigger: 'hover',
+            boundary: 'window',
+            customClass: 'queries-alloc-tooltip'
+        });
+    });
+
+    // ── Multi-select dropdowns ───────────────────────────────────────────
+    function toggleMsDropdown(id) {
+        const wrapper = document.getElementById(id);
+        const menu = wrapper.querySelector('.ms-menu');
+        const btn = wrapper.querySelector('.ms-toggle');
+        const isOpen = menu.classList.contains('open');
+        // Cerrar todos los demás primero
+        document.querySelectorAll('.ms-menu.open').forEach(m => m.classList.remove('open'));
+        document.querySelectorAll('.ms-toggle.active').forEach(b => b.classList.remove('active'));
+        if (!isOpen) {
+            menu.classList.add('open');
+            btn.classList.add('active');
+        }
+    }
+
+    function submitMsForm() {
+        // Cerrar todos los menús antes de enviar
+        document.querySelectorAll('.ms-menu.open').forEach(m => m.classList.remove('open'));
+        // Eliminar el hidden de fiscal_year duplicado porque el select real ya lo envía
+        const hiddenFY = document.querySelector('input[type=hidden][name=fiscal_year]');
+        if (hiddenFY) hiddenFY.disabled = true;
+        document.getElementById('queries-filter-form').submit();
+    }
+
+    // Cerrar menús al hacer click fuera
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.ms-dropdown')) {
+            document.querySelectorAll('.ms-menu.open').forEach(m => m.classList.remove('open'));
+            document.querySelectorAll('.ms-toggle.active').forEach(b => b.classList.remove('active'));
+        }
+    });
+</script>
+{% endblock %}

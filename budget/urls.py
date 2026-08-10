@@ -70,4 +70,5 @@ urlpatterns = [
     path('consolidation/', views.budget_consolidation, name='consolidation'),
     path('consolidation/export/', views.export_consolidation_csv, name='export_consolidation_csv'),
     path('consolidation/save-backup/', views.save_budget_backup, name='save_budget_backup'),
+    path('queries/', views.budget_queries, name='queries'),
 ]

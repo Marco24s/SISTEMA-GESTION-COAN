@@ -2086,6 +2086,39 @@ def budget_consolidation(request):
                     tooltip_lines.append("<i>Sin distribución a unidades</i>")
                 allocations_tooltip = "<br/>".join(tooltip_lines)
 
+                # Calcular desglose por destino (Respaldo, Asignación, Com + Dev, Saldo, Falta Asignar) para la tabla interactiva
+                pi_backups = {b.unit_id: b.amount for b in BudgetUnitBackup.objects.filter(fiscal_year=fiscal_year, pre_inc=pi)}
+                pi_allocs = {ua['unit_id']: ua['total'] for ua in BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    credit__pre_inc=pi
+                ).values('unit_id').annotate(total=Sum('allocated_amount'))}
+                pi_spent = {ua['unit_id']: ua['total'] for ua in BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    credit__pre_inc=pi
+                ).values('unit_id').annotate(total=Sum('spent_amount'))}
+                
+                all_u_ids = set(pi_backups.keys()) | set(pi_allocs.keys())
+                unit_breakdown = []
+                if all_u_ids:
+                    from core.models import Unit
+                    relevant_units = Unit.objects.filter(id__in=all_u_ids).order_by('name')
+                    for u in relevant_units:
+                        u_respaldo = pi_backups.get(u.id, Decimal('0.00'))
+                        u_asig = pi_allocs.get(u.id, Decimal('0.00'))
+                        u_spent = pi_spent.get(u.id, Decimal('0.00'))
+                        u_saldo = u_asig - u_spent
+                        u_falta = max(Decimal('0.00'), u_respaldo - u_asig)
+                        unit_breakdown.append({
+                            'unit_name': u.name,
+                            'respaldo': float(u_respaldo),
+                            'asignacion': float(u_asig),
+                            'com_dev': float(u_spent),
+                            'saldo': float(u_saldo),
+                            'falta_asignar': float(u_falta)
+                        })
+                import json
+                unit_breakdown_json = json.dumps(unit_breakdown)
+
                 row_data = {
                     'category': pi.name if pi.name else pi.code,
                     'code': pi.code,
@@ -2098,7 +2131,8 @@ def budget_consolidation(request):
                     'reserva': reserva,
                     'com_dev': com_dev,
                     'saldo_disponible': saldo_disponible,
-                    'allocations_tooltip': allocations_tooltip
+                    'allocations_tooltip': allocations_tooltip,
+                    'breakdown_json': unit_breakdown_json
                 }
                 rows.append(row_data)
                 
@@ -2140,6 +2174,39 @@ def budget_consolidation(request):
                 tooltip_lines_un.append("<i>Sin distribución a unidades</i>")
             allocations_tooltip_un = "<br/>".join(tooltip_lines_un)
 
+            # Cargar respaldos de pre_inc = None
+            pi_backups_un = {b.unit_id: b.amount for b in BudgetUnitBackup.objects.filter(fiscal_year=fiscal_year, pre_inc=None)}
+            pi_allocs_un = {ua['unit_id']: ua['total'] for ua in BudgetAllocation.objects.filter(
+                credit__fiscal_year=fiscal_year,
+                credit__pre_inc=None
+            ).values('unit_id').annotate(total=Sum('allocated_amount'))}
+            pi_spent_un = {ua['unit_id']: ua['total'] for ua in BudgetAllocation.objects.filter(
+                credit__fiscal_year=fiscal_year,
+                credit__pre_inc=None
+            ).values('unit_id').annotate(total=Sum('spent_amount'))}
+            
+            all_u_ids_un = set(pi_backups_un.keys()) | set(pi_allocs_un.keys())
+            unit_breakdown_un = []
+            if all_u_ids_un:
+                from core.models import Unit
+                relevant_units_un = Unit.objects.filter(id__in=all_u_ids_un).order_by('name')
+                for u in relevant_units_un:
+                    u_respaldo = pi_backups_un.get(u.id, Decimal('0.00'))
+                    u_asig = pi_allocs_un.get(u.id, Decimal('0.00'))
+                    u_spent = pi_spent_un.get(u.id, Decimal('0.00'))
+                    u_saldo = u_asig - u_spent
+                    u_falta = max(Decimal('0.00'), u_respaldo - u_asig)
+                    unit_breakdown_un.append({
+                        'unit_name': u.name,
+                        'respaldo': float(u_respaldo),
+                        'asignacion': float(u_asig),
+                        'com_dev': float(u_spent),
+                        'saldo': float(u_saldo),
+                        'falta_asignar': float(u_falta)
+                    })
+            import json
+            unit_breakdown_json_un = json.dumps(unit_breakdown_un)
+
             row_data = {
                 'category': 'Sin Clasificar / Otros',
                 'code': 'S/C',
@@ -2152,7 +2219,8 @@ def budget_consolidation(request):
                 'reserva': reserva_un,
                 'com_dev': com_dev_un,
                 'saldo_disponible': saldo_disponible_un,
-                'allocations_tooltip': allocations_tooltip_un
+                'allocations_tooltip': allocations_tooltip_un,
+                'breakdown_json': unit_breakdown_json_un
             }
             rows.append(row_data)
             totals['foxtrot'] += foxtrot_un
@@ -2364,4 +2432,240 @@ def save_budget_backup(request):
         
     return redirect('budget:consolidation')
 
+
+@login_required
+def budget_queries(request):
+    from .models import BudgetFiscalYear, BudgetFF, BudgetProg, BudgetSubprog, BudgetInc, BudgetPreInc, BudgetCredit, BudgetAllocation
+    from django.db.models import Sum
+    from decimal import Decimal
+    
+    def safe_int_list(values):
+        """Convierte una lista de strings a lista de enteros, ignorando valores inválidos."""
+        result = []
+        for v in values:
+            try:
+                result.append(int(v))
+            except (ValueError, TypeError):
+                pass
+        return result
+    
+    # 1. Obtener ejercicios
+    fiscal_years = BudgetFiscalYear.objects.all().order_by('-year')
+    active_year = BudgetFiscalYear.objects.filter(status='OPEN').first() or fiscal_years.first()
+    
+    fy_id = request.GET.get('fiscal_year')
+    if fy_id:
+        try:
+            selected_year = BudgetFiscalYear.objects.get(id=int(fy_id))
+        except (ValueError, BudgetFiscalYear.DoesNotExist):
+            selected_year = active_year
+    else:
+        selected_year = active_year
+
+    # 2. Cargar listas para filtros dinámicos (encadenados) — soporte multi-selección
+    
+    # A. FFs disponibles en el ejercicio
+    ff_ids_available = BudgetCredit.objects.filter(fiscal_year=selected_year).values_list('ff_id', flat=True).distinct()
+    ffs = BudgetFF.objects.filter(id__in=ff_ids_available).order_by('code')
+    
+    raw_ff_ids = safe_int_list(request.GET.getlist('ff'))
+    selected_ff_ids = [x for x in raw_ff_ids if ffs.filter(id=x).exists()]
+    
+    # B. Programas disponibles según FFs seleccionados
+    prog_qs = BudgetCredit.objects.filter(fiscal_year=selected_year)
+    if selected_ff_ids:
+        prog_qs = prog_qs.filter(ff_id__in=selected_ff_ids)
+    prog_ids_available = prog_qs.values_list('programa_id', flat=True).distinct()
+    programas = BudgetProg.objects.filter(id__in=prog_ids_available).order_by('code')
+    
+    raw_prog_ids = safe_int_list(request.GET.getlist('programa'))
+    selected_prog_ids = [x for x in raw_prog_ids if programas.filter(id=x).exists()]
+    
+    # C. Subprogramas disponibles según FFs y Programas seleccionados
+    subprog_qs = BudgetCredit.objects.filter(fiscal_year=selected_year)
+    if selected_ff_ids:
+        subprog_qs = subprog_qs.filter(ff_id__in=selected_ff_ids)
+    if selected_prog_ids:
+        subprog_qs = subprog_qs.filter(programa_id__in=selected_prog_ids)
+    subprog_ids_available = subprog_qs.values_list('subprog_id', flat=True).distinct()
+    subprogramas = BudgetSubprog.objects.filter(id__in=subprog_ids_available).order_by('code')
+    
+    raw_subprog_ids = safe_int_list(request.GET.getlist('subprog'))
+    selected_subprog_ids = [x for x in raw_subprog_ids if subprogramas.filter(id=x).exists()]
+    
+    # D. Incisos disponibles según filtros anteriores
+    inc_qs = BudgetCredit.objects.filter(fiscal_year=selected_year)
+    if selected_ff_ids:
+        inc_qs = inc_qs.filter(ff_id__in=selected_ff_ids)
+    if selected_prog_ids:
+        inc_qs = inc_qs.filter(programa_id__in=selected_prog_ids)
+    if selected_subprog_ids:
+        inc_qs = inc_qs.filter(subprog_id__in=selected_subprog_ids)
+    inc_ids_available = inc_qs.values_list('inc_id', flat=True).distinct()
+    incisos = BudgetInc.objects.filter(id__in=inc_ids_available).order_by('code')
+    
+    raw_inc_ids = safe_int_list(request.GET.getlist('inc'))
+    selected_inc_ids = [x for x in raw_inc_ids if incisos.filter(id=x).exists()]
+    
+    # E. Subparciales disponibles según filtros anteriores
+    pre_inc_qs = BudgetCredit.objects.filter(fiscal_year=selected_year)
+    if selected_ff_ids:
+        pre_inc_qs = pre_inc_qs.filter(ff_id__in=selected_ff_ids)
+    if selected_prog_ids:
+        pre_inc_qs = pre_inc_qs.filter(programa_id__in=selected_prog_ids)
+    if selected_subprog_ids:
+        pre_inc_qs = pre_inc_qs.filter(subprog_id__in=selected_subprog_ids)
+    if selected_inc_ids:
+        pre_inc_qs = pre_inc_qs.filter(inc_id__in=selected_inc_ids)
+    pre_inc_ids_available = pre_inc_qs.values_list('pre_inc_id', flat=True).distinct()
+    pre_incs = BudgetPreInc.objects.filter(id__in=pre_inc_ids_available).order_by('code')
+    
+    raw_pre_inc_ids = safe_int_list(request.GET.getlist('pre_inc'))
+    selected_pre_inc_ids = [x for x in raw_pre_inc_ids if pre_incs.filter(id=x).exists()]
+    
+    # 3. Iniciar querysets base y aplicar filtros multi-selección
+    credits_qs = BudgetCredit.objects.filter(fiscal_year=selected_year)
+    allocations_qs = BudgetAllocation.objects.filter(credit__fiscal_year=selected_year)
+    
+    if selected_ff_ids:
+        credits_qs = credits_qs.filter(ff_id__in=selected_ff_ids)
+        allocations_qs = allocations_qs.filter(credit__ff_id__in=selected_ff_ids)
+        
+    if selected_prog_ids:
+        credits_qs = credits_qs.filter(programa_id__in=selected_prog_ids)
+        allocations_qs = allocations_qs.filter(credit__programa_id__in=selected_prog_ids)
+        
+    if selected_subprog_ids:
+        credits_qs = credits_qs.filter(subprog_id__in=selected_subprog_ids)
+        allocations_qs = allocations_qs.filter(credit__subprog_id__in=selected_subprog_ids)
+            
+    if selected_inc_ids:
+        credits_qs = credits_qs.filter(inc_id__in=selected_inc_ids)
+        allocations_qs = allocations_qs.filter(credit__inc_id__in=selected_inc_ids)
+            
+    if selected_pre_inc_ids:
+        credits_qs = credits_qs.filter(pre_inc_id__in=selected_pre_inc_ids)
+        allocations_qs = allocations_qs.filter(credit__pre_inc_id__in=selected_pre_inc_ids)
+            
+    # 4. Agrupar créditos y asignaciones por combinación única de (ff, programa, subprog, inc, pre_inc)
+    credit_data = credits_qs.values(
+        'ff_id', 'ff__code', 'ff__name',
+        'programa_id', 'programa__code', 'programa__name',
+        'subprog_id', 'subprog__code', 'subprog__name',
+        'inc_id', 'inc__code', 'inc__name',
+        'pre_inc_id', 'pre_inc__code', 'pre_inc__name'
+    ).annotate(total_credit=Sum('total_amount'))
+    
+    alloc_data = allocations_qs.values(
+        'credit__ff_id', 'credit__programa_id', 'credit__subprog_id', 'credit__inc_id', 'credit__pre_inc_id'
+    ).annotate(total_alloc=Sum('allocated_amount'))
+    
+    # Consulta de asignaciones por unidad para armar los tooltips
+    alloc_units_data = allocations_qs.values(
+        'credit__ff_id', 'credit__programa_id', 'credit__subprog_id', 'credit__inc_id', 'credit__pre_inc_id',
+        'unit__name'
+    ).annotate(total_unit=Sum('allocated_amount')).order_by('-total_unit')
+    
+    unit_distributions = {}
+    for au in alloc_units_data:
+        key = (au['credit__ff_id'], au['credit__programa_id'], au['credit__subprog_id'], au['credit__inc_id'], au['credit__pre_inc_id'])
+        if key not in unit_distributions:
+            unit_distributions[key] = []
+        if au['total_unit'] > 0:
+            unit_distributions[key].append({
+                'unit_name': au['unit__name'],
+                'amount': float(au['total_unit'])
+            })
+            
+    # 5. Mapear y consolidar la información
+    row_map = {}
+    
+    def build_tooltip(key):
+        dist_list = unit_distributions.get(key, [])
+        tooltip_lines = ["<b>Distribución por Destino:</b>"]
+        for d in dist_list:
+            monto = f"{d['amount']:,.0f}".replace(",", ".")
+            tooltip_lines.append(f"• {d['unit_name']}: ${monto}")
+        if len(tooltip_lines) == 1:
+            tooltip_lines.append("<i>Sin distribución a unidades</i>")
+        return "<br/>".join(tooltip_lines)
+    
+    for c in credit_data:
+        key = (c['ff_id'], c['programa_id'], c['subprog_id'], c['inc_id'], c['pre_inc_id'])
+        row_map[key] = {
+            'ff_code': c['ff__code'] or 'N/A',
+            'ff_name': c['ff__name'] or 'Sin FF',
+            'prog_code': c['programa__code'] or 'N/A',
+            'prog_name': c['programa__name'] or 'Sin Programa',
+            'subprog_code': c['subprog__code'] or 'N/A',
+            'subprog_name': c['subprog__name'] or 'Sin Subprog',
+            'inc_code': c['inc__code'] or 'S/C',
+            'inc_name': c['inc__name'] or 'Sin Clasificar',
+            'pre_inc_code': c['pre_inc__code'] or 'S/C',
+            'pre_inc_name': c['pre_inc__name'] or 'Sin Clasificar',
+            'asignado_coaa': c['total_credit'] or Decimal('0.00'),
+            'asignado_destinos': Decimal('0.00'),
+            'falta_asignar': c['total_credit'] or Decimal('0.00'),
+            'allocations_tooltip': build_tooltip(key)
+        }
+        
+    for a in alloc_data:
+        key = (a['credit__ff_id'], a['credit__programa_id'], a['credit__subprog_id'], a['credit__inc_id'], a['credit__pre_inc_id'])
+        if key not in row_map:
+            ff_obj = BudgetFF.objects.filter(id=a['credit__ff_id']).first()
+            prog_obj = BudgetProg.objects.filter(id=a['credit__programa_id']).first()
+            subprog_obj = BudgetSubprog.objects.filter(id=a['credit__subprog_id']).first()
+            inc_obj = BudgetInc.objects.filter(id=a['credit__inc_id']).first()
+            pre_inc_obj = BudgetPreInc.objects.filter(id=a['credit__pre_inc_id']).first()
+            row_map[key] = {
+                'ff_code': ff_obj.code if ff_obj else 'N/A',
+                'ff_name': ff_obj.name if ff_obj else 'Sin FF',
+                'prog_code': prog_obj.code if prog_obj else 'N/A',
+                'prog_name': prog_obj.name if prog_obj else 'Sin Programa',
+                'subprog_code': subprog_obj.code if subprog_obj else 'N/A',
+                'subprog_name': subprog_obj.name if subprog_obj else 'Sin Subprog',
+                'inc_code': inc_obj.code if inc_obj else 'S/C',
+                'inc_name': inc_obj.name if inc_obj else 'Sin Clasificar',
+                'pre_inc_code': pre_inc_obj.code if pre_inc_obj else 'S/C',
+                'pre_inc_name': pre_inc_obj.name if pre_inc_obj else 'Sin Clasificar',
+                'asignado_coaa': Decimal('0.00'),
+                'asignado_destinos': a['total_alloc'] or Decimal('0.00'),
+                'falta_asignar': - (a['total_alloc'] or Decimal('0.00')),
+                'allocations_tooltip': build_tooltip(key)
+            }
+        else:
+            row_map[key]['asignado_destinos'] = a['total_alloc'] or Decimal('0.00')
+            row_map[key]['falta_asignar'] = row_map[key]['asignado_coaa'] - row_map[key]['asignado_destinos']
+            
+    # Convertir a lista y ordenar por FF, Prog, Subprog, Inc, PreInc
+    rows = list(row_map.values())
+    rows.sort(key=lambda r: (r['ff_code'], r['prog_code'], r['subprog_code'], r['inc_code'], r['pre_inc_code']))
+    
+    # 6. Calcular totales generales
+    totals = {
+        'asignado_coaa': sum(r['asignado_coaa'] for r in rows),
+        'asignado_destinos': sum(r['asignado_destinos'] for r in rows),
+        'falta_asignar': sum(r['falta_asignar'] for r in rows),
+    }
+    
+    # Convertir selected ids a strings para comparación en el template
+    context = {
+        'fiscal_years': fiscal_years,
+        'selected_year': selected_year,
+        'ffs': ffs,
+        'programas': programas,
+        'subprogramas': subprogramas,
+        'incisos': incisos,
+        'pre_incs': pre_incs,
+        'selected_ff_ids': [str(x) for x in selected_ff_ids],
+        'selected_prog_ids': [str(x) for x in selected_prog_ids],
+        'selected_subprog_ids': [str(x) for x in selected_subprog_ids],
+        'selected_inc_ids': [str(x) for x in selected_inc_ids],
+        'selected_pre_inc_ids': [str(x) for x in selected_pre_inc_ids],
+        'has_active_filters': bool(selected_ff_ids or selected_prog_ids or selected_subprog_ids or selected_inc_ids or selected_pre_inc_ids),
+        'rows': rows,
+        'totals': totals
+    }
+    
+    return render(request, 'budget/queries.html', context)
 
