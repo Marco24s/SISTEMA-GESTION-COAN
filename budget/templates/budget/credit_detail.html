@@ -90,7 +90,16 @@
                     <div class="bg-info bg-opacity-25 rounded-3 p-3 flex-fill text-center border border-info border-opacity-50 shadow-sm" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(13, 202, 240, 0.35)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(13, 202, 240, 0.25)'">
                         <div class="text-white small text-uppercase mb-1 fw-bold tracking-wider" style="font-size: 0.65rem;">SUBPC</div>
                         <div class="fw-bolder fs-5 text-white" style="text-shadow: 0 2px 4px rgba(0,0,0,0.2);">{{ credit.pre_inc.code|default:"--" }}</div>
+                        {% if credit.pre_inc_display %}
+                        <div class="mt-1">
+                            <span class="badge bg-warning text-dark small" style="font-size: 0.6rem;"
+                                  data-bs-toggle="tooltip" title="Reclasificado visualmente como {{ credit.pre_inc_display.code }} en la tabla consolidada">
+                                <i class="fa-solid fa-arrow-right-arrow-left me-1"></i>{{ credit.pre_inc_display.code }}
+                            </span>
+                        </div>
+                        {% endif %}
                     </div>
+
 
                     <!-- Moneda -->
                     <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-fill text-center" style="backdrop-filter: blur(10px); transition: transform 0.2s, background 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-3px)'; this.style.backgroundColor='rgba(255,255,255,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.backgroundColor='rgba(255,255,255,0.1)'">
@@ -204,6 +213,9 @@
             </a>
             <a href="{% url 'budget:credit_adjust' credit.id %}" class="btn btn-outline-info rounded-pill py-2 shadow-sm">
                 <i class="fa-solid fa-pen-to-square me-2"></i>Ajustar Montos
+            </a>
+            <a href="{% url 'budget:credit_splits_manage' credit.id %}" class="btn btn-outline-warning rounded-pill py-2 shadow-sm">
+                <i class="fa-solid fa-code-branch me-2"></i>Gestionar Reclasificaciones
             </a>
         </div>
         {% endif %}

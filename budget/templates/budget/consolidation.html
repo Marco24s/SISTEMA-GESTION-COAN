@@ -69,14 +69,19 @@
 
 {% block budget_content %}
 <div class="mb-4 animate__animated animate__fadeIn">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-end mb-4">
         <div>
-            <h1 class="h3 mb-1">Consolidado por Inciso / Subparcial</h1>
-            <p class="text-muted small mb-0">Resumen y monitoreo del Ejercicio Económico {{ fiscal_year.year }}</p>
+            <h1 class="h3 mb-2"><i class="fa-solid fa-table-list text-primary me-2"></i>Consolidado por Inciso (COAA)</h1>
+            <p class="text-muted mb-0">Vista global de créditos, distribuciones y reservas</p>
         </div>
         <div class="d-flex gap-2">
-            <a href="{% url 'budget:export_consolidation_csv' %}" class="btn btn-success btn-sm rounded-pill px-3 shadow-sm">
-                <i class="fa-solid fa-file-excel me-1"></i> Exportar a Excel (CSV)
+            {% if is_admin %}
+            <a href="{% url 'budget:foxtrot_ceilings_manage' %}?fiscal_year={{ fiscal_year.id }}" class="btn btn-outline-primary rounded-pill px-4 shadow-sm fw-bold">
+                <i class="fa-solid fa-arrow-up-right-dots me-2"></i>Techos Foxtrot
+            </a>
+            {% endif %}
+            <a href="{% url 'budget:export_consolidation_csv' %}?fiscal_year={{ fiscal_year.id }}" class="btn btn-outline-success rounded-pill px-4 shadow-sm fw-bold">
+                <i class="fa-solid fa-file-excel me-2"></i>Exportar Excel
             </a>
             <a href="{% url 'budget:dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
                 <i class="fa-solid fa-arrow-left me-1"></i> Volver al Panel

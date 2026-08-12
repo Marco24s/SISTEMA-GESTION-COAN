@@ -1,0 +1,59 @@
+﻿{% extends "budget/base_budget.html" %}
+{% load l10n %}
+
+{% block budget_content %}
+<div class="animate__animated animate__fadeIn">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1"><i class="fa-solid fa-arrow-up-right-dots text-primary me-2"></i>Techos Foxtrot</h1>
+            <p class="text-muted small mb-0">Definí manualmente el monto total de Foxtrot (FF11) para cada fila del consolidado</p>
+        </div>
+        <a href="{% url 'budget:consolidation' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver al Consolidado
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 p-4">
+        <form method="post">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 30%">Inciso / Subparcial</th>
+                            <th>Techo Foxtrot ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr>
+                            <td class="fw-bold">
+                                {% if row.code == 'Sin Clasificar' %}
+                                <span class="badge bg-secondary">{{ row.code }}</span>
+                                {% else %}
+                                {{ row.code }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">$</span>
+                                    <input type="number" step="0.01" min="0" class="form-control font-monospace" name="ceiling_{{ row.id }}" value="{{ row.amount|unlocalize }}">
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="d-flex justify-content-end mt-4">
+                <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold">
+                    <i class="fa-solid fa-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

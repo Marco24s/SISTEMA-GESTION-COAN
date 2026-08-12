@@ -67,7 +67,7 @@ class BudgetCreditForm(forms.ModelForm):
         model = BudgetCredit
         fields = [
             'fiscal_year', 'credit_type', 'ff', 'programa', 'subprog', 'inc',
-            'ppp_inc', 'pp_inc', 'pre_inc', 'incisos_agrupado',
+            'ppp_inc', 'pp_inc', 'pre_inc', 'pre_inc_display', 'incisos_agrupado',
             'q1_amount', 'q2_amount', 'q3_amount', 'q4_amount', 'notes'
         ]
         labels = {
@@ -79,7 +79,8 @@ class BudgetCreditForm(forms.ModelForm):
             'inc': 'INCISO',
             'ppp_inc': 'PPAL',
             'pp_inc': 'PARCIAL',
-            'pre_inc': 'SUBPC',
+            'pre_inc': 'SUBPC (original)',
+            'pre_inc_display': 'SUBPC Visual (reclasificación)',
             'incisos_agrupado': 'MONEDA',
             'q1_amount': 'Monto 1er Trimestre',
             'q2_amount': 'Monto 2do Trimestre',

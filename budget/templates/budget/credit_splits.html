@@ -1,0 +1,162 @@
+﻿{% extends "budget/base_budget.html" %}
+{% load l10n static %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .splits-card { border: none; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.07); }
+    .credit-info-bar { background: linear-gradient(135deg, #198754 0%, #0b422a 100%); border-radius: 12px; color: white; }
+    .split-badge { font-size: 0.75rem; padding: 0.35em 0.75em; border-radius: 20px; }
+    .progress-custom { height: 22px; border-radius: 10px; background: #e9ecef; overflow: hidden; }
+    .progress-custom .progress-bar { font-size: 0.75rem; font-weight: 600; transition: width 0.6s ease; }
+    .split-row:hover { background-color: rgba(255, 193, 7, 0.06); }
+</style>
+{% endblock %}
+
+{% block budget_content %}
+<div class="animate__animated animate__fadeIn">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1"><i class="fa-solid fa-code-branch text-warning me-2"></i>Reclasificaciones Parciales</h1>
+            <p class="text-muted small mb-0">Divide el monto de este credito entre distintas filas del consolidado</p>
+        </div>
+        <a href="{% url 'budget:credit_detail' credit.id %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver al Credito
+        </a>
+    </div>
+
+    <div class="credit-info-bar p-4 mb-4 d-flex flex-wrap gap-4 align-items-center">
+        <div>
+            <div class="small text-white-50 text-uppercase fw-bold" style="font-size:0.65rem;">SUBPC Original</div>
+            <div class="fw-bold fs-5">{{ credit.pre_inc.code|default:"Sin clasificar" }}</div>
+        </div>
+        <div>
+            <div class="small text-white-50 text-uppercase fw-bold" style="font-size:0.65rem;">Tipo de Credito</div>
+            <div class="fw-bold">{{ credit.credit_type.code|default:"--" }}</div>
+        </div>
+        <div>
+            <div class="small text-white-50 text-uppercase fw-bold" style="font-size:0.65rem;">FF</div>
+            <div class="fw-bold">{{ credit.ff.code|default:"--" }}</div>
+        </div>
+        <div class="ms-auto text-end">
+            <div class="small text-white-50 text-uppercase fw-bold" style="font-size:0.65rem;">Monto Total del Credito</div>
+            <div class="fw-bold fs-4">${{ credit.total_amount|floatformat:0|localize }}</div>
+        </div>
+    </div>
+
+    <div class="card splits-card p-4 mb-4">
+        <div class="d-flex justify-content-between mb-2">
+            <span class="small fw-bold text-muted text-uppercase">Distribucion del monto</span>
+            <span class="small text-muted">{{ pct_split }}% reclasificado</span>
+        </div>
+        <div class="progress-custom mb-3">
+            {% if pct_split > 0 %}
+            <div class="progress-bar bg-warning text-dark" style="width: {{ pct_split }}%;">${{ total_split|floatformat:0|localize }}</div>
+            {% endif %}
+        </div>
+        <div class="row text-center g-2">
+            <div class="col-4">
+                <div class="p-2 bg-light rounded-3">
+                    <div class="small text-muted fw-bold" style="font-size:0.7rem;">TOTAL CREDITO</div>
+                    <div class="fw-bold text-dark">${{ credit.total_amount|floatformat:0|localize }}</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-2 rounded-3" style="background: rgba(255,193,7,0.15);">
+                    <div class="small text-warning fw-bold" style="font-size:0.7rem;">RECLASIFICADO</div>
+                    <div class="fw-bold text-warning">${{ total_split|floatformat:0|localize }}</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-2 rounded-3" style="background: rgba(25,135,84,0.1);">
+                    <div class="small text-success fw-bold" style="font-size:0.7rem;">QUEDA EN {{ credit.pre_inc.code|default:"S/C" }}</div>
+                    <div class="fw-bold text-success">${{ remaining|floatformat:0|localize }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card splits-card p-4 h-100">
+                <h5 class="fw-bold mb-4"><i class="fa-solid fa-list text-warning me-2"></i>Reclasificaciones actuales</h5>
+                {% if splits %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>SUBPC Destino</th>
+                                <th class="text-end">Monto</th>
+                                <th>Observaciones</th>
+                                <th class="text-center" style="width:60px;">Eliminar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in splits %}
+                            <tr class="split-row">
+                                <td><span class="badge bg-warning text-dark split-badge"><i class="fa-solid fa-arrow-right me-1"></i>{{ s.pre_inc_destino.code }}</span></td>
+                                <td class="text-end fw-bold font-monospace">${{ s.amount|floatformat:0|localize }}</td>
+                                <td class="text-muted small">{{ s.notes|default:"--" }}</td>
+                                <td class="text-center">
+                                    <form method="post" action="{% url 'budget:credit_split_delete' credit.id s.id %}" onsubmit="return confirm('Eliminar esta reclasificacion?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-circle" style="width:32px;height:32px;padding:0;">
+                                            <i class="fa-solid fa-trash" style="font-size:0.75rem;"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td>Total reclasificado</td>
+                                <td class="text-end text-warning">${{ total_split|floatformat:0|localize }}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fa-solid fa-code-branch fs-2 mb-3 d-block opacity-25"></i>
+                    <p class="mb-0">Sin reclasificaciones. El credito completo aparece bajo <strong>{{ credit.pre_inc.code|default:"Sin clasificar" }}</strong>.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card splits-card p-4 h-100">
+                <h5 class="fw-bold mb-4"><i class="fa-solid fa-plus-circle text-success me-2"></i>Agregar reclasificacion</h5>
+                {% if remaining > 0 %}
+                <div class="alert alert-info small py-2 mb-3">
+                    <i class="fa-solid fa-circle-info me-1"></i>
+                    Disponible para reclasificar: <strong>${{ remaining|floatformat:0|localize }}</strong>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<div class="form-text text-muted small">{{ field.help_text }}</div>{% endif %}
+                        {% for err in field.errors %}<div class="invalid-feedback d-block small text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ err }}</div>{% endfor %}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-warning rounded-pill w-100 fw-bold">
+                        <i class="fa-solid fa-code-branch me-2"></i>Guardar Reclasificacion
+                    </button>
+                </form>
+                {% else %}
+                <div class="alert alert-warning small py-3">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                    El monto total del credito ya fue reclasificado completamente.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

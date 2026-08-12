@@ -20,6 +20,8 @@ urlpatterns = [
     path('credits/<int:pk>/unassign-type/', views.credit_unassign_type, name='credit_unassign_type'),
     path('credits/<int:pk>/detail/', views.credit_detail, name='credit_detail'),
     path('credits/<int:pk>/adjust/', views.credit_adjust, name='credit_adjust'),
+    path('credits/<int:pk>/splits/', views.credit_splits_manage, name='credit_splits_manage'),
+    path('credits/<int:pk>/splits/<int:split_pk>/delete/', views.credit_split_delete, name='credit_split_delete'),
     path('credits/<int:pk>/delete/', views.credit_delete, name='credit_delete'),
     path('credits/bulk-delete/', views.credit_bulk_delete, name='credit_bulk_delete'),
     
@@ -67,6 +69,7 @@ urlpatterns = [
     path('reclasificaciones/<int:pk>/execute/', views.allocation_reclassification_execute, name='allocation_reclassification_execute'),
     path('reclasificaciones/<int:pk>/reject/', views.allocation_reclassification_reject, name='allocation_reclassification_reject'),
     
+    path('foxtrot-ceilings/', views.foxtrot_ceilings_manage, name='foxtrot_ceilings_manage'),
     path('consolidation/', views.budget_consolidation, name='consolidation'),
     path('consolidation/export/', views.export_consolidation_csv, name='export_consolidation_csv'),
     path('consolidation/save-backup/', views.save_budget_backup, name='save_budget_backup'),

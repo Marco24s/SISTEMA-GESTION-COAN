@@ -91,6 +91,15 @@ class BudgetCredit(models.Model):
     ppp_inc = models.ForeignKey(BudgetPPPInc, on_delete=models.PROTECT, verbose_name="PPAL", null=True, blank=True)
     pp_inc = models.ForeignKey(BudgetPPInc, on_delete=models.PROTECT, verbose_name="PARCIAL", null=True, blank=True)
     pre_inc = models.ForeignKey(BudgetPreInc, on_delete=models.PROTECT, verbose_name="SUBPC", null=True, blank=True)
+    pre_inc_display = models.ForeignKey(
+        BudgetPreInc,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='credits_display',
+        verbose_name="SUBPC Visual (reclasificación)",
+        help_text="Si se completa, este crédito aparecerá bajo este subparcial en la tabla consolidada, "
+                  "en lugar de su SUBPC original. Dejar vacío para usar el SUBPC original."
+    )
     incisos_agrupado = models.ForeignKey(BudgetIncisosAgrupado, on_delete=models.PROTECT, verbose_name="MONEDA", null=True, blank=True)
     q1_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     q2_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0)
@@ -119,6 +128,56 @@ class BudgetCredit(models.Model):
     def save(self, *args, **kwargs):
         self.total_amount = self.q1_amount + self.q2_amount + self.q3_amount + self.q4_amount
         super().save(*args, **kwargs)
+
+
+class BudgetCreditSplit(models.Model):
+    """
+    Reclasificación parcial de un crédito para la tabla consolidada.
+    Permite mostrar una porción del monto de un crédito bajo un SUBPC distinto
+    al original, sin alterar el crédito ni sus distribuciones reales.
+    """
+    credit = models.ForeignKey(
+        BudgetCredit, on_delete=models.CASCADE,
+        related_name='splits', verbose_name="Crédito"
+    )
+    pre_inc_destino = models.ForeignKey(
+        BudgetPreInc, on_delete=models.PROTECT,
+        related_name='credit_splits', verbose_name="SUBPC Destino"
+    )
+    amount = models.DecimalField(
+        max_digits=18, decimal_places=2,
+        verbose_name="Monto Reclasificado"
+    )
+    notes = models.TextField(blank=True, null=True, verbose_name="Observaciones")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Reclasificación Parcial"
+        verbose_name_plural = "Reclasificaciones Parciales"
+        ordering = ['pre_inc_destino__code']
+
+    def __str__(self):
+        return f"{self.credit} → {self.pre_inc_destino.code}: ${self.amount:,.0f}"
+
+
+class BudgetFoxtrotCeiling(models.Model):
+    """
+    Techo de Foxtrot asignado manualmente a cada inciso (o sin clasificar).
+    """
+    fiscal_year = models.ForeignKey(BudgetFiscalYear, on_delete=models.CASCADE, related_name="foxtrot_ceilings")
+    pre_inc = models.ForeignKey(BudgetPreInc, on_delete=models.CASCADE, null=True, blank=True, related_name="foxtrot_ceilings")
+    amount = models.DecimalField(max_digits=18, decimal_places=2, default=0, verbose_name="Techo Foxtrot")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Techo Foxtrot"
+        verbose_name_plural = "Techos Foxtrot"
+        unique_together = ('fiscal_year', 'pre_inc')
+
+    def __str__(self):
+        inciso = self.pre_inc.code if self.pre_inc else "Sin Clasificar"
+        return f"{self.fiscal_year.year} - {inciso}: ${self.amount:,.2f}"
+
 
 class BudgetAllocation(models.Model):
     credit = models.ForeignKey(BudgetCredit, on_delete=models.PROTECT, related_name="allocations", verbose_name="Crédito Origen")
