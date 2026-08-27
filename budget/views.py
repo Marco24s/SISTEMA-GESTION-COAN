@@ -1807,10 +1807,15 @@ def classification_detail(request, pk):
         'available_to_execute': total_allocated - total_spent
     }
 
+    original_credits = BudgetCredit.objects.filter(
+        pre_inc__code=classification.name
+    ).select_related('ff', 'inc', 'pre_inc').order_by('-fiscal_year__year', '-total_amount')
+    
     return render(request, 'budget/classification_detail.html', {
         'classification': classification,
         'stats': stats,
-        'allocation_details': allocation_details
+        'allocation_details': allocation_details,
+        'original_credits': original_credits
     })
 
 
@@ -2001,7 +2006,7 @@ def budget_consolidation(request):
     if unit_id:
         selected_unit = get_object_or_404(Unit, pk=unit_id)
         
-    from .models import BudgetPreInc, BudgetCredit, BudgetAllocation, BudgetUnitBackup
+    from .models import BudgetPreInc, BudgetCredit, BudgetAllocation, BudgetUnitBackup, BudgetClassification, BudgetFoxtrotCeiling
     
     custom_order = [
         '2+3',
@@ -2022,7 +2027,17 @@ def budget_consolidation(request):
         'VERSTUARIO PACID',
     ]
     order_map = {code: i for i, code in enumerate(custom_order)}
-    pre_incs = sorted(BudgetPreInc.objects.all(), key=lambda pi: order_map.get(pi.code, 999))
+    
+    # Unificar nombres de BudgetPreInc y BudgetClassification
+    pre_incs = list(BudgetPreInc.objects.all())
+    classifications = list(BudgetClassification.objects.all())
+    
+    # Crear un diccionario para acceder rápido a los IDs si existen
+    pre_inc_map = {pi.code: pi for pi in pre_incs}
+    class_map = {c.name: c for c in classifications}
+    
+    all_codes = set([pi.code for pi in pre_incs] + [c.name for c in classifications])
+    sorted_codes = sorted(list(all_codes), key=lambda code: (order_map.get(code, 999), code))
     
     rows = []
     modal_rows = []
@@ -2040,39 +2055,41 @@ def budget_consolidation(request):
         # Cargar los respaldos guardados
         backups = {b.pre_inc_id: b.amount for b in BudgetUnitBackup.objects.filter(fiscal_year=fiscal_year, unit=selected_unit)}
         
-        # Generar lista de todos los incisos posibles para mostrar en el modal
-        for pi in pre_incs:
-            r_val = backups.get(pi.id, Decimal('0.00'))
-            modal_rows.append({
-                'pre_inc_id': pi.id,
-                'code': pi.code,
-                'category': pi.name if pi.name else pi.code,
-                'respaldo': r_val
-            })
-        
-        for pi in pre_incs:
-            respaldo = backups.get(pi.id, Decimal('0.00'))
+        for code in sorted_codes:
+            pi = pre_inc_map.get(code)
+            c = class_map.get(code)
             
-            asignacion = BudgetAllocation.objects.filter(
-                credit__fiscal_year=fiscal_year,
-                credit__pre_inc=pi,
-                unit=selected_unit
-            ).aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
+            respaldo = backups.get(pi.id, Decimal('0.00')) if pi else Decimal('0.00')
             
-            com_dev = BudgetAllocation.objects.filter(
+            # Asignación Distribuida (por proyecto/plan O pre_inc para mantener compatibilidad si no hay custom_classes)
+            allocs = BudgetAllocation.objects.filter(
                 credit__fiscal_year=fiscal_year,
-                credit__pre_inc=pi,
                 unit=selected_unit
-            ).aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
+            )
+            
+            if c:
+                asignacion = allocs.filter(custom_classes=c).aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
+                com_dev = allocs.filter(custom_classes=c).aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
+            else:
+                asignacion = allocs.filter(credit__pre_inc=pi, custom_classes__isnull=True).aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
+                com_dev = allocs.filter(credit__pre_inc=pi, custom_classes__isnull=True).aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
             
             saldo = asignacion - com_dev
             falta_asignar = max(Decimal('0.00'), respaldo - asignacion)
             
+            if pi:
+                modal_rows.append({
+                    'pre_inc_id': pi.id,
+                    'code': code,
+                    'category': code,
+                    'respaldo': respaldo
+                })
+            
             if respaldo > 0 or asignacion > 0 or com_dev > 0:
                 row_data = {
-                    'pre_inc_id': pi.id,
-                    'code': pi.code,
-                    'category': pi.name if pi.name else pi.code,
+                    'pre_inc_id': pi.id if pi else f'class_{c.id}',
+                    'code': code,
+                    'category': code,
                     'respaldo': respaldo,
                     'asignacion': asignacion,
                     'com_dev': com_dev,
@@ -2089,16 +2106,9 @@ def budget_consolidation(request):
                 
         # Sin Clasificar
         respaldo_un = backups.get(None, Decimal('0.00'))
-        asignacion_un = BudgetAllocation.objects.filter(
-            credit__fiscal_year=fiscal_year,
-            credit__pre_inc=None,
-            unit=selected_unit
-        ).aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
-        com_dev_un = BudgetAllocation.objects.filter(
-            credit__fiscal_year=fiscal_year,
-            credit__pre_inc=None,
-            unit=selected_unit
-        ).aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
+        allocs_un = BudgetAllocation.objects.filter(credit__fiscal_year=fiscal_year, unit=selected_unit, custom_classes__isnull=True, credit__pre_inc__isnull=True)
+        asignacion_un = allocs_un.aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
+        com_dev_un = allocs_un.aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
         saldo_un = asignacion_un - com_dev_un
         falta_asignar_un = max(Decimal('0.00'), respaldo_un - asignacion_un)
         
@@ -2120,7 +2130,6 @@ def budget_consolidation(request):
             totals['saldo'] += saldo_un
             totals['falta_asignar'] += falta_asignar_un
             
-        # Calcular RSM SALDOS
         rsm_saldos_group1 = Decimal('0.00')
         for r in rows:
             if r['code'] in ['2+3', 'PROM', 'RyC PAIS', 'GGOO']:
@@ -2151,138 +2160,123 @@ def budget_consolidation(request):
     else:
         # Vista global de COAA
         totals = {
-            'foxtrot': 0,
-            'asig_coaa': 0,
-            'falta_asig': 0,
-            'refuerzo': 0,
-            'total_asignado': 0,
-            'distribuido': 0,
-            'reserva': 0,
-            'com_dev': 0,
-            'saldo_disponible': 0
+            'foxtrot': Decimal('0.00'),
+            'asig_coaa': Decimal('0.00'),
+            'falta_asig': Decimal('0.00'),
+            'refuerzo': Decimal('0.00'),
+            'total_asignado': Decimal('0.00'),
+            'distribuido': Decimal('0.00'),
+            'reserva': Decimal('0.00'),
+            'com_dev': Decimal('0.00'),
+            'saldo_disponible': Decimal('0.00')
         }
         
-        from .models import BudgetCreditSplit, BudgetFoxtrotCeiling
-        from core.models import Unit
-        
-        # Cargar todos los techos de foxtrot definidos manualmente
-        foxtrot_ceilings = {c.pre_inc_id: c.amount for c in BudgetFoxtrotCeiling.objects.filter(fiscal_year=fiscal_year)}
+        for code in sorted_codes:
+            pi = pre_inc_map.get(code)
+            c = class_map.get(code)
+            
+            foxtrot = Decimal('0.00')
+            if pi:
+                fc = BudgetFoxtrotCeiling.objects.filter(fiscal_year=fiscal_year, pre_inc=pi).first()
+                if fc:
+                    foxtrot = fc.amount
 
-        # PRECALCULAR DISTRIBUCIONES PROPORCIONALES
-        all_credits = BudgetCredit.objects.filter(fiscal_year=fiscal_year).prefetch_related('splits', 'allocations')
-        agg = {pi.id: {'distribuido': Decimal('0'), 'com_dev': Decimal('0'), 'unit_allocs': {}, 'unit_spent': {}} for pi in pre_incs}
-        agg[None] = {'distribuido': Decimal('0'), 'com_dev': Decimal('0'), 'unit_allocs': {}, 'unit_spent': {}}
-        
-        for c in all_credits:
-            total_c = c.total_amount
-            if total_c <= 0: continue
+            asig_coaa = Decimal('0.00')
+            if pi:
+                asig_coaa = BudgetCredit.objects.filter(
+                    fiscal_year=fiscal_year,
+                    pre_inc=pi
+                ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+
+            falta_asig = max(Decimal('0.00'), foxtrot - asig_coaa)
+            refuerzo = max(Decimal('0.00'), asig_coaa - foxtrot)
+            total_asignado = asig_coaa
             
-            splits = list(c.splits.all())
-            out_total = sum(s.amount for s in splits)
-            base_amount = total_c - out_total
-            
-            proportions = {}
-            if base_amount > 0: proportions[c.pre_inc_id] = base_amount / total_c
-            for s in splits:
-                proportions[s.pre_inc_destino_id] = proportions.get(s.pre_inc_destino_id, Decimal('0')) + (s.amount / total_c)
+            if c:
+                distribuido = BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    custom_classes=c
+                ).aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
+                com_dev = BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    custom_classes=c
+                ).aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
                 
-            for a in c.allocations.all():
-                for p_id, prop in proportions.items():
-                    if prop <= 0: continue
-                    if p_id not in agg: agg[p_id] = {'distribuido': Decimal('0'), 'com_dev': Decimal('0'), 'unit_allocs': {}, 'unit_spent': {}}
-                    
-                    alloc_prop = a.allocated_amount * prop
-                    spent_prop = a.spent_amount * prop
-                    
-                    agg[p_id]['distribuido'] += alloc_prop
-                    agg[p_id]['com_dev'] += spent_prop
-                    
-                    u_id = a.unit_id
-                    agg[p_id]['unit_allocs'][u_id] = agg[p_id]['unit_allocs'].get(u_id, Decimal('0')) + alloc_prop
-                    agg[p_id]['unit_spent'][u_id] = agg[p_id]['unit_spent'].get(u_id, Decimal('0')) + spent_prop
-
-        units_dict = Unit.objects.in_bulk()
-
-        for pi in pre_incs:
-            # Foxtrot: valor manual cargado por el usuario
-            foxtrot = foxtrot_ceilings.get(pi.id, Decimal('0.00'))
-
-            asig_coaa_base = BudgetCredit.objects.filter(
-                fiscal_year=fiscal_year, pre_inc=pi, credit_type__code='ASIGNACION'
-            ).aggregate(total=Sum('total_amount'))['total'] or 0
-            asig_coaa_out = BudgetCreditSplit.objects.filter(
-                credit__fiscal_year=fiscal_year, credit__pre_inc=pi,
-                credit__credit_type__code='ASIGNACION'
-            ).aggregate(total=Sum('amount'))['total'] or 0
-            asig_coaa_in = BudgetCreditSplit.objects.filter(
-                credit__fiscal_year=fiscal_year, pre_inc_destino=pi,
-                credit__credit_type__code='ASIGNACION'
-            ).aggregate(total=Sum('amount'))['total'] or 0
-            asig_coaa = asig_coaa_base - asig_coaa_out + asig_coaa_in
-
-            falta_asig = max(0, foxtrot - asig_coaa)
-
-            refuerzo_base = BudgetCredit.objects.filter(
-                fiscal_year=fiscal_year, pre_inc=pi, credit_type__code='REFUERZO'
-            ).aggregate(total=Sum('total_amount'))['total'] or 0
-            refuerzo_out = BudgetCreditSplit.objects.filter(
-                credit__fiscal_year=fiscal_year, credit__pre_inc=pi,
-                credit__credit_type__code='REFUERZO'
-            ).aggregate(total=Sum('amount'))['total'] or 0
-            refuerzo_in = BudgetCreditSplit.objects.filter(
-                credit__fiscal_year=fiscal_year, pre_inc_destino=pi,
-                credit__credit_type__code='REFUERZO'
-            ).aggregate(total=Sum('amount'))['total'] or 0
-            refuerzo = refuerzo_base - refuerzo_out + refuerzo_in
-
-            total_asignado = asig_coaa + refuerzo
-
-            distribuido = agg[pi.id]['distribuido']
-            reserva = total_asignado - distribuido
-            com_dev = agg[pi.id]['com_dev']
+                allocs = BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    custom_classes=c
+                )
+            else:
+                distribuido = BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    credit__pre_inc=pi,
+                    custom_classes__isnull=True
+                ).aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
+                com_dev = BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    credit__pre_inc=pi,
+                    custom_classes__isnull=True
+                ).aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
+                
+                allocs = BudgetAllocation.objects.filter(
+                    credit__fiscal_year=fiscal_year,
+                    credit__pre_inc=pi,
+                    custom_classes__isnull=True
+                )
+                
+            reserva = max(Decimal('0.00'), total_asignado - distribuido)
             saldo_disponible = distribuido - com_dev
-
-            if foxtrot > 0 or asig_coaa > 0 or refuerzo > 0 or distribuido > 0 or com_dev > 0:
-                tooltip_lines = ["<b>Distribución por Destino:</b>"]
-                allocs_items = sorted(agg[pi.id]['unit_allocs'].items(), key=lambda x: x[1], reverse=True)
-                for u_id, amt in allocs_items:
-                    if amt > 0:
-                        u_name = units_dict[u_id].name if u_id in units_dict else str(u_id)
-                        monto = f"{amt:,.0f}".replace(",", ".")
-                        tooltip_lines.append(f"• {u_name}: ${monto}")
-                if len(tooltip_lines) == 1:
-                    tooltip_lines.append("<i>Sin distribución a unidades</i>")
-                allocations_tooltip = "<br/>".join(tooltip_lines)
-
-                pi_backups = {b.unit_id: b.amount for b in BudgetUnitBackup.objects.filter(fiscal_year=fiscal_year, pre_inc=pi)}
-                pi_allocs = agg[pi.id]['unit_allocs']
-                pi_spent = agg[pi.id]['unit_spent']
-
-                all_u_ids = set(pi_backups.keys()) | set(pi_allocs.keys())
-                unit_breakdown = []
-                if all_u_ids:
-                    relevant_units = [units_dict[u_id] for u_id in all_u_ids if u_id in units_dict]
-                    relevant_units.sort(key=lambda u: u.name)
-                    for u in relevant_units:
-                        u_respaldo = pi_backups.get(u.id, Decimal('0.00'))
-                        u_asig = pi_allocs.get(u.id, Decimal('0.00'))
-                        u_spent = pi_spent.get(u.id, Decimal('0.00'))
-                        u_saldo = u_asig - u_spent
-                        u_falta = max(Decimal('0.00'), u_respaldo - u_asig)
-                        unit_breakdown.append({
-                            'unit_name': u.name,
-                            'respaldo': float(u_respaldo),
-                            'asignacion': float(u_asig),
-                            'com_dev': float(u_spent),
-                            'saldo': float(u_saldo),
-                            'falta_asignar': float(u_falta)
+            
+            if foxtrot > 0 or asig_coaa > 0 or distribuido > 0 or com_dev > 0:
+                units_data = {}
+                for alloc in allocs:
+                    uid = alloc.unit.id
+                    if uid not in units_data:
+                        units_data[uid] = {
+                            'unit_name': alloc.unit.name,
+                            'respaldo': Decimal('0.00'),
+                            'asignacion': Decimal('0.00'),
+                            'com_dev': Decimal('0.00')
+                        }
+                    units_data[uid]['asignacion'] += alloc.allocated_amount
+                    units_data[uid]['com_dev'] += alloc.spent_amount
+                
+                if pi:
+                    unit_backups = BudgetUnitBackup.objects.filter(fiscal_year=fiscal_year, pre_inc=pi)
+                    for b in unit_backups:
+                        uid = b.unit.id
+                        if uid not in units_data:
+                            units_data[uid] = {
+                                'unit_name': b.unit.name,
+                                'respaldo': Decimal('0.00'),
+                                'asignacion': Decimal('0.00'),
+                                'com_dev': Decimal('0.00')
+                            }
+                        units_data[uid]['respaldo'] += b.amount
+                        
+                breakdown_list = []
+                for uid, data in units_data.items():
+                    r_val = data['respaldo']
+                    a_val = data['asignacion']
+                    cd_val = data['com_dev']
+                    s_val = a_val - cd_val
+                    f_val = max(Decimal('0.00'), r_val - a_val)
+                    if r_val > 0 or a_val > 0 or cd_val > 0:
+                        breakdown_list.append({
+                            'unit_name': data['unit_name'],
+                            'respaldo': float(r_val),
+                            'asignacion': float(a_val),
+                            'com_dev': float(cd_val),
+                            'saldo': float(s_val),
+                            'falta_asignar': float(f_val)
                         })
-                import json
-                unit_breakdown_json = json.dumps(unit_breakdown)
-
-                row_data = {
-                    'category': pi.name if pi.name else pi.code,
-                    'code': pi.code,
+                breakdown_list.sort(key=lambda x: x['unit_name'])
+                
+                tooltip_lines = [f"{item['unit_name']}: ${item['asignacion']:,.2f}" for item in breakdown_list if item['asignacion'] > 0]
+                tooltip = "<br>".join(tooltip_lines) if tooltip_lines else "Sin distribuciones"
+                
+                rows.append({
+                    'code': code,
                     'foxtrot': foxtrot,
                     'asig_coaa': asig_coaa,
                     'falta_asig': falta_asig,
@@ -2292,11 +2286,10 @@ def budget_consolidation(request):
                     'reserva': reserva,
                     'com_dev': com_dev,
                     'saldo_disponible': saldo_disponible,
-                    'allocations_tooltip': allocations_tooltip,
-                    'breakdown_json': unit_breakdown_json
-                }
-                rows.append(row_data)
-
+                    'breakdown_json': json.dumps(breakdown_list),
+                    'allocations_tooltip': tooltip
+                })
+                
                 totals['foxtrot'] += foxtrot
                 totals['asig_coaa'] += asig_coaa
                 totals['falta_asig'] += falta_asig
@@ -2306,75 +2299,38 @@ def budget_consolidation(request):
                 totals['reserva'] += reserva
                 totals['com_dev'] += com_dev
                 totals['saldo_disponible'] += saldo_disponible
-
-        # Sin Clasificar: créditos sin pre_inc
-        unclassified_credits = BudgetCredit.objects.filter(fiscal_year=fiscal_year, pre_inc=None)
+                
+        # Sin Clasificar
+        foxtrot_un = Decimal('0.00')
+        fc_un = BudgetFoxtrotCeiling.objects.filter(fiscal_year=fiscal_year, pre_inc__isnull=True).first()
+        if fc_un:
+            foxtrot_un = fc_un.amount
+            
+        asig_coaa_un = BudgetCredit.objects.filter(
+            fiscal_year=fiscal_year,
+            pre_inc__isnull=True
+        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
         
-        foxtrot_un = foxtrot_ceilings.get(None, Decimal('0.00'))
+        falta_asig_un = max(Decimal('0.00'), foxtrot_un - asig_coaa_un)
+        refuerzo_un = max(Decimal('0.00'), asig_coaa_un - foxtrot_un)
+        total_asignado_un = asig_coaa_un
         
-        asig_coaa_un_base = unclassified_credits.filter(credit_type__code='ASIGNACION').aggregate(total=Sum('total_amount'))['total'] or 0
-        asig_coaa_un_out = BudgetCreditSplit.objects.filter(
-            credit__fiscal_year=fiscal_year, credit__pre_inc__isnull=True,
-            credit__credit_type__code='ASIGNACION'
-        ).aggregate(total=Sum('amount'))['total'] or 0
-        asig_coaa_un = asig_coaa_un_base - asig_coaa_un_out
-
-        falta_asig_un = max(0, foxtrot_un - asig_coaa_un)
-
-        refuerzo_un_base = unclassified_credits.filter(credit_type__code='REFUERZO').aggregate(total=Sum('total_amount'))['total'] or 0
-        refuerzo_un_out = BudgetCreditSplit.objects.filter(
-            credit__fiscal_year=fiscal_year, credit__pre_inc__isnull=True,
-            credit__credit_type__code='REFUERZO'
-        ).aggregate(total=Sum('amount'))['total'] or 0
-        refuerzo_un = refuerzo_un_base - refuerzo_un_out
-
-        total_asignado_un = asig_coaa_un + refuerzo_un
+        distribuido_un = BudgetAllocation.objects.filter(
+            credit__fiscal_year=fiscal_year,
+            credit__pre_inc__isnull=True,
+            custom_classes__isnull=True
+        ).aggregate(total=Sum('allocated_amount'))['total'] or Decimal('0.00')
+        com_dev_un = BudgetAllocation.objects.filter(
+            credit__fiscal_year=fiscal_year,
+            credit__pre_inc__isnull=True,
+            custom_classes__isnull=True
+        ).aggregate(total=Sum('spent_amount'))['total'] or Decimal('0.00')
         
-        distribuido_un = agg[None]['distribuido']
-        reserva_un = total_asignado_un - distribuido_un
-        com_dev_un = agg[None]['com_dev']
+        reserva_un = max(Decimal('0.00'), total_asignado_un - distribuido_un)
         saldo_disponible_un = distribuido_un - com_dev_un
         
-        if foxtrot_un > 0 or asig_coaa_un > 0 or refuerzo_un > 0 or distribuido_un > 0 or com_dev_un > 0:
-            tooltip_lines_un = ["<b>Distribución por Destino:</b>"]
-            allocs_items_un = sorted(agg[None]['unit_allocs'].items(), key=lambda x: x[1], reverse=True)
-            for u_id, amt in allocs_items_un:
-                if amt > 0:
-                    u_name = units_dict[u_id].name if u_id in units_dict else str(u_id)
-                    monto = f"{amt:,.0f}".replace(",", ".")
-                    tooltip_lines_un.append(f"• {u_name}: ${monto}")
-            if len(tooltip_lines_un) == 1:
-                tooltip_lines_un.append("<i>Sin distribución a unidades</i>")
-            allocations_tooltip_un = "<br/>".join(tooltip_lines_un)
-
-            pi_backups_un = {b.unit_id: b.amount for b in BudgetUnitBackup.objects.filter(fiscal_year=fiscal_year, pre_inc=None)}
-            pi_allocs_un = agg[None]['unit_allocs']
-            pi_spent_un = agg[None]['unit_spent']
-            
-            all_u_ids_un = set(pi_backups_un.keys()) | set(pi_allocs_un.keys())
-            unit_breakdown_un = []
-            if all_u_ids_un:
-                relevant_units_un = [units_dict[u_id] for u_id in all_u_ids_un if u_id in units_dict]
-                relevant_units_un.sort(key=lambda u: u.name)
-                for u in relevant_units_un:
-                    u_respaldo = pi_backups_un.get(u.id, Decimal('0.00'))
-                    u_asig = pi_allocs_un.get(u.id, Decimal('0.00'))
-                    u_spent = pi_spent_un.get(u.id, Decimal('0.00'))
-                    u_saldo = u_asig - u_spent
-                    u_falta = max(Decimal('0.00'), u_respaldo - u_asig)
-                    unit_breakdown_un.append({
-                        'unit_name': u.name,
-                        'respaldo': float(u_respaldo),
-                        'asignacion': float(u_asig),
-                        'com_dev': float(u_spent),
-                        'saldo': float(u_saldo),
-                        'falta_asignar': float(u_falta)
-                    })
-            import json
-            unit_breakdown_json_un = json.dumps(unit_breakdown_un)
-
-            row_data = {
-                'category': 'Sin Clasificar / Otros',
+        if foxtrot_un > 0 or asig_coaa_un > 0 or distribuido_un > 0 or com_dev_un > 0:
+            rows.append({
                 'code': 'S/C',
                 'foxtrot': foxtrot_un,
                 'asig_coaa': asig_coaa_un,
@@ -2385,10 +2341,9 @@ def budget_consolidation(request):
                 'reserva': reserva_un,
                 'com_dev': com_dev_un,
                 'saldo_disponible': saldo_disponible_un,
-                'allocations_tooltip': allocations_tooltip_un,
-                'breakdown_json': unit_breakdown_json_un
-            }
-            rows.append(row_data)
+                'breakdown_json': '[]',
+                'allocations_tooltip': ''
+            })
             totals['foxtrot'] += foxtrot_un
             totals['asig_coaa'] += asig_coaa_un
             totals['falta_asig'] += falta_asig_un
@@ -2404,17 +2359,15 @@ def budget_consolidation(request):
     context = {
         'fiscal_year': fiscal_year,
         'rows': rows,
+        'modal_rows': modal_rows,
         'totals': totals,
-        'is_admin': is_admin_user,
         'units': units,
         'selected_unit': selected_unit,
         'rsm_saldos': rsm_saldos,
-        'modal_rows': modal_rows
+        'is_admin': is_admin_user,
     }
     return render(request, 'budget/consolidation.html', context)
 
-
-@login_required
 def export_consolidation_csv(request):
     fiscal_year = _get_fiscal_year_from_request(request)
     if not fiscal_year:

@@ -322,6 +322,21 @@ class BudgetClassificationForm(forms.ModelForm):
         }
         localized_fields = ('target_amount',)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import BudgetPreInc
+        # Obtener los pre_incs para mostrarlos como opciones
+        pre_incs = BudgetPreInc.objects.all().order_by('code')
+        choices = [('', '--------- Seleccione un Inciso/Proyecto ---------')]
+        for pi in pre_incs:
+            choices.append((pi.code, pi.code))
+        
+        self.fields['name'] = forms.ChoiceField(
+            choices=choices,
+            label='Nombre del Proyecto / Plan',
+            widget=forms.Select(attrs={'class': 'form-select'})
+        )
+
 class BudgetAllocationMultipleChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
         amount_str = f"{obj.allocated_amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")

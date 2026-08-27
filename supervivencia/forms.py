@@ -6,6 +6,8 @@ from licitaciones.models import TenderProcess
 from .models import (
     Aircraft,
     AircraftVariant,
+    ItemClassification,
+    ItemSystem,
     PyrotechnicCatalogItem,
     PyrotechnicCatalogLifeRule,
     PyrotechnicAssignment,
@@ -15,6 +17,7 @@ from .models import (
     PyrotechnicRequirement,
     SurvivalMedium,
 )
+from core.models import Unit
 
 
 class AircraftChoiceField(forms.ModelChoiceField):
@@ -54,29 +57,114 @@ class SurvivalMediumForm(forms.ModelForm):
 
 
 class PyrotechnicCatalogItemForm(forms.ModelForm):
+    classification = forms.ModelChoiceField(
+        queryset=ItemClassification.objects.filter(is_active=True),
+        label="Clasificacion",
+        required=False,
+        help_text="Seleccione para filtrar los sistemas"
+    )
+    new_classification = forms.CharField(
+        label="➕ O crear nueva Clasificación",
+        required=False,
+        help_text="Escriba aqui solo si no encuentra la clasificacion en la lista superior."
+    )
+    new_system = forms.CharField(
+        label="➕ O crear nuevo Sistema",
+        required=False,
+        help_text="Escriba aqui solo si no encuentra el sistema en la lista. Se asociará a la clasificación indicada."
+    )
+    compatible_medium_names = forms.MultipleChoiceField(
+        label="Unidades asociadas (opcional)",
+        required=False,
+        widget=forms.CheckboxSelectMultiple()
+    )
+
     class Meta:
         model = PyrotechnicCatalogItem
         fields = [
-            "nomenclature",
+            "classification",
+            "new_classification",
             "system",
+            "new_system",
+            "nomenclature",
             "part_number",
-            "nsn",
             "alternate_part_number",
+            "nsn",
+            "alternate_nsn",
             "description",
+            "compatible_medium_names",
             "is_active",
         ]
         labels = {
             "nomenclature": "Nomenclatura",
             "system": "Sistema",
             "part_number": "N° / Parte",
-            "nsn": "N.S.N",
             "alternate_part_number": "Numero de parte alternativo",
+            "nsn": "N.S.N",
+            "alternate_nsn": "N.S.N alternativo",
             "description": "Descripcion",
             "is_active": "Activo",
         }
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.system:
+            self.fields["classification"].initial = self.instance.system.classification
+        self.fields["system"].queryset = ItemSystem.objects.filter(is_active=True).select_related("classification")
+        self.fields["system"].required = False
+        
+        # Poblar opciones con Unidades
+        unit_names = Unit.objects.values_list("name", flat=True).distinct().order_by("name")
+        self.fields["compatible_medium_names"].choices = [(name, name) for name in unit_names if name]
+        
+        if self.instance and self.instance.pk and self.instance.compatible_medium_names:
+            self.fields["compatible_medium_names"].initial = [name.strip() for name in self.instance.compatible_medium_names.split(",") if name.strip()]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        classification = cleaned_data.get("classification")
+        new_classification_name = cleaned_data.get("new_classification")
+        system = cleaned_data.get("system")
+        new_system_name = cleaned_data.get("new_system")
+
+        if not classification and not new_classification_name:
+            self.add_error("classification", "Debe seleccionar una clasificacion o ingresar una nueva.")
+            self.add_error("new_classification", "Debe seleccionar una clasificacion o ingresar una nueva.")
+        
+        if not system and not new_system_name:
+            self.add_error("system", "Debe seleccionar un sistema o ingresar uno nuevo.")
+            self.add_error("new_system", "Debe seleccionar un sistema o ingresar uno nuevo.")
+
+        # Resolver o crear clasificacion
+        if new_classification_name:
+            classification, _ = ItemClassification.objects.get_or_create(
+                name=new_classification_name.upper().strip()
+            )
+            cleaned_data["classification"] = classification
+        
+        # Resolver o crear sistema
+        if new_system_name and classification:
+            system, _ = ItemSystem.objects.get_or_create(
+                name=new_system_name.upper().strip(),
+                classification=classification
+            )
+            cleaned_data["system"] = system
+            
+        if system:
+            self.instance.system = system
+            
+        compatible_names = cleaned_data.get("compatible_medium_names")
+        if compatible_names:
+            cleaned_data["compatible_medium_names"] = ", ".join(compatible_names)
+            self.instance.compatible_medium_names = cleaned_data["compatible_medium_names"]
+        else:
+            cleaned_data["compatible_medium_names"] = ""
+            self.instance.compatible_medium_names = ""
+
+        return cleaned_data
 
 
 class PyrotechnicCatalogLifeRuleForm(forms.ModelForm):

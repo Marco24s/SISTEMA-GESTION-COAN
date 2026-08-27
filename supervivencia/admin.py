@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import (
+    ItemClassification,
+    ItemSystem,
     PyrotechnicAssignment,
     PyrotechnicCatalogItem,
     PyrotechnicCatalogLifeRule,
@@ -11,6 +13,16 @@ from .models import (
     SurvivalMedium,
 )
 
+@admin.register(ItemClassification)
+class ItemClassificationAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active")
+    search_fields = ("name",)
+
+@admin.register(ItemSystem)
+class ItemSystemAdmin(admin.ModelAdmin):
+    list_display = ("name", "classification", "is_active")
+    list_filter = ("classification", "is_active")
+    search_fields = ("name", "classification__name")
 
 @admin.register(SurvivalMedium)
 class SurvivalMediumAdmin(admin.ModelAdmin):
@@ -26,21 +38,17 @@ class PyrotechnicCatalogLifeRuleInline(admin.TabularInline):
 
 @admin.register(PyrotechnicCatalogItem)
 class PyrotechnicCatalogItemAdmin(admin.ModelAdmin):
-    list_display = ("nomenclature", "system", "part_number", "nsn", "life_rules_summary", "is_active")
-    list_filter = ("system", "is_active")
-    search_fields = ("nomenclature", "system", "part_number", "nsn", "alternate_part_number")
+    list_display = ("nomenclature", "system", "part_number", "nsn", "is_active")
+    list_filter = ("system__classification", "system", "is_active")
+    search_fields = ("nomenclature", "system__name", "system__classification__name", "part_number", "nsn", "alternate_part_number", "alternate_nsn")
     inlines = [PyrotechnicCatalogLifeRuleInline]
-
-    @admin.display(description="Vida util")
-    def life_rules_summary(self, obj):
-        return obj.life_rules_summary
 
 
 @admin.register(PyrotechnicCatalogLifeRule)
 class PyrotechnicCatalogLifeRuleAdmin(admin.ModelAdmin):
     list_display = ("catalog_item", "situation", "duration_value", "duration_unit")
     list_filter = ("situation", "duration_unit")
-    search_fields = ("catalog_item__nomenclature", "catalog_item__system", "notes")
+    search_fields = ("catalog_item__nomenclature", "catalog_item__system__name", "notes")
 
 
 @admin.register(PyrotechnicPhysicalItem)
@@ -60,7 +68,7 @@ class PyrotechnicPhysicalItemAdmin(admin.ModelAdmin):
     list_filter = ("condition", "operational_status", "current_storage_location", "expiration_date", "is_active")
     search_fields = (
         "catalog_item__nomenclature",
-        "catalog_item__system",
+        "catalog_item__system__name",
         "serial_number",
         "lot_number",
         "manufacturer",

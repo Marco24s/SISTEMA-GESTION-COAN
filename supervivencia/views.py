@@ -518,31 +518,10 @@ class PyrotechnicCatalogCreateView(LoginRequiredMixin, SuccessMessageMixin, Crea
     success_url = reverse_lazy("supervivencia:catalog_list")
     success_message = "Elemento de pirotecnia cargado correctamente."
 
-    def _get_life_rule_formset(self, instance=None):
-        return PyrotechnicCatalogLifeRuleFormSet(
-            self.request.POST or None,
-            instance=instance,
-            prefix="life_rules",
-        )
-
-    def form_valid(self, form):
-        self.object = form.save(commit=False)
-        life_rule_formset = self._get_life_rule_formset(self.object)
-        if life_rule_formset.is_valid():
-            with transaction.atomic():
-                self.object.save()
-                life_rule_formset.instance = self.object
-                life_rule_formset.save()
-            messages.success(self.request, self.success_message)
-            return redirect(self.success_url)
-        return self.render_to_response(self.get_context_data(form=form, life_rule_formset=life_rule_formset))
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Nuevo elemento de pirotecnia"
-        context.setdefault("life_rule_formset", self._get_life_rule_formset(self.object if hasattr(self, "object") else None))
         return context
-
 
 class PyrotechnicCatalogUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = PyrotechnicCatalogItem
@@ -551,29 +530,9 @@ class PyrotechnicCatalogUpdateView(LoginRequiredMixin, SuccessMessageMixin, Upda
     success_url = reverse_lazy("supervivencia:catalog_list")
     success_message = "Elemento de pirotecnia actualizado correctamente."
 
-    def _get_life_rule_formset(self, instance=None):
-        return PyrotechnicCatalogLifeRuleFormSet(
-            self.request.POST or None,
-            instance=instance or self.object,
-            prefix="life_rules",
-        )
-
-    def form_valid(self, form):
-        self.object = form.save(commit=False)
-        life_rule_formset = self._get_life_rule_formset(self.object)
-        if life_rule_formset.is_valid():
-            with transaction.atomic():
-                self.object.save()
-                life_rule_formset.instance = self.object
-                life_rule_formset.save()
-            messages.success(self.request, self.success_message)
-            return redirect(self.success_url)
-        return self.render_to_response(self.get_context_data(form=form, life_rule_formset=life_rule_formset))
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Editar elemento de pirotecnia"
-        context.setdefault("life_rule_formset", self._get_life_rule_formset(self.object))
         return context
 
 

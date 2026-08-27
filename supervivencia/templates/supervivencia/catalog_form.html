@@ -13,65 +13,7 @@
                     {% csrf_token %}
                     {{ form|crispy }}
 
-                    <div class="border rounded p-3 mt-4 bg-light">
-                        <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
-                            <div>
-                                <h5 class="mb-1"><i class="fa-solid fa-calendar-days me-2 text-danger"></i> Reglas de vida util</h5>
-                                <p class="text-muted mb-0 small">
-                                    Cargue solo las situaciones que apliquen. Puede usar una regla general o vencimientos distintos segun envase, deposito o instalado.
-                                </p>
-                            </div>
-                        </div>
 
-                        {{ life_rule_formset.management_form }}
-                        {% if life_rule_formset.non_form_errors %}
-                            <div class="alert alert-danger">{{ life_rule_formset.non_form_errors }}</div>
-                        {% endif %}
-
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Situacion</th>
-                                        <th style="width: 140px;">Vida util</th>
-                                        <th style="width: 160px;">Unidad</th>
-                                        <th>Observaciones</th>
-                                        <th style="width: 90px;">Quitar</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for rule_form in life_rule_formset.forms %}
-                                    <tr>
-                                        <td>
-                                            {% for hidden in rule_form.hidden_fields %}{{ hidden }}{% endfor %}
-                                            {{ rule_form.situation }}
-                                            {% if rule_form.situation.errors %}<div class="text-danger small">{{ rule_form.situation.errors }}</div>{% endif %}
-                                        </td>
-                                        <td>
-                                            {{ rule_form.duration_value }}
-                                            {% if rule_form.duration_value.errors %}<div class="text-danger small">{{ rule_form.duration_value.errors }}</div>{% endif %}
-                                        </td>
-                                        <td>
-                                            {{ rule_form.duration_unit }}
-                                            {% if rule_form.duration_unit.errors %}<div class="text-danger small">{{ rule_form.duration_unit.errors }}</div>{% endif %}
-                                        </td>
-                                        <td>
-                                            {{ rule_form.notes }}
-                                            {% if rule_form.notes.errors %}<div class="text-danger small">{{ rule_form.notes.errors }}</div>{% endif %}
-                                        </td>
-                                        <td class="text-center">
-                                            {% if rule_form.DELETE %}
-                                                {{ rule_form.DELETE }}
-                                            {% else %}
-                                                <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
 
                     <div class="d-flex justify-content-between mt-4">
                         <a href="javascript:history.back()" class="btn btn-outline-secondary">
@@ -86,4 +28,118 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const classificationSelect = document.getElementById("id_classification");
+        const systemSelect = document.getElementById("id_system");
+        
+        if (!classificationSelect || !systemSelect) return;
+
+        // Extraer los valores originales del select de sistemas
+        const allSystems = Array.from(systemSelect.options).map(opt => ({
+            value: opt.value,
+            text: opt.text
+        }));
+
+        function updateSystems() {
+            const selectedClass = classificationSelect.options[classificationSelect.selectedIndex].text;
+            const currentValue = systemSelect.value;
+            
+            // Limpiar opciones
+            systemSelect.innerHTML = "";
+            
+            allSystems.forEach(sys => {
+                // Agregar si es la opcion vacia, o si el texto del sistema empieza con "Clasificacion - "
+                // (nuestro __str__ es "Clasificacion - Sistema")
+                if (sys.value === "" || !classificationSelect.value || sys.text.startsWith(selectedClass + " - ")) {
+                    const option = new Option(sys.text, sys.value);
+                    systemSelect.add(option);
+                }
+            });
+            
+            // Restaurar el valor si sigue existiendo
+            if (Array.from(systemSelect.options).some(opt => opt.value === currentValue)) {
+                systemSelect.value = currentValue;
+            }
+        }
+
+        classificationSelect.addEventListener("change", updateSystems);
+        // Filtrar inicialmente
+        updateSystems();
+
+        // Convertir campos de texto simples en inputs múltiples dinámicos
+        function makeMultiInput(inputId) {
+            const originalInput = document.getElementById(inputId);
+            if (!originalInput) return;
+            
+            // Ocultar input original
+            originalInput.style.display = 'none';
+            
+            const container = document.createElement('div');
+            container.className = 'multi-input-container';
+            originalInput.parentNode.insertBefore(container, originalInput.nextSibling);
+            
+            const values = originalInput.value.split(',').map(v => v.trim()).filter(v => v);
+            if (values.length === 0) values.push(""); // Al menos un campo vacio
+            
+            function render() {
+                container.innerHTML = '';
+                values.forEach((val, idx) => {
+                    const row = document.createElement('div');
+                    row.className = 'd-flex mb-2 gap-2';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'form-control';
+                    input.value = val;
+                    input.addEventListener('input', (e) => {
+                        values[idx] = e.target.value;
+                        updateOriginal();
+                    });
+                    
+                    row.appendChild(input);
+                    
+                    if (idx === values.length - 1) {
+                        // Boton de agregar
+                        const btnAdd = document.createElement('button');
+                        btnAdd.type = 'button';
+                        btnAdd.className = 'btn btn-outline-primary px-3';
+                        btnAdd.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                        btnAdd.onclick = () => {
+                            values.push("");
+                            render();
+                        };
+                        row.appendChild(btnAdd);
+                    } else {
+                        // Boton de eliminar
+                        const btnRem = document.createElement('button');
+                        btnRem.type = 'button';
+                        btnRem.className = 'btn btn-outline-danger px-3';
+                        btnRem.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                        btnRem.onclick = () => {
+                            values.splice(idx, 1);
+                            render();
+                            updateOriginal();
+                        };
+                        row.appendChild(btnRem);
+                    }
+                    
+                    container.appendChild(row);
+                });
+            }
+            
+            function updateOriginal() {
+                originalInput.value = values.map(v => v.trim()).filter(v => v).join(', ');
+            }
+            
+            render();
+        }
+
+        makeMultiInput('id_alternate_part_number');
+        makeMultiInput('id_alternate_nsn');
+    });
+</script>
 {% endblock %}

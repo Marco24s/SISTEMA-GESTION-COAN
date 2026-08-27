@@ -82,7 +82,14 @@
                 </h5>
             </div>
             <div class="card-body">
-                {% if item.current_storage_location %}
+                {% if active_assignment %}
+                    <span class="badge bg-warning text-dark border">MONTADO EN MEDIO</span>
+                    <div class="fw-bold mt-2">
+                        <a href="{% url 'supervivencia:medium_detail' active_assignment.medium.id %}" class="text-decoration-none text-dark">
+                            {{ active_assignment.medium.identifier }} - {{ active_assignment.medium.name }}
+                        </a>
+                    </div>
+                {% elif item.current_storage_location %}
                     <span class="badge bg-light text-dark border">{{ item.current_storage_location.code }}</span>
                     <div class="fw-bold mt-2">{{ item.current_storage_location.get_name_display }}</div>
                 {% else %}

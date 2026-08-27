@@ -53,16 +53,62 @@ class SurvivalMedium(models.Model):
         super().save(*args, **kwargs)
 
 
+class ItemClassification(models.Model):
+    name = models.CharField(max_length=150, unique=True, verbose_name="Clasificacion")
+    description = models.TextField(blank=True, null=True, verbose_name="Descripcion")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+
+    class Meta:
+        verbose_name = "Clasificacion de elemento"
+        verbose_name_plural = "Clasificaciones de elementos"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if self.name:
+            self.name = self.name.upper().strip()
+        super().save(*args, **kwargs)
+
+
+class ItemSystem(models.Model):
+    classification = models.ForeignKey(ItemClassification, on_delete=models.PROTECT, related_name="systems", verbose_name="Clasificacion")
+    name = models.CharField(max_length=150, verbose_name="Sistema")
+    description = models.TextField(blank=True, null=True, verbose_name="Descripcion")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+
+    class Meta:
+        verbose_name = "Sistema de elemento"
+        verbose_name_plural = "Sistemas de elementos"
+        ordering = ["classification__name", "name"]
+        unique_together = ("classification", "name")
+
+    def __str__(self):
+        return f"{self.classification.name} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        if self.name:
+            self.name = self.name.upper().strip()
+        super().save(*args, **kwargs)
+
+
 class PyrotechnicCatalogItem(models.Model):
     nomenclature = models.CharField(max_length=150, verbose_name="Nomenclatura")
-    system = models.CharField(max_length=150, verbose_name="Sistema")
+    system = models.ForeignKey(ItemSystem, on_delete=models.PROTECT, verbose_name="Sistema")
     part_number = models.CharField(max_length=80, blank=True, default="", verbose_name="N° / Parte")
     nsn = models.CharField(max_length=80, blank=True, default="", verbose_name="N.S.N")
     alternate_part_number = models.CharField(
-        max_length=120,
+        max_length=500,
         blank=True,
         default="",
         verbose_name="Numero de parte alternativo",
+    )
+    alternate_nsn = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        verbose_name="N.S.N alternativo",
     )
     theoretical_life_months = models.PositiveIntegerField(
         blank=True,
@@ -70,6 +116,7 @@ class PyrotechnicCatalogItem(models.Model):
         verbose_name="Vida util teorica (meses)",
     )
     description = models.TextField(blank=True, null=True, verbose_name="Descripcion")
+    compatible_medium_names = models.CharField(max_length=500, blank=True, default="", verbose_name="Unidades asociadas")
     is_active = models.BooleanField(default=True, verbose_name="Activo")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creado")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Actualizado")
@@ -88,13 +135,31 @@ class PyrotechnicCatalogItem(models.Model):
     def __str__(self):
         return f"{self.nomenclature} - {self.system}"
 
+    @property
+    def get_compatible_mediums_list(self):
+        if not self.compatible_medium_names:
+            return []
+        return [m.strip() for m in self.compatible_medium_names.split(",") if m.strip()]
+
+    @property
+    def get_alternate_part_numbers_list(self):
+        if not self.alternate_part_number:
+            return []
+        return [p.strip() for p in self.alternate_part_number.split(",") if p.strip()]
+
+    @property
+    def get_alternate_nsns_list(self):
+        if not self.alternate_nsn:
+            return []
+        return [n.strip() for n in self.alternate_nsn.split(",") if n.strip()]
+
     def clean(self):
         super().clean()
         self.nomenclature = (self.nomenclature or "").upper().strip()
-        self.system = (self.system or "").upper().strip()
         self.part_number = (self.part_number or "").upper().strip()
         self.nsn = (self.nsn or "").upper().strip()
         self.alternate_part_number = (self.alternate_part_number or "").upper().strip()
+        self.alternate_nsn = (self.alternate_nsn or "").upper().strip()
 
         duplicate = PyrotechnicCatalogItem.objects.filter(
             nomenclature=self.nomenclature,
@@ -102,6 +167,7 @@ class PyrotechnicCatalogItem(models.Model):
             part_number=self.part_number,
             nsn=self.nsn,
             alternate_part_number=self.alternate_part_number,
+            alternate_nsn=self.alternate_nsn,
         ).exclude(pk=self.pk)
         if duplicate.exists():
             raise ValidationError(
@@ -111,8 +177,6 @@ class PyrotechnicCatalogItem(models.Model):
     def save(self, *args, **kwargs):
         if self.nomenclature:
             self.nomenclature = self.nomenclature.upper().strip()
-        if self.system:
-            self.system = self.system.upper().strip()
         self.part_number = (self.part_number or "").upper().strip()
         self.nsn = (self.nsn or "").upper().strip()
         self.alternate_part_number = (self.alternate_part_number or "").upper().strip()
