@@ -32,6 +32,7 @@ from .models import (
     PyrotechnicStorageLocation,
     SupervivenciaDeletionLog,
     SurvivalMedium,
+    ItemSystem,
 )
 
 
@@ -259,11 +260,12 @@ class SupervivenciaDashboardView(LoginRequiredMixin, TemplateView):
 
         context.update(
             {
-                "medium_count": SurvivalMedium.objects.filter(is_active=True).count(),
-                "catalog_count": PyrotechnicCatalogItem.objects.filter(is_active=True).count(),
+                "medium_count": SurvivalMedium.objects.count(),
+                "catalog_count": PyrotechnicCatalogItem.objects.count(),
                 "total_active_material": active_items.count(),
-                "mounted_count": active_assignments.count(),
+                "mounted_count": active_items.filter(operational_status="INSTALLED").count(),
                 "stock_count": active_items.filter(operational_status="STOCK").count(),
+                "other_status_count": active_items.exclude(operational_status__in=["STOCK", "INSTALLED"]).count(),
                 "expired_count": active_items.filter(expiration_date__lte=today).count(),
                 "next_6_months_count": active_items.filter(
                     expiration_date__gt=today, expiration_date__lte=next_6_months
@@ -555,7 +557,7 @@ class PyrotechnicPhysicalItemListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         queryset = PyrotechnicPhysicalItem.objects.select_related(
-            "catalog_item", "created_by", "current_storage_location"
+            "catalog_item__system__classification", "created_by", "current_storage_location"
         ).order_by("expiration_date", "catalog_item__nomenclature", "serial_number", "lot_number")
         q = self.request.GET.get("q")
         condition = self.request.GET.get("condition")
@@ -570,7 +572,11 @@ class PyrotechnicPhysicalItemListView(LoginRequiredMixin, ListView):
         if q:
             queryset = queryset.filter(
                 Q(catalog_item__nomenclature__icontains=q)
-                | Q(catalog_item__system__icontains=q)
+                | Q(catalog_item__system__name__icontains=q)
+                | Q(catalog_item__part_number__icontains=q)
+                | Q(catalog_item__nsn__icontains=q)
+                | Q(catalog_item__alternate_part_number__icontains=q)
+                | Q(catalog_item__alternate_nsn__icontains=q)
                 | Q(serial_number__icontains=q)
                 | Q(lot_number__icontains=q)
                 | Q(manufacturer__icontains=q)
@@ -579,12 +585,29 @@ class PyrotechnicPhysicalItemListView(LoginRequiredMixin, ListView):
                 | Q(current_storage_location__name__icontains=q)
                 | Q(certificate_reference__icontains=q)
             )
+        
+        system = self.request.GET.get("system")
+        medium = self.request.GET.get("medium")
+        if system:
+            queryset = queryset.filter(catalog_item__system_id=system)
+        if medium:
+            queryset = queryset.filter(catalog_item__compatible_medium_names__icontains=medium)
+
         if condition:
             queryset = queryset.filter(condition=condition)
         if status:
-            queryset = queryset.filter(operational_status=status)
+            if status == "OTHER":
+                queryset = queryset.exclude(operational_status__in=["STOCK", "INSTALLED"])
+            else:
+                queryset = queryset.filter(operational_status=status)
         if location:
             queryset = queryset.filter(current_storage_location_id=location)
+            
+        active = self.request.GET.get("active")
+        if active == "1":
+            queryset = queryset.filter(is_active=True)
+        elif active == "0":
+            queryset = queryset.filter(is_active=False)
         if expiration == "expired":
             queryset = queryset.filter(expiration_date__lte=today)
         elif expiration == "next_6_months":
@@ -607,9 +630,13 @@ class PyrotechnicPhysicalItemListView(LoginRequiredMixin, ListView):
                 "selected_status": self.request.GET.get("status", ""),
                 "selected_expiration": self.request.GET.get("expiration", ""),
                 "selected_location": self.request.GET.get("location", ""),
+                "selected_system": self.request.GET.get("system", ""),
+                "selected_medium": self.request.GET.get("medium", ""),
                 "condition_choices": PyrotechnicPhysicalItem.CONDITION_CHOICES,
                 "status_choices": PyrotechnicPhysicalItem.STATUS_CHOICES,
                 "locations": PyrotechnicStorageLocation.objects.filter(is_active=True).order_by("code"),
+                "systems": ItemSystem.objects.filter(is_active=True).select_related("classification").order_by("classification__name", "name"),
+                "mediums": SurvivalMedium.objects.filter(is_active=True).order_by("name"),
                 "total_active": active_items.count(),
                 "expired_count": active_items.filter(expiration_date__lte=today).count(),
                 "next_6_months_count": active_items.filter(
