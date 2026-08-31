@@ -5,11 +5,18 @@
 {% block navbar %}
 <nav class="navbar navbar-dark shadow-sm" style="background: linear-gradient(135deg, #334155 0%, #0f766e 100%);">
     <div class="container-fluid px-4">
-        <a href="/" class="btn btn-sm text-white border-white me-3 d-inline-flex align-items-center justify-content-center"
+        <!-- Botón Volver al portal -->
+        <a href="/" class="btn btn-sm text-white border-white me-2 d-inline-flex align-items-center justify-content-center"
            style="border-radius: 50%; width: 36px; height: 36px; padding: 0; background: rgba(255,255,255,0.1);"
-           title="Volver al portal">
-            <i class="fa-solid fa-arrow-left"></i>
+           title="Portal General">
+            <i class="fa-solid fa-house"></i>
         </a>
+        <!-- Botón Volver atrás -->
+        <button type="button" onclick="window.history.back()" class="btn btn-sm text-white border-white me-3 d-inline-flex align-items-center justify-content-center"
+           style="border-radius: 50%; width: 36px; height: 36px; padding: 0; background: rgba(255,255,255,0.1);"
+           title="Volver atrás">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
         <span class="navbar-brand d-flex align-items-center mb-0">
             <i class="fa-solid fa-file-contract me-2"></i>
             <strong>Procesos Licitatorios</strong>

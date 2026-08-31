@@ -3,10 +3,16 @@
 {% block navbar %}
 <nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background:#1f4b63;">
     <div class="container-fluid px-4">
-        <a href="{% url 'licitaciones:type_selection' %}" class="btn btn-sm text-white border-white me-3 d-inline-flex align-items-center justify-content-center"
-           style="border-radius:50%; width:34px; height:34px; padding:0;" title="Cambiar tipo de licitacion">
-            <i class="fa-solid fa-arrow-left"></i>
+        <!-- Botón Volver al Portal -->
+        <a href="/" class="btn btn-sm text-white border-white me-2 d-inline-flex align-items-center justify-content-center"
+           style="border-radius:50%; width:34px; height:34px; padding:0; background: rgba(255,255,255,0.1);" title="Portal General">
+            <i class="fa-solid fa-house"></i>
         </a>
+        <!-- Botón Volver atrás -->
+        <button type="button" onclick="window.history.back()" class="btn btn-sm text-white border-white me-3 d-inline-flex align-items-center justify-content-center"
+           style="border-radius:50%; width:34px; height:34px; padding:0; background: rgba(255,255,255,0.1);" title="Volver atrás">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
         <a class="navbar-brand d-flex align-items-center" href="{% url 'licitaciones:foreign_dashboard' %}">
             <i class="fa-solid fa-earth-americas me-2"></i>
             <strong>Licitaciones en el Exterior</strong>

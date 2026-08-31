@@ -143,21 +143,23 @@ ADMIN_DELETE_MODELS = {
     "catalog": {
         "label": "Catalogo",
         "model": PyrotechnicCatalogItem,
-        "search": ("nomenclature", "system", "part_number", "nsn", "alternate_part_number"),
+        "search": ("nomenclature", "system__name", "part_number", "nsn", "alternate_part_number", "alternate_nsn"),
         "order": ("nomenclature",),
+        "select_related": ("system", "system__classification"),
     },
     "life_rule": {
         "label": "Reglas de vida util",
         "model": PyrotechnicCatalogLifeRule,
-        "search": ("catalog_item__nomenclature", "catalog_item__system", "notes"),
+        "search": ("catalog_item__nomenclature", "catalog_item__system__name", "notes"),
         "order": ("catalog_item__nomenclature", "situation"),
+        "select_related": ("catalog_item", "catalog_item__system"),
     },
     "physical": {
         "label": "Material fisico",
         "model": PyrotechnicPhysicalItem,
         "search": (
             "catalog_item__nomenclature",
-            "catalog_item__system",
+            "catalog_item__system__name",
             "catalog_item__part_number",
             "catalog_item__nsn",
             "catalog_item__alternate_part_number",
@@ -169,7 +171,7 @@ ADMIN_DELETE_MODELS = {
             "current_storage_location__unit__name",
         ),
         "order": ("expiration_date", "catalog_item__nomenclature"),
-        "select_related": ("catalog_item", "current_storage_location", "current_storage_location__unit"),
+        "select_related": ("catalog_item", "catalog_item__system", "current_storage_location", "current_storage_location__unit"),
     },
     "location": {
         "label": "Ubicaciones",
@@ -495,15 +497,21 @@ class PyrotechnicCatalogListView(LoginRequiredMixin, ListView):
     context_object_name = "items"
 
     def get_queryset(self):
-        queryset = PyrotechnicCatalogItem.objects.prefetch_related("life_rules").order_by("nomenclature")
+        queryset = (
+            PyrotechnicCatalogItem.objects.select_related("system", "system__classification")
+            .prefetch_related("life_rules")
+            .order_by("nomenclature")
+        )
         q = self.request.GET.get("q")
         if q:
             queryset = queryset.filter(
                 Q(nomenclature__icontains=q)
-                | Q(system__icontains=q)
+                | Q(system__name__icontains=q)
+                | Q(system__classification__name__icontains=q)
                 | Q(part_number__icontains=q)
                 | Q(nsn__icontains=q)
                 | Q(alternate_part_number__icontains=q)
+                | Q(alternate_nsn__icontains=q)
             )
         return queryset
 
@@ -902,7 +910,7 @@ class PyrotechnicAssignmentListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         queryset = PyrotechnicAssignment.objects.select_related(
-            "medium", "medium__unit", "physical_item", "physical_item__catalog_item"
+            "medium", "medium__unit", "physical_item", "physical_item__catalog_item", "physical_item__catalog_item__system"
         ).order_by("medium__identifier", "-is_active", "physical_item__expiration_date")
         q = self.request.GET.get("q")
         medium = self.request.GET.get("medium")
@@ -913,7 +921,7 @@ class PyrotechnicAssignmentListView(LoginRequiredMixin, ListView):
                 Q(medium__identifier__icontains=q)
                 | Q(medium__name__icontains=q)
                 | Q(physical_item__catalog_item__nomenclature__icontains=q)
-                | Q(physical_item__catalog_item__system__icontains=q)
+                | Q(physical_item__catalog_item__system__name__icontains=q)
                 | Q(physical_item__serial_number__icontains=q)
                 | Q(physical_item__lot_number__icontains=q)
                 | Q(position__icontains=q)
@@ -953,6 +961,7 @@ class PyrotechnicMovementListView(LoginRequiredMixin, ListView):
         queryset = PyrotechnicMovement.objects.select_related(
             "physical_item",
             "physical_item__catalog_item",
+            "physical_item__catalog_item__system",
             "medium",
             "created_by",
         ).order_by("-movement_date", "-created_at")
@@ -963,7 +972,7 @@ class PyrotechnicMovementListView(LoginRequiredMixin, ListView):
         if q:
             queryset = queryset.filter(
                 Q(physical_item__catalog_item__nomenclature__icontains=q)
-                | Q(physical_item__catalog_item__system__icontains=q)
+                | Q(physical_item__catalog_item__system__name__icontains=q)
                 | Q(physical_item__serial_number__icontains=q)
                 | Q(physical_item__lot_number__icontains=q)
                 | Q(medium__identifier__icontains=q)

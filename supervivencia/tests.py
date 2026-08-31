@@ -10,6 +10,8 @@ from core.models import UserSystemPIN
 
 from .forms import PyrotechnicCatalogItemForm, PyrotechnicPhysicalItemForm
 from .models import (
+    ItemClassification,
+    ItemSystem,
     PyrotechnicAssignment,
     PyrotechnicCatalogItem,
     PyrotechnicMovement,
@@ -21,9 +23,12 @@ from .models import (
 
 class PyrotechnicCatalogIdentityTests(TestCase):
     def setUp(self):
+        self.classification = ItemClassification.objects.create(name="PIROTECNIA")
+        self.system_chaleco = ItemSystem.objects.create(classification=self.classification, name="CHALECO")
+        self.system_balsa = ItemSystem.objects.create(classification=self.classification, name="BALSA")
         self.existing = PyrotechnicCatalogItem.objects.create(
             nomenclature="BENGALA DE MANO",
-            system="CHALECO",
+            system=self.system_chaleco,
             part_number="13",
             nsn="13",
             alternate_part_number="1",
@@ -31,8 +36,9 @@ class PyrotechnicCatalogIdentityTests(TestCase):
 
     def test_part_number_can_repeat_when_other_identity_data_differs(self):
         form = PyrotechnicCatalogItemForm(data={
+            "classification": self.classification.pk,
             "nomenclature": "BENGALA DE SENALES",
-            "system": "BALSA",
+            "system": self.system_balsa.pk,
             "part_number": "13",
             "nsn": "99",
             "alternate_part_number": "2",
@@ -44,8 +50,9 @@ class PyrotechnicCatalogIdentityTests(TestCase):
 
     def test_complete_identity_cannot_repeat(self):
         form = PyrotechnicCatalogItemForm(data={
+            "classification": self.classification.pk,
             "nomenclature": "BENGALA DE MANO",
-            "system": "CHALECO",
+            "system": self.system_chaleco.pk,
             "part_number": "13",
             "nsn": "13",
             "alternate_part_number": "1",
@@ -62,6 +69,18 @@ class PyrotechnicCatalogIdentityTests(TestCase):
         label = form.fields["catalog_item"].label_from_instance(self.existing)
 
         self.assertEqual(label, "BENGALA DE MANO | N/P: 13 | NSN: 13")
+
+    def test_catalog_list_search_by_system_and_query(self):
+        user = get_user_model().objects.create_user(username="testuser", password="password")
+        UserSystemPIN.objects.create(user=user, system_code="supervivencia", pin_hash=make_password("1234"))
+        self.client.force_login(user)
+        session = self.client.session
+        session["verified_pins"] = {"supervivencia": time.time()}
+        session.save()
+
+        response = self.client.get(reverse("supervivencia:catalog_list"), {"q": "CHALECO"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "BENGALA DE MANO")
 
 
 @override_settings(ROOT_URLCONF="config.urls")
@@ -86,9 +105,11 @@ class PyrotechnicPhysicalItemForceDeleteTests(TestCase):
         session = self.client.session
         session["verified_pins"] = {"supervivencia": time.time(), "supervivencia_admin": time.time()}
         session.save()
+        self.classification = ItemClassification.objects.create(name="PIROTECNIA")
+        self.system = ItemSystem.objects.create(classification=self.classification, name="ASIENTO EYECTABLE")
         self.catalog_item = PyrotechnicCatalogItem.objects.create(
             nomenclature="CARTUCHO IMPULSOR",
-            system="ASIENTO EYECTABLE",
+            system=self.system,
             part_number="PN-1",
             nsn="NSN-1",
         )
