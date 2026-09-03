@@ -512,6 +512,7 @@ class PyrotechnicCatalogListView(LoginRequiredMixin, ListView):
                 | Q(nsn__icontains=q)
                 | Q(alternate_part_number__icontains=q)
                 | Q(alternate_nsn__icontains=q)
+                | Q(compatible_medium_names__icontains=q)
             )
         return queryset
 
@@ -531,7 +532,23 @@ class PyrotechnicCatalogCreateView(LoginRequiredMixin, SuccessMessageMixin, Crea
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Nuevo elemento de pirotecnia"
+        if self.request.POST:
+            context["life_rules_formset"] = PyrotechnicCatalogLifeRuleFormSet(self.request.POST)
+        else:
+            context["life_rules_formset"] = PyrotechnicCatalogLifeRuleFormSet()
         return context
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        life_rules_formset = context["life_rules_formset"]
+        if life_rules_formset.is_valid():
+            self.object = form.save()
+            life_rules_formset.instance = self.object
+            life_rules_formset.save()
+            return super().form_valid(form)
+        else:
+            return self.form_invalid(form)
+
 
 class PyrotechnicCatalogUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = PyrotechnicCatalogItem
@@ -543,7 +560,26 @@ class PyrotechnicCatalogUpdateView(LoginRequiredMixin, SuccessMessageMixin, Upda
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Editar elemento de pirotecnia"
+        if self.request.POST:
+            context["life_rules_formset"] = PyrotechnicCatalogLifeRuleFormSet(
+                self.request.POST, instance=self.object
+            )
+        else:
+            context["life_rules_formset"] = PyrotechnicCatalogLifeRuleFormSet(
+                instance=self.object
+            )
         return context
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        life_rules_formset = context["life_rules_formset"]
+        if life_rules_formset.is_valid():
+            self.object = form.save()
+            life_rules_formset.instance = self.object
+            life_rules_formset.save()
+            return super().form_valid(form)
+        else:
+            return self.form_invalid(form)
 
 
 @login_required

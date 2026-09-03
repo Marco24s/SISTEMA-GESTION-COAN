@@ -2,6 +2,29 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
+<style>
+    #div_id_compatible_medium_names fieldset {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    #div_id_compatible_medium_names legend {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 8px;
+    }
+    #div_id_compatible_medium_names .form-check {
+        margin-bottom: 0.35rem;
+    }
+    #div_id_compatible_medium_names .form-check-label {
+        font-size: 0.88rem;
+        cursor: pointer;
+    }
+</style>
 <div class="row justify-content-center mt-4">
     <div class="col-lg-11 col-xl-10">
         <div class="card shadow-sm border-0">
@@ -12,6 +35,83 @@
                 <form method="post">
                     {% csrf_token %}
                     {{ form|crispy }}
+
+                    <div class="card border mt-4 mb-3 shadow-sm">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0 text-danger fw-bold"><i class="fa-solid fa-clock-rotate-left me-2"></i>Reglas de Vida Útil / Vencimientos</h6>
+                                <small class="text-muted">Defina las reglas de vencimiento según la situación del elemento (envase original, depósito, instalado, etc.).</small>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            {{ life_rules_formset.management_form }}
+                            {% if life_rules_formset.non_form_errors %}
+                                <div class="alert alert-danger m-3 mb-0">{{ life_rules_formset.non_form_errors }}</div>
+                            {% endif %}
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                                    <thead class="table-light text-center">
+                                        <tr>
+                                            <th style="width: 25%;">Situación</th>
+                                            <th style="width: 18%;">Vida Útil</th>
+                                            <th style="width: 18%;">Unidad</th>
+                                            <th style="width: 31%;">Observaciones / Criterio</th>
+                                            {% if life_rules_formset.can_delete %}
+                                            <th style="width: 8%;">Eliminar</th>
+                                            {% endif %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rule_form in life_rules_formset %}
+                                        <tr>
+                                            <td>
+                                                {% for hidden in rule_form.hidden_fields %}
+                                                    {{ hidden }}
+                                                {% endfor %}
+                                                {{ rule_form.situation }}
+                                                {% if rule_form.situation.errors %}
+                                                    <div class="text-danger small">{{ rule_form.situation.errors|striptags }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ rule_form.duration_value }}
+                                                {% if rule_form.duration_value.errors %}
+                                                    <div class="text-danger small">{{ rule_form.duration_value.errors|striptags }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ rule_form.duration_unit }}
+                                                {% if rule_form.duration_unit.errors %}
+                                                    <div class="text-danger small">{{ rule_form.duration_unit.errors|striptags }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ rule_form.notes }}
+                                                {% if rule_form.notes.errors %}
+                                                    <div class="text-danger small">{{ rule_form.notes.errors|striptags }}</div>
+                                                {% endif %}
+                                            </td>
+                                            {% if life_rules_formset.can_delete %}
+                                            <td class="text-center">
+                                                {% if rule_form.instance.pk %}
+                                                    {{ rule_form.DELETE }}
+                                                {% endif %}
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% if rule_form.non_field_errors %}
+                                        <tr>
+                                            <td colspan="5" class="text-danger small bg-light py-1">
+                                                {{ rule_form.non_field_errors|striptags }}
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
 
 
 
@@ -44,16 +144,17 @@
             text: opt.text
         }));
 
-        function updateSystems() {
-            const selectedClass = classificationSelect.options[classificationSelect.selectedIndex].text;
-            const currentValue = systemSelect.value;
+        const initialSystemValue = systemSelect.value;
+
+        function updateSystems(isInitial = false) {
+            const selectedOpt = classificationSelect.options[classificationSelect.selectedIndex];
+            const selectedClass = selectedOpt ? selectedOpt.text.trim() : "";
+            const currentValue = systemSelect.value || (isInitial ? initialSystemValue : "");
             
             // Limpiar opciones
             systemSelect.innerHTML = "";
             
             allSystems.forEach(sys => {
-                // Agregar si es la opcion vacia, o si el texto del sistema empieza con "Clasificacion - "
-                // (nuestro __str__ es "Clasificacion - Sistema")
                 if (sys.value === "" || !classificationSelect.value || sys.text.startsWith(selectedClass + " - ")) {
                     const option = new Option(sys.text, sys.value);
                     systemSelect.add(option);
@@ -61,14 +162,14 @@
             });
             
             // Restaurar el valor si sigue existiendo
-            if (Array.from(systemSelect.options).some(opt => opt.value === currentValue)) {
+            if (currentValue && Array.from(systemSelect.options).some(opt => opt.value === currentValue)) {
                 systemSelect.value = currentValue;
             }
         }
 
-        classificationSelect.addEventListener("change", updateSystems);
-        // Filtrar inicialmente
-        updateSystems();
+        classificationSelect.addEventListener("change", () => updateSystems(false));
+        // Filtrar inicialmente preservando los valores precargados
+        updateSystems(true);
 
         // Convertir campos de texto simples en inputs múltiples dinámicos
         function makeMultiInput(inputId) {

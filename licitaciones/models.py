@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -347,6 +348,19 @@ class ForeignTenderProcess(models.Model):
         if self.evaluation_amount is None or self.awarded_amount is None:
             return None
         return self.evaluation_amount - self.awarded_amount
+
+    @property
+    def committed_po_amount(self):
+        return sum(
+            (po.amount for po in self.purchase_orders.all() if po.amount is not None),
+            start=Decimal("0.00"),
+        )
+
+    @property
+    def remaining_awarded_amount(self):
+        if self.awarded_amount is None:
+            return None
+        return self.awarded_amount - self.committed_po_amount
 
     @property
     def latest_update(self):

@@ -17,7 +17,7 @@ from .models import (
     PyrotechnicRequirement,
     SurvivalMedium,
 )
-from core.models import Unit
+from core.models import AircraftModel, Unit
 
 
 class AircraftChoiceField(forms.ModelChoiceField):
@@ -74,9 +74,9 @@ class PyrotechnicCatalogItemForm(forms.ModelForm):
         help_text="Escriba aqui solo si no encuentra el sistema en la lista. Se asociará a la clasificación indicada."
     )
     compatible_medium_names = forms.MultipleChoiceField(
-        label="Unidades asociadas (opcional)",
+        label="Aeronave / Modelo / Unidad Aplicable (opcional)",
         required=False,
-        widget=forms.CheckboxSelectMultiple()
+        widget=forms.CheckboxSelectMultiple(),
     )
 
     class Meta:
@@ -111,17 +111,47 @@ class PyrotechnicCatalogItemForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk and self.instance.system:
-            self.fields["classification"].initial = self.instance.system.classification
+        if self.instance and self.instance.pk:
+            if self.instance.system:
+                self.initial["classification"] = self.instance.system.classification_id
+                self.fields["classification"].initial = self.instance.system.classification_id
+                self.initial["system"] = self.instance.system_id
+                self.fields["system"].initial = self.instance.system_id
+            if self.instance.compatible_medium_names:
+                med_list = [name.strip() for name in self.instance.compatible_medium_names.split(",") if name.strip()]
+                self.initial["compatible_medium_names"] = med_list
+                self.fields["compatible_medium_names"].initial = med_list
         self.fields["system"].queryset = ItemSystem.objects.filter(is_active=True).select_related("classification")
         self.fields["system"].required = False
         
-        # Poblar opciones con Unidades
+        # Poblar opciones agrupadas: 1) Modelos de Aeronaves desde Medios, 2) Unidades / Bases Generales
+        medium_aircraft = (
+            SurvivalMedium.objects.filter(medium_type="AERONAVE")
+            .exclude(unit__isnull=True)
+            .values("unit__name", "name", "model")
+            .distinct()
+            .order_by("unit__name", "name", "model")
+        )
+        aircraft_choices = []
+        for m in medium_aircraft:
+            u = m["unit__name"]
+            name = m["name"]
+            model = m["model"]
+            if model and model != "N/A":
+                val = f"{u} - {name} {model}"
+                disp = f"{u} · {name} ({model})"
+                if (val, disp) not in aircraft_choices:
+                    aircraft_choices.append((val, disp))
+
+        aircraft_choices.sort(key=lambda x: x[0])
+
         unit_names = Unit.objects.values_list("name", flat=True).distinct().order_by("name")
-        self.fields["compatible_medium_names"].choices = [(name, name) for name in unit_names if name]
-        
-        if self.instance and self.instance.pk and self.instance.compatible_medium_names:
-            self.fields["compatible_medium_names"].initial = [name.strip() for name in self.instance.compatible_medium_names.split(",") if name.strip()]
+        general_choices = [(name, f"{name} (Unidad / Base General)") for name in unit_names if name]
+
+        self.fields["compatible_medium_names"].choices = [
+            ("AERONAVES Y MODELOS POR ESCUADRILLA", aircraft_choices),
+            ("UNIDADES Y BASES GENERALES", general_choices),
+        ]
 
     def clean(self):
         cleaned_data = super().clean()
