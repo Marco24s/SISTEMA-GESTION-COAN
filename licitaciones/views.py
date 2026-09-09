@@ -1,4 +1,8 @@
 import csv
+import io
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -709,6 +713,269 @@ def export_national_tenders_csv(request):
             p.amount_ars if p.amount_ars is not None else ""
         ])
 
+    return response
+
+
+@login_required
+def export_foreign_tenders_excel(request):
+    queryset = ForeignTenderProcess.objects.filter(is_active=True).prefetch_related(
+        "requirements__unit", "purchase_orders__provision_requests", "updates"
+    ).order_by("-year", "process_number")
+
+    year = _clean_int(request.GET.get("year"))
+    status = request.GET.get("status", "")
+    currency = request.GET.get("currency", "")
+    query = request.GET.get("q", "").strip()
+
+    if year:
+        queryset = queryset.filter(year=year)
+    if status:
+        queryset = queryset.filter(status=status)
+    if currency:
+        queryset = queryset.filter(currency=currency)
+    if query:
+        queryset = queryset.filter(
+            Q(process_number__icontains=query)
+            | Q(expediente__icontains=query)
+            | Q(requirements__requirement_number__icontains=query)
+            | Q(requirements__description__icontains=query)
+            | Q(purchase_orders__order_number__icontains=query)
+        ).distinct()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Procesos Exterior"
+
+    header_fill = PatternFill(start_color="1F4B63", end_color="1F4B63", fill_type="solid")
+    header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+    data_font = Font(name="Calibri", size=10)
+    thin_border = Border(
+        left=Side(style="thin", color="CCCCCC"),
+        right=Side(style="thin", color="CCCCCC"),
+        top=Side(style="thin", color="CCCCCC"),
+        bottom=Side(style="thin", color="CCCCCC"),
+    )
+    align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    align_left = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    align_right = Alignment(horizontal="right", vertical="center", wrap_text=True)
+
+    def apply_range_style(min_row, min_col, max_row, max_col, font=None, fill=None, border=None, alignment=None):
+        for r in range(min_row, max_row + 1):
+            for c in range(min_col, max_col + 1):
+                cell = ws.cell(row=r, column=c)
+                if font:
+                    cell.font = font
+                if fill:
+                    cell.fill = fill
+                if border:
+                    cell.border = border
+                if alignment:
+                    cell.alignment = alignment
+
+    # --- ENCABEZADOS (Fila 1 y Fila 2) ---
+    ws.cell(row=1, column=1, value="DATOS INICIALES")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
+
+    ws.cell(row=2, column=1, value="LICITACION")
+    ws.cell(row=2, column=2, value="OCA")
+    ws.cell(row=2, column=3, value="REQ")
+    ws.cell(row=2, column=4, value="OBJETO / EXPEDIENTE")
+
+    headers_spanning = [
+        (5, "MONTO\nREQUERIMIENTO"),
+        (6, "MONTO DICTAMEN\nDE EVALUACION"),
+        (7, "TALLER"),
+        (8, "AERONAVE"),
+        (9, "DESCRIPCION"),
+        (10, "ESTADO DE LA\nCONTRATACION"),
+        (11, "MONTO\nASIGNADO"),
+        (12, "GFH DE\nASIGNACION"),
+        (13, "INCOTERM"),
+        (14, "NRO. OC"),
+        (15, "ORDEN DE\nCOMPRA"),
+        (16, "MONTO OC\nCOMPROMETIDO"),
+        (17, "FECHA DE\nEMISION"),
+        (18, "FECHA VTO OC"),
+        (19, "SOLICITUD DE\nPROVISION (SP)"),
+        (20, "MONTO SP"),
+        (21, "FECHA EMISION\n(SP)"),
+        (22, "FECHA VTO\n(SP)"),
+        (23, "MONTO\nREMANENTE"),
+        (24, "SAIMB NRO."),
+        (25, "RECIBIDO"),
+        (26, "ULTIMO ESTADO\nPOR GDE/GFH"),
+    ]
+
+    for col_idx, text in headers_spanning:
+        ws.cell(row=1, column=col_idx, value=text)
+        ws.merge_cells(start_row=1, start_column=col_idx, end_row=2, end_column=col_idx)
+
+    apply_range_style(
+        min_row=1,
+        min_col=1,
+        max_row=2,
+        max_col=26,
+        font=header_font,
+        fill=header_fill,
+        border=thin_border,
+        alignment=align_center,
+    )
+    ws.row_dimensions[1].height = 26
+    ws.row_dimensions[2].height = 24
+
+    # --- DATOS ---
+    row_num = 3
+    for process in queryset:
+        pos = list(process.purchase_orders.all())
+        reqs = list(process.requirements.all())
+        n_reqs = len(reqs)
+
+        oc_numbers = "\n".join(po.order_number for po in pos) if pos else "-"
+        oc_types = "\n".join("OCA" if po.order_type == "OCA" else "OC" for po in pos) if pos else "-"
+        oc_amounts = "\n".join(f"{process.currency_symbol} {po.amount:,.2f}" for po in pos if po.amount is not None) if pos else "-"
+        oc_issues = "\n".join(po.issue_date.strftime("%d/%m/%Y") for po in pos if po.issue_date) if pos else "-"
+        oc_exps = "\n".join(po.expiration_date.strftime("%d/%m/%Y") for po in pos if po.expiration_date) if pos else "-"
+
+        all_sps = [sp for po in pos for sp in po.provision_requests.all()]
+        sp_numbers = "\n".join(sp.sp_number for sp in all_sps) if all_sps else "-"
+        sp_amounts = "\n".join(f"{process.currency_symbol} {sp.amount:,.2f}" for sp in all_sps if sp.amount is not None) if all_sps else "-"
+        sp_issues = "\n".join(sp.issue_date.strftime("%d/%m/%Y") for sp in all_sps if sp.issue_date) if all_sps else "-"
+        sp_exps = "\n".join(sp.expiration_date.strftime("%d/%m/%Y") for sp in all_sps if sp.expiration_date) if all_sps else "-"
+
+        if process.has_oca:
+            saimb = "\n".join(sp.saimb_number for sp in all_sps if sp.saimb_number) if all_sps else "-"
+            recibido = "\n".join("SI" if sp.received else ("NO" if sp.received is False else "-") for sp in all_sps) if all_sps else "-"
+        else:
+            saimb = "\n".join(po.saimb_number for po in pos if po.saimb_number) if pos else "-"
+            recibido = "SI" if process.received else ("NO" if process.received is False else "-")
+
+        if process.latest_update:
+            org = f"{process.latest_update.organization} - " if process.latest_update.organization else ""
+            date_str = f" ({process.latest_update.event_date.strftime('%d/%m/%Y')})" if process.latest_update.event_date else ""
+            ultimo_estado = f"{org}{process.latest_update.description}{date_str}"
+        else:
+            ultimo_estado = process.notes or "-"
+
+        has_oca_str = "SI" if process.has_oca else ("NO" if process.has_oca is False else "-")
+        eval_amount_str = f"{process.currency_symbol} {process.evaluation_amount:,.2f}" if process.evaluation_amount is not None else "-"
+        awarded_amount_str = f"{process.currency_symbol} {process.awarded_amount:,.2f}" if process.awarded_amount is not None else "-"
+        remaining_amount_str = f"{process.currency_symbol} {process.remaining_amount:,.2f}" if process.remaining_amount is not None else "-"
+        licitacion_str = f"{process.process_number}\n{process.year}"
+
+        if n_reqs > 0:
+            start_row = row_num
+            end_row = row_num + n_reqs - 1
+
+            for idx, req in enumerate(reqs):
+                r = start_row + idx
+                req_amount_str = f"{process.currency_symbol} {req.requested_amount:,.2f}" if req.requested_amount is not None else "-"
+                ws.cell(row=r, column=3, value=req.requirement_number)
+                ws.cell(row=r, column=5, value=req_amount_str)
+                ws.cell(row=r, column=7, value=req.workshop_label or "-")
+                ws.cell(row=r, column=8, value=req.aircraft or "-")
+                ws.cell(row=r, column=9, value=req.description or "-")
+
+            # Valores del proceso en start_row
+            ws.cell(row=start_row, column=1, value=licitacion_str)
+            ws.cell(row=start_row, column=2, value=has_oca_str)
+            ws.cell(row=start_row, column=4, value=process.expediente or "-")
+            ws.cell(row=start_row, column=6, value=eval_amount_str)
+            ws.cell(row=start_row, column=10, value=process.get_status_display())
+            ws.cell(row=start_row, column=11, value=awarded_amount_str)
+            ws.cell(row=start_row, column=12, value=process.allocation_gfh or "-")
+            ws.cell(row=start_row, column=13, value=process.incoterm or "-")
+            ws.cell(row=start_row, column=14, value=oc_numbers)
+            ws.cell(row=start_row, column=15, value=oc_types)
+            ws.cell(row=start_row, column=16, value=oc_amounts)
+            ws.cell(row=start_row, column=17, value=oc_issues)
+            ws.cell(row=start_row, column=18, value=oc_exps)
+            ws.cell(row=start_row, column=19, value=sp_numbers)
+            ws.cell(row=start_row, column=20, value=sp_amounts)
+            ws.cell(row=start_row, column=21, value=sp_issues)
+            ws.cell(row=start_row, column=22, value=sp_exps)
+            ws.cell(row=start_row, column=23, value=remaining_amount_str)
+            ws.cell(row=start_row, column=24, value=saimb)
+            ws.cell(row=start_row, column=25, value=recibido)
+            ws.cell(row=start_row, column=26, value=ultimo_estado)
+
+            if n_reqs > 1:
+                cols_to_merge = [1, 2, 4, 6, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+                for col_c in cols_to_merge:
+                    ws.merge_cells(start_row=start_row, start_column=col_c, end_row=end_row, end_column=col_c)
+
+            for r in range(start_row, end_row + 1):
+                for col_c in range(1, 27):
+                    c = ws.cell(row=r, column=col_c)
+                    c.font = data_font
+                    c.border = thin_border
+                    if col_c in (4, 9, 26):
+                        c.alignment = align_left
+                    elif col_c in (5, 6, 11, 16, 20, 23):
+                        c.alignment = align_right
+                    else:
+                        c.alignment = align_center
+
+            row_num = end_row + 1
+        else:
+            ws.cell(row=row_num, column=1, value=licitacion_str)
+            ws.cell(row=row_num, column=2, value=has_oca_str)
+            ws.cell(row=row_num, column=3, value="-")
+            ws.cell(row=row_num, column=4, value=process.expediente or "-")
+            ws.cell(row=row_num, column=5, value="-")
+            ws.cell(row=row_num, column=6, value=eval_amount_str)
+            ws.cell(row=row_num, column=7, value="-")
+            ws.cell(row=row_num, column=8, value="-")
+            ws.cell(row=row_num, column=9, value="-")
+            ws.cell(row=row_num, column=10, value=process.get_status_display())
+            ws.cell(row=row_num, column=11, value=awarded_amount_str)
+            ws.cell(row=row_num, column=12, value=process.allocation_gfh or "-")
+            ws.cell(row=row_num, column=13, value=process.incoterm or "-")
+            ws.cell(row=row_num, column=14, value=oc_numbers)
+            ws.cell(row=row_num, column=15, value=oc_types)
+            ws.cell(row=row_num, column=16, value=oc_amounts)
+            ws.cell(row=row_num, column=17, value=oc_issues)
+            ws.cell(row=row_num, column=18, value=oc_exps)
+            ws.cell(row=row_num, column=19, value=sp_numbers)
+            ws.cell(row=row_num, column=20, value=sp_amounts)
+            ws.cell(row=row_num, column=21, value=sp_issues)
+            ws.cell(row=row_num, column=22, value=sp_exps)
+            ws.cell(row=row_num, column=23, value=remaining_amount_str)
+            ws.cell(row=row_num, column=24, value=saimb)
+            ws.cell(row=row_num, column=25, value=recibido)
+            ws.cell(row=row_num, column=26, value=ultimo_estado)
+
+            for col_c in range(1, 27):
+                c = ws.cell(row=row_num, column=col_c)
+                c.font = data_font
+                c.border = thin_border
+                if col_c in (4, 9, 26):
+                    c.alignment = align_left
+                elif col_c in (5, 6, 11, 16, 20, 23):
+                    c.alignment = align_right
+                else:
+                    c.alignment = align_center
+            row_num += 1
+
+    # Ajuste dinámico del ancho de columnas
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            val = str(cell.value or "")
+            for l in val.split("\n"):
+                if len(l) > max_len:
+                    max_len = len(l)
+        ws.column_dimensions[col_letter].width = min(max(max_len + 4, 14), 50)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    response = HttpResponse(
+        output.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = 'attachment; filename="licitaciones_exteriores.xlsx"'
     return response
 
 @login_required

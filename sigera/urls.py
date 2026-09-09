@@ -11,6 +11,7 @@ urlpatterns = [
     path('personnel/import/', views.personnel_import, name='personnel_import'),
     path('personnel/new/', views.personnel_create, name='personnel_create'),
     path('personnel/<int:pk>/measures/', views.personnel_measure_sheet, name='personnel_measure_sheet'),
+    path('personnel/<int:pk>/clothing/', views.personnel_clothing_detail, name='personnel_clothing_detail'),
     path('personnel/<int:pk>/edit/', views.personnel_edit, name='personnel_edit'),
     path('personnel/<int:pk>/delete/', views.personnel_delete, name='personnel_delete'),
     path('size-curve/', views.size_curve, name='size_curve'),

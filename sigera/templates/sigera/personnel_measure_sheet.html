@@ -22,6 +22,9 @@
                 <i class="fa-solid fa-pen-to-square me-2"></i>{% if completed_rows %}Modificar talles{% else %}Cargar talles{% endif %}
             </a>
         {% endif %}
+        <a href="{% url 'sigera:personnel_clothing_detail' person.pk %}" class="btn btn-outline-info rounded-pill px-3">
+            <i class="fa-solid fa-shirt me-2"></i>Ficha de Ropa
+        </a>
         <a href="{% url 'sigera:personnel_edit' person.pk %}" class="btn btn-outline-primary rounded-pill px-3" style="color: #6f42c1; border-color: #6f42c1;">
             <i class="fa-solid fa-user-pen me-2"></i>Datos personales
         </a>

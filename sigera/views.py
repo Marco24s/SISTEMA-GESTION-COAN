@@ -327,13 +327,18 @@ def personnel_list(request):
 @login_required
 def assignment_list(request):
     """
-    Vista de historial de entregas de ropa con búsqueda y control de provisiones
+    Vista de historial de entregas de ropa con búsqueda, filtro por año, filtro por tipo de prenda y control de provisiones
     """
+    from datetime import date, timedelta
+    from collections import defaultdict
+
     query = request.GET.get('q', '')
+    selected_year = request.GET.get('year', '')
+    selected_clothing_type = request.GET.get('clothing_type', '')
     user = request.user
     is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
     
-    # 1. Historial General
+    # 1. Historial General base
     assignments = ClothingAssignment.objects.select_related(
         'personnel', 'batch__clothing_size__clothing_type', 'issued_by'
     )
@@ -343,6 +348,31 @@ def assignment_list(request):
             assignments = assignments.filter(personnel__assigned_unit=user.unit)
         else:
             assignments = assignments.none()
+
+    # Obtener años disponibles
+    available_years_dates = ClothingAssignment.objects.dates('assigned_date', 'year', order='DESC')
+    available_years = [d.year for d in available_years_dates]
+    current_year = date.today().year
+    if current_year not in available_years:
+        available_years.insert(0, current_year)
+
+    clothing_types = ClothingType.objects.order_by('name')
+
+    # Filtro por año
+    if selected_year:
+        try:
+            year_int = int(selected_year)
+            assignments = assignments.filter(assigned_date__year=year_int)
+        except ValueError:
+            pass
+
+    # Filtro por tipo de prenda
+    if selected_clothing_type:
+        try:
+            ct_id = int(selected_clothing_type)
+            assignments = assignments.filter(batch__clothing_size__clothing_type_id=ct_id)
+        except ValueError:
+            pass
     
     if query:
         assignments = assignments.filter(
@@ -354,8 +384,11 @@ def assignment_list(request):
         
     assignments = assignments.order_by('personnel__last_name', 'personnel__first_name', '-assigned_date', '-id')
     
+    # Resumen del filtro aplicado
+    filtered_personnel_count = assignments.values('personnel').distinct().count()
+    filtered_items_count = assignments.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+
     # 2. Primera Provisión
-    from django.db.models import Count
     personnel_first_provision = Personnel.objects.annotate(
         num_assignments=Count('assignments')
     ).filter(num_assignments=0).select_related('assigned_unit')
@@ -374,7 +407,6 @@ def assignment_list(request):
         )
         
     # 3. Renovaciones (Vencidos o próximos a vencer en <= 30 días)
-    from datetime import date, timedelta
     active_assignments = ClothingAssignment.objects.filter(
         returned=False,
         reception_status='CONFIRMED',
@@ -414,9 +446,69 @@ def assignment_list(request):
         'renewals_list': renewals_list,
         'pending_personnel_ids': pending_personnel_ids,
         'search_query': query,
+        'selected_year': selected_year,
+        'selected_clothing_type': selected_clothing_type,
+        'available_years': available_years,
+        'clothing_types': clothing_types,
+        'filtered_personnel_count': filtered_personnel_count,
+        'filtered_items_count': filtered_items_count,
         'is_admin': is_admin,
     }
     return render(request, 'sigera/assignment_list.html', context)
+
+@login_required
+def personnel_clothing_detail(request, pk):
+    """
+    Ficha de Dotación y Entregas de Ropa de una persona.
+    Muestra:
+    - Información del personal
+    - Cargos activos (prendas vigentes en posesión)
+    - Historial de entregas y devoluciones agrupadas por año
+    - Talles cargados en su planilla de medidas
+    """
+    from collections import defaultdict
+    personnel = get_object_or_404(Personnel.objects.select_related('assigned_unit'), pk=pk)
+    user = request.user
+    is_admin = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+    
+    if not is_admin:
+        if getattr(user, 'unit', None) and personnel.assigned_unit != user.unit:
+            messages.error(request, "No tienes permiso para ver el personal de otra unidad.")
+            return redirect('sigera:personnel_list')
+
+    assignments = ClothingAssignment.objects.filter(
+        personnel=personnel
+    ).select_related(
+        'batch__clothing_size__clothing_type', 'issued_by', 'received_by'
+    ).order_by('-assigned_date', '-id')
+
+    active_assignments = [a for a in assignments if not a.returned]
+    returned_assignments = [a for a in assignments if a.returned]
+
+    assignments_by_year = defaultdict(list)
+    for a in assignments:
+        year = a.assigned_date.year if a.assigned_date else "Sin fecha"
+        assignments_by_year[year].append(a)
+    
+    sorted_years = sorted(assignments_by_year.keys(), reverse=True, key=lambda y: int(y) if isinstance(y, int) else 0)
+    history_by_year = [(y, assignments_by_year[y]) for y in sorted_years]
+
+    measures = PersonnelClothingMeasure.objects.filter(
+        personnel=personnel
+    ).select_related('clothing_type', 'clothing_size').order_by('clothing_type__name')
+
+    context = {
+        'person': personnel,
+        'active_assignments': active_assignments,
+        'returned_assignments': returned_assignments,
+        'history_by_year': history_by_year,
+        'total_assignments_count': len(assignments),
+        'active_count': len(active_assignments),
+        'returned_count': len(returned_assignments),
+        'measures': measures,
+        'is_admin': is_admin,
+    }
+    return render(request, 'sigera/personnel_clothing_detail.html', context)
 
 @login_required
 def personnel_create(request):

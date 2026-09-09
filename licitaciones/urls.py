@@ -17,6 +17,7 @@ urlpatterns = [
     path("etapas/<int:pk>/editar/", views.TenderStageUpdateView.as_view(), name="stage_update"),
     path("exterior/", views.ForeignTenderDashboardView.as_view(), name="foreign_dashboard"),
     path("exterior/procesos/", views.ForeignTenderProcessListView.as_view(), name="foreign_list"),
+    path("exterior/procesos/exportar/excel/", views.export_foreign_tenders_excel, name="foreign_export_excel"),
     path("exterior/historial/", views.ForeignTenderProcessHistoryView.as_view(), name="foreign_history"),
     path("exterior/nuevo/", views.ForeignTenderProcessCreateView.as_view(), name="foreign_create"),
     path("exterior/<int:pk>/", views.ForeignTenderProcessDetailView.as_view(), name="foreign_detail"),

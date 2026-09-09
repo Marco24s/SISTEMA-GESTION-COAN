@@ -109,7 +109,11 @@
                                                             <tbody class="border-top-0">
                                                                 {% for person in rank_group.people %}
                                                                     <tr>
-                                                                        <td class="px-4 py-3 fw-bold">{{ person.last_name }}, {{ person.first_name }}</td>
+                                                                        <td class="px-4 py-3">
+                                                                            <a href="{% url 'sigera:personnel_clothing_detail' person.pk %}" class="text-decoration-none fw-bold" style="color: #462880;" title="Ver Ficha de Ropa y Entregas">
+                                                                                {{ person.last_name }}, {{ person.first_name }}
+                                                                            </a>
+                                                                        </td>
                                                                         <td class="py-3 font-monospace text-center">{{ person.dni }}</td>
                                                                         <td class="py-3 text-center">
                                                                             <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="badge text-decoration-none px-3 py-2 {{ person.measure_badge_class }}" title="Ver o cargar planilla de talles">
@@ -118,6 +122,9 @@
                                                                         </td>
                                                                         <td class="py-3 text-center">
                                                                             <div class="d-flex justify-content-center gap-1">
+                                                                                <a href="{% url 'sigera:personnel_clothing_detail' person.pk %}" class="btn btn-sm btn-outline-info shadow-sm" title="Ficha de Ropa y Entregas">
+                                                                                    <i class="fa-solid fa-shirt"></i>
+                                                                                </a>
                                                                                 <a href="{% url 'sigera:personnel_measure_sheet' person.pk %}" class="btn btn-sm btn-outline-success shadow-sm" title="Planilla de Medidas">
                                                                                     <i class="fa-solid fa-ruler-combined"></i>
                                                                                 </a>
