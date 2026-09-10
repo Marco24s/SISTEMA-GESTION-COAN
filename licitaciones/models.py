@@ -455,6 +455,11 @@ class ForeignTenderPurchaseOrder(models.Model):
         verbose_name="Tipo",
     )
     order_number = models.CharField(max_length=40, verbose_name="Número de orden")
+    supplier = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Proveedor",
+    )
     amount = models.DecimalField(
         max_digits=18,
         decimal_places=2,
@@ -516,6 +521,8 @@ class ForeignTenderPurchaseOrder(models.Model):
     def save(self, *args, **kwargs):
         if self.order_number:
             self.order_number = self.order_number.upper().strip()
+        if self.supplier:
+            self.supplier = self.supplier.strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

@@ -89,12 +89,13 @@
         <a href="{% url 'licitaciones:foreign_purchase_order_create' process.pk %}" class="btn btn-sm btn-primary"><i class="fa-solid fa-plus me-1"></i> Agregar OC / OCA</a>
     </div>
     <div class="table-responsive"><table class="table table-hover align-middle mb-0">
-        <thead class="table-light"><tr><th>Nro. Orden</th><th>Orden de compra</th><th>Monto</th><th>Fecha de emision</th><th>Fecha de vencimiento</th>{% if process.has_oca %}<th>SP asociadas</th>{% else %}<th>SAIMB Nro.</th>{% endif %}<th></th></tr></thead>
+        <thead class="table-light"><tr><th>Nro. Orden</th><th>Orden de compra</th><th>Proveedor</th><th>Monto</th><th>Fecha de emision</th><th>Fecha de vencimiento</th>{% if process.has_oca %}<th>SP asociadas</th>{% else %}<th>SAIMB Nro.</th>{% endif %}<th></th></tr></thead>
             <tbody>
             {% for order in process.purchase_orders.all %}
                 <tr>
                     <td><strong>{{ order.order_number }}</strong></td>
                     <td><span class="badge {% if process.has_oca %}text-bg-warning{% else %}text-bg-info{% endif %}">{% if process.has_oca %}OCA{% else %}OC{% endif %}</span></td>
+                    <td>{{ order.supplier|default:"-" }}</td>
                     <td>{{ process.currency_symbol }} {{ order.amount|floatformat:2|intcomma }}</td>
                     <td>{{ order.issue_date|date:"d/m/Y"|default:"-" }}</td>
                     <td>{{ order.expiration_date|date:"d/m/Y"|default:"-" }}</td>
@@ -122,7 +123,7 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7" class="text-center text-muted py-4">Todavia no se cargaron ordenes de compra.</td></tr>
+                <tr><td colspan="8" class="text-center text-muted py-4">Todavia no se cargaron ordenes de compra.</td></tr>
             {% endfor %}
             </tbody>
     </table></div>

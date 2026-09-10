@@ -39,6 +39,7 @@
                     <th rowspan="2">INCOTERM</th>
                     <th rowspan="2">NRO. OC</th>
                     <th rowspan="2">ORDEN DE<br>COMPRA</th>
+                    <th rowspan="2">PROVEEDOR</th>
                     <th rowspan="2">MONTO OC<br>COMPROMETIDO</th>
                     <th rowspan="2">FECHA DE<br>EMISION</th>
                     <th rowspan="2">FECHA VTO OC</th>
@@ -78,6 +79,7 @@
                         <td rowspan="{{ reqs|length }}">{{ process.incoterm|default:"-" }}</td>
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.order_number }}</div>{% empty %}-{% endfor %}</td>
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap"><span class="badge {% if process.has_oca %}text-bg-warning{% else %}text-bg-info{% endif %}">{% if process.has_oca %}OCA{% else %}OC{% endif %}</span></div>{% empty %}-{% endfor %}</td>
+                        <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.supplier|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ process.currency_symbol }} {{ order.amount|floatformat:2|intcomma }}</div>{% empty %}-{% endfor %}</td>
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.issue_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td rowspan="{{ reqs|length }}">{% for order in process.purchase_orders.all %}<div class="text-nowrap">{{ order.expiration_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
@@ -132,6 +134,7 @@
                         <td>{{ process.allocation_gfh|default:"-"|linebreaksbr }}</td><td>{{ process.incoterm|default:"-" }}</td>
                         <td>{% for order in process.purchase_orders.all %}<div>{{ order.order_number }}</div>{% empty %}-{% endfor %}</td>
                         <td>{% for order in process.purchase_orders.all %}<div><span class="badge {% if process.has_oca %}text-bg-warning{% else %}text-bg-info{% endif %}">{% if process.has_oca %}OCA{% else %}OC{% endif %}</span></div>{% empty %}-{% endfor %}</td>
+                        <td>{% for order in process.purchase_orders.all %}<div>{{ order.supplier|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td>{% for order in process.purchase_orders.all %}<div>{{ process.currency_symbol }} {{ order.amount|floatformat:2|intcomma }}</div>{% empty %}-{% endfor %}</td>
                         <td>{% for order in process.purchase_orders.all %}<div>{{ order.issue_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>
                         <td>{% for order in process.purchase_orders.all %}<div>{{ order.expiration_date|date:"d/m/Y"|default:"-" }}</div>{% empty %}-{% endfor %}</td>

@@ -428,6 +428,7 @@ class ForeignTenderProcessListView(LoginRequiredMixin, ListView):
                 | Q(requirements__requirement_number__icontains=query)
                 | Q(requirements__description__icontains=query)
                 | Q(purchase_orders__order_number__icontains=query)
+                | Q(purchase_orders__supplier__icontains=query)
             ).distinct()
         return queryset
 
@@ -473,7 +474,9 @@ class ForeignTenderProcessHistoryView(LoginRequiredMixin, ListView):
                 Q(process_number__icontains=query)
                 | Q(expediente__icontains=query)
                 | Q(requirements__requirement_number__icontains=query)
+                | Q(requirements__description__icontains=query)
                 | Q(purchase_orders__order_number__icontains=query)
+                | Q(purchase_orders__supplier__icontains=query)
             ).distinct()
         return queryset
 
@@ -740,6 +743,7 @@ def export_foreign_tenders_excel(request):
             | Q(requirements__requirement_number__icontains=query)
             | Q(requirements__description__icontains=query)
             | Q(purchase_orders__order_number__icontains=query)
+            | Q(purchase_orders__supplier__icontains=query)
         ).distinct()
 
     wb = openpyxl.Workbook()
@@ -793,17 +797,18 @@ def export_foreign_tenders_excel(request):
         (13, "INCOTERM"),
         (14, "NRO. OC"),
         (15, "ORDEN DE\nCOMPRA"),
-        (16, "MONTO OC\nCOMPROMETIDO"),
-        (17, "FECHA DE\nEMISION"),
-        (18, "FECHA VTO OC"),
-        (19, "SOLICITUD DE\nPROVISION (SP)"),
-        (20, "MONTO SP"),
-        (21, "FECHA EMISION\n(SP)"),
-        (22, "FECHA VTO\n(SP)"),
-        (23, "MONTO\nREMANENTE"),
-        (24, "SAIMB NRO."),
-        (25, "RECIBIDO"),
-        (26, "ULTIMO ESTADO\nPOR GDE/GFH"),
+        (16, "PROVEEDOR"),
+        (17, "MONTO OC\nCOMPROMETIDO"),
+        (18, "FECHA DE\nEMISION"),
+        (19, "FECHA VTO OC"),
+        (20, "SOLICITUD DE\nPROVISION (SP)"),
+        (21, "MONTO SP"),
+        (22, "FECHA EMISION\n(SP)"),
+        (23, "FECHA VTO\n(SP)"),
+        (24, "MONTO\nREMANENTE"),
+        (25, "SAIMB NRO."),
+        (26, "RECIBIDO"),
+        (27, "ULTIMO ESTADO\nPOR GDE/GFH"),
     ]
 
     for col_idx, text in headers_spanning:
@@ -814,7 +819,7 @@ def export_foreign_tenders_excel(request):
         min_row=1,
         min_col=1,
         max_row=2,
-        max_col=26,
+        max_col=27,
         font=header_font,
         fill=header_fill,
         border=thin_border,
@@ -832,6 +837,7 @@ def export_foreign_tenders_excel(request):
 
         oc_numbers = "\n".join(po.order_number for po in pos) if pos else "-"
         oc_types = "\n".join("OCA" if po.order_type == "OCA" else "OC" for po in pos) if pos else "-"
+        oc_suppliers = "\n".join(po.supplier or "-" for po in pos) if pos else "-"
         oc_amounts = "\n".join(f"{process.currency_symbol} {po.amount:,.2f}" for po in pos if po.amount is not None) if pos else "-"
         oc_issues = "\n".join(po.issue_date.strftime("%d/%m/%Y") for po in pos if po.issue_date) if pos else "-"
         oc_exps = "\n".join(po.expiration_date.strftime("%d/%m/%Y") for po in pos if po.expiration_date) if pos else "-"
@@ -886,31 +892,32 @@ def export_foreign_tenders_excel(request):
             ws.cell(row=start_row, column=13, value=process.incoterm or "-")
             ws.cell(row=start_row, column=14, value=oc_numbers)
             ws.cell(row=start_row, column=15, value=oc_types)
-            ws.cell(row=start_row, column=16, value=oc_amounts)
-            ws.cell(row=start_row, column=17, value=oc_issues)
-            ws.cell(row=start_row, column=18, value=oc_exps)
-            ws.cell(row=start_row, column=19, value=sp_numbers)
-            ws.cell(row=start_row, column=20, value=sp_amounts)
-            ws.cell(row=start_row, column=21, value=sp_issues)
-            ws.cell(row=start_row, column=22, value=sp_exps)
-            ws.cell(row=start_row, column=23, value=remaining_amount_str)
-            ws.cell(row=start_row, column=24, value=saimb)
-            ws.cell(row=start_row, column=25, value=recibido)
-            ws.cell(row=start_row, column=26, value=ultimo_estado)
+            ws.cell(row=start_row, column=16, value=oc_suppliers)
+            ws.cell(row=start_row, column=17, value=oc_amounts)
+            ws.cell(row=start_row, column=18, value=oc_issues)
+            ws.cell(row=start_row, column=19, value=oc_exps)
+            ws.cell(row=start_row, column=20, value=sp_numbers)
+            ws.cell(row=start_row, column=21, value=sp_amounts)
+            ws.cell(row=start_row, column=22, value=sp_issues)
+            ws.cell(row=start_row, column=23, value=sp_exps)
+            ws.cell(row=start_row, column=24, value=remaining_amount_str)
+            ws.cell(row=start_row, column=25, value=saimb)
+            ws.cell(row=start_row, column=26, value=recibido)
+            ws.cell(row=start_row, column=27, value=ultimo_estado)
 
             if n_reqs > 1:
-                cols_to_merge = [1, 2, 4, 6, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+                cols_to_merge = [1, 2, 4, 6, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
                 for col_c in cols_to_merge:
                     ws.merge_cells(start_row=start_row, start_column=col_c, end_row=end_row, end_column=col_c)
 
             for r in range(start_row, end_row + 1):
-                for col_c in range(1, 27):
+                for col_c in range(1, 28):
                     c = ws.cell(row=r, column=col_c)
                     c.font = data_font
                     c.border = thin_border
-                    if col_c in (4, 9, 26):
+                    if col_c in (4, 9, 27):
                         c.alignment = align_left
-                    elif col_c in (5, 6, 11, 16, 20, 23):
+                    elif col_c in (5, 6, 11, 17, 21, 24):
                         c.alignment = align_right
                     else:
                         c.alignment = align_center
@@ -932,25 +939,26 @@ def export_foreign_tenders_excel(request):
             ws.cell(row=row_num, column=13, value=process.incoterm or "-")
             ws.cell(row=row_num, column=14, value=oc_numbers)
             ws.cell(row=row_num, column=15, value=oc_types)
-            ws.cell(row=row_num, column=16, value=oc_amounts)
-            ws.cell(row=row_num, column=17, value=oc_issues)
-            ws.cell(row=row_num, column=18, value=oc_exps)
-            ws.cell(row=row_num, column=19, value=sp_numbers)
-            ws.cell(row=row_num, column=20, value=sp_amounts)
-            ws.cell(row=row_num, column=21, value=sp_issues)
-            ws.cell(row=row_num, column=22, value=sp_exps)
-            ws.cell(row=row_num, column=23, value=remaining_amount_str)
-            ws.cell(row=row_num, column=24, value=saimb)
-            ws.cell(row=row_num, column=25, value=recibido)
-            ws.cell(row=row_num, column=26, value=ultimo_estado)
+            ws.cell(row=row_num, column=16, value=oc_suppliers)
+            ws.cell(row=row_num, column=17, value=oc_amounts)
+            ws.cell(row=row_num, column=18, value=oc_issues)
+            ws.cell(row=row_num, column=19, value=oc_exps)
+            ws.cell(row=row_num, column=20, value=sp_numbers)
+            ws.cell(row=row_num, column=21, value=sp_amounts)
+            ws.cell(row=row_num, column=22, value=sp_issues)
+            ws.cell(row=row_num, column=23, value=sp_exps)
+            ws.cell(row=row_num, column=24, value=remaining_amount_str)
+            ws.cell(row=row_num, column=25, value=saimb)
+            ws.cell(row=row_num, column=26, value=recibido)
+            ws.cell(row=row_num, column=27, value=ultimo_estado)
 
-            for col_c in range(1, 27):
+            for col_c in range(1, 28):
                 c = ws.cell(row=row_num, column=col_c)
                 c.font = data_font
                 c.border = thin_border
-                if col_c in (4, 9, 26):
+                if col_c in (4, 9, 27):
                     c.alignment = align_left
-                elif col_c in (5, 6, 11, 16, 20, 23):
+                elif col_c in (5, 6, 11, 17, 21, 24):
                     c.alignment = align_right
                 else:
                     c.alignment = align_center

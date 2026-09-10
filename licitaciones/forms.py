@@ -173,6 +173,7 @@ class ForeignTenderPurchaseOrderForm(forms.ModelForm):
         model = ForeignTenderPurchaseOrder
         fields = [
             "order_number",
+            "supplier",
             "amount",
             "issue_date",
             "expiration_date",
