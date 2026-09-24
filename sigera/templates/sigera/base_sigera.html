@@ -73,10 +73,12 @@
                                 <li><a class="dropdown-item" href="/admin/"><i class="fa-solid fa-gear me-2"></i>Administración</a></li>
                                 <li><hr class="dropdown-divider"></li>
                             {% endif %}
+                            <li><a class="dropdown-item" href="{% url 'password_change' %}"><i class="fa-solid fa-key me-2 text-primary"></i>Cambiar Contraseña</a></li>
+                            <li><hr class="dropdown-divider"></li>
                             <li>
                                 <form method="post" action="{% url 'logout' %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="dropdown-item"><i class="fa-solid fa-right-from-bracket me-2"></i>Cerrar Sesión</button>
+                                    <button type="submit" class="dropdown-item text-danger"><i class="fa-solid fa-right-from-bracket me-2"></i>Cerrar Sesión</button>
                                 </form>
                             </li>
                         </ul>

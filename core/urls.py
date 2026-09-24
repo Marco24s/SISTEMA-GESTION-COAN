@@ -90,5 +90,9 @@ urlpatterns = [
     path('responsibles/add/', views.ResponsibleCreateView.as_view(), name='responsible_create'),
     path('responsibles/<int:pk>/edit/', views.ResponsibleUpdateView.as_view(), name='responsible_update'),
     path('responsibles/<int:pk>/delete/', views.ResponsibleDeleteView.as_view(), name='responsible_delete'),
+
+    # User Password Change
+    path('accounts/password-change/', views.UserPasswordChangeView.as_view(), name='password_change'),
 ]
+
 

@@ -1626,3 +1626,12 @@ class ResponsibleDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteV
         messages.success(self.request, self.success_message)
         return super().form_valid(form)
 
+
+from django.contrib.auth.views import PasswordChangeView
+
+class UserPasswordChangeView(LoginRequiredMixin, SuccessMessageMixin, PasswordChangeView):
+    template_name = 'registration/password_change_form.html'
+    success_url = reverse_lazy('portal')
+    success_message = "¡Tu contraseña de usuario ha sido cambiada exitosamente!"
+
+

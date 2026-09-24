@@ -150,6 +150,8 @@
                                     <li><a class="dropdown-item py-2 fw-bold" href="/admin/"><i class="fa-solid fa-user-shield me-2 text-primary"></i> Administración</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                 {% endif %}
+                                <li><a class="dropdown-item py-2" href="{% url 'password_change' %}"><i class="fa-solid fa-key me-2 text-primary"></i> Cambiar Contraseña</a></li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <form method="post" action="{% url 'logout' %}">
                                         {% csrf_token %}
