@@ -71,12 +71,42 @@ def _status_filter_for_group(group):
     if group == "ADJUDICADO":
         return ["ADJUDICADO"]
     if group == "DISPONIBLE":
-        return ["PREADJUDICADO", "DISPONIBLE_ADJUDICAR"]
+        return ["PREADJUDICADO", "DISPONIBLE_ADJUDICAR", "PREADJUDICADO_DISPONIBLE"]
     if group == "EN_PROCESO":
-        return ["PUBLICADO", "EN_EVALUACION"]
+        return ["PUBLICADO", "EN_APERTURA", "EN_EVALUACION"]
     if group == "SIN_EFECTO":
         return ["FRACASADO", "DESIERTO", "DEJADO_SIN_EFECTO"]
     return []
+
+
+def _get_classification_choices():
+    default_keys = [c[0] for c in TenderProcess.CLASSIFICATION_CHOICES]
+    choices = [choice for choice in TenderProcess.CLASSIFICATION_CHOICES if choice[0]]
+    existing_custom = (
+        TenderProcess.objects.exclude(classification__in=default_keys)
+        .exclude(classification__isnull=True)
+        .exclude(classification="")
+        .values_list("classification", flat=True)
+        .distinct()
+        .order_by("classification")
+    )
+    for c in existing_custom:
+        if (c, c) not in choices:
+            choices.append((c, c))
+    return choices
+
+
+def _get_custom_classifications_with_count():
+    default_keys = ["", "REPUESTO", "SUPERVIVENCIA", "GRASAS_LUBRICANTES", "REPUESTOS_FONDEF"]
+    items = (
+        TenderProcess.objects.exclude(classification__in=default_keys)
+        .exclude(classification__isnull=True)
+        .exclude(classification="")
+        .values("classification")
+        .annotate(count=Count("id"))
+        .order_by("classification")
+    )
+    return [{"name": item["classification"], "count": item["count"]} for item in items]
 
 
 class TenderDashboardView(LoginRequiredMixin, TemplateView):
@@ -229,6 +259,7 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         classification = self.request.GET.get("classification")
         group = self.request.GET.get("group")
         control = self.request.GET.get("control")
+        ipp = self.request.GET.get("ipp", "").strip()
         q = self.request.GET.get("q")
 
         if year:
@@ -247,11 +278,14 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(amount_ars__isnull=True)
         elif control == "foreign_currency":
             queryset = queryset.filter(currency__in=["USD", "EUR", "OTRA"])
+        if ipp:
+            queryset = queryset.filter(ipp__icontains=ipp)
         if q:
             queryset = queryset.filter(
                 Q(process_number__icontains=q)
                 | Q(expediente__icontains=q)
                 | Q(name__icontains=q)
+                | Q(ipp__icontains=q)
             )
         return queryset
 
@@ -259,19 +293,28 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["units"] = Unit.objects.filter().order_by("name")
         context["status_choices"] = TenderProcess.STATUS_CHOICES
-        context["classification_choices"] = [choice for choice in TenderProcess.CLASSIFICATION_CHOICES if choice[0]]
+        context["classification_choices"] = _get_classification_choices()
         context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
         context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
         context["selected_status"] = self.request.GET.get("status", "")
         context["selected_classification"] = self.request.GET.get("classification", "")
         context["selected_group"] = self.request.GET.get("group", "")
         context["selected_control"] = self.request.GET.get("control", "")
+        context["selected_ipp"] = self.request.GET.get("ipp", "").strip()
         context["search_query"] = self.request.GET.get("q", "")
         context["years"] = (
             TenderProcess.objects.order_by("-year")
             .values_list("year", flat=True)
             .distinct()
         )
+        context["ipp_choices"] = (
+            TenderProcess.objects.exclude(ipp__isnull=True)
+            .exclude(ipp="")
+            .values_list("ipp", flat=True)
+            .distinct()
+            .order_by("ipp")
+        )
+        context["custom_classifications"] = _get_custom_classifications_with_count()
         query_params = self.request.GET.copy()
         query_params.pop("page", None)
         context["pagination_query"] = query_params.urlencode()
@@ -294,6 +337,7 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
         unit = _clean_int(self.request.GET.get("unit"))
         status = self.request.GET.get("status")
         classification = self.request.GET.get("classification")
+        ipp = self.request.GET.get("ipp", "").strip()
         q = self.request.GET.get("q")
 
         if year:
@@ -304,11 +348,14 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(status=status)
         if classification:
             queryset = queryset.filter(classification=classification)
+        if ipp:
+            queryset = queryset.filter(ipp__icontains=ipp)
         if q:
             queryset = queryset.filter(
                 Q(process_number__icontains=q)
                 | Q(expediente__icontains=q)
                 | Q(name__icontains=q)
+                | Q(ipp__icontains=q)
             )
         return queryset
 
@@ -316,17 +363,26 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["units"] = Unit.objects.filter().order_by("name")
         context["status_choices"] = TenderProcess.STATUS_CHOICES
-        context["classification_choices"] = [choice for choice in TenderProcess.CLASSIFICATION_CHOICES if choice[0]]
+        context["classification_choices"] = _get_classification_choices()
+        context["custom_classifications"] = _get_custom_classifications_with_count()
         context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
         context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
         context["selected_status"] = self.request.GET.get("status", "")
         context["selected_classification"] = self.request.GET.get("classification", "")
+        context["selected_ipp"] = self.request.GET.get("ipp", "").strip()
         context["search_query"] = self.request.GET.get("q", "")
         context["years"] = (
             TenderProcess.objects.filter(is_active=False)
             .order_by("-year")
             .values_list("year", flat=True)
             .distinct()
+        )
+        context["ipp_choices"] = (
+            TenderProcess.objects.exclude(ipp__isnull=True)
+            .exclude(ipp="")
+            .values_list("ipp", flat=True)
+            .distinct()
+            .order_by("ipp")
         )
         return context
 
@@ -342,6 +398,11 @@ class TenderProcessCreateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMes
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["custom_classifications"] = _get_custom_classifications_with_count()
+        return context
 
 
 class TenderProcessDetailView(LoginRequiredMixin, DetailView):
@@ -364,6 +425,29 @@ class TenderProcessUpdateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMes
         if self.object.is_active:
             return reverse_lazy("licitaciones:process_list")
         return reverse_lazy("licitaciones:process_history")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["custom_classifications"] = _get_custom_classifications_with_count()
+        return context
+
+
+class TenderClassificationDeleteView(LoginRequiredMixin, GroupRequiredMixin, View):
+    group_required = ["Supervisor", "Capturista"]
+
+    def post(self, request, *args, **kwargs):
+        classification_name = request.POST.get("classification_name", "").strip()
+        if classification_name:
+            updated_count = TenderProcess.objects.filter(classification=classification_name).update(classification="")
+            messages.success(
+                request,
+                f"Clasificación '{classification_name}' eliminada correctamente ({updated_count} proceso(s) desvinculado(s))."
+            )
+        else:
+            messages.error(request, "No se especificó ninguna clasificación para eliminar.")
+
+        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("licitaciones:process_list")
+        return redirect(next_url)
 
 
 class ForeignTenderDashboardView(LoginRequiredMixin, TemplateView):
@@ -700,7 +784,7 @@ def export_national_tenders_csv(request):
     response['Content-Disposition'] = 'attachment; filename="licitaciones_nacionales.csv"'
 
     writer = csv.writer(response, delimiter=';')
-    writer.writerow(['Año', 'Unidad/Destino', 'Proceso', 'Expediente', 'Objeto', 'Clasificación', 'Estado', 'Monto Adjudicado (ARS)'])
+    writer.writerow(['Año', 'Unidad/Destino', 'Proceso', 'Expediente', 'Objeto', 'Clasificación', 'Estado', 'Monto Adjudicado (ARS)', 'IPP'])
 
     processes = TenderProcess.objects.select_related("unit").all().order_by("-year", "unit__name", "-opening_date", "process_number")
 
@@ -713,7 +797,8 @@ def export_national_tenders_csv(request):
             p.name,
             p.get_classification_display() if p.classification else "-",
             p.get_status_display(),
-            p.amount_ars if p.amount_ars is not None else ""
+            p.amount_ars if p.amount_ars is not None else "",
+            p.ipp or "",
         ])
 
     return response

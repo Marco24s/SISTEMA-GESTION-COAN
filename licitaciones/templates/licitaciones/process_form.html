@@ -7,11 +7,16 @@
 <div class="row justify-content-center mt-4">
     <div class="col-lg-10 col-xl-8">
         <div class="card shadow-sm border-0">
-            <div class="card-header text-white" style="background: #0f766e;">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background: #0f766e;">
                 <h4 class="mb-0">
                     <i class="fa-solid fa-file-circle-plus me-2"></i>
                     {% if object %}Editar proceso licitatorio{% else %}Nuevo proceso licitatorio{% endif %}
                 </h4>
+                {% if custom_classifications %}
+                <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#deleteClassificationModal">
+                    <i class="fa-solid fa-trash-can me-1"></i> Borrar clasificaciones
+                </button>
+                {% endif %}
             </div>
             <div class="card-body">
                 <form method="post">
@@ -30,4 +35,22 @@
         </div>
     </div>
 </div>
+
+{% include "licitaciones/includes/classification_delete_modal.html" %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const newClassGroup = document.getElementById("div_id_new_classification");
+    if (newClassGroup) {
+        const manageContainer = document.createElement("div");
+        manageContainer.className = "mt-2";
+        manageContainer.innerHTML = `
+            <button type="button" class="btn btn-sm btn-outline-danger" style="font-size: 0.8rem; padding: 0.2rem 0.6rem;" data-bs-toggle="modal" data-bs-target="#deleteClassificationModal">
+                <i class="fa-solid fa-trash-can me-1"></i> Borrar / Administrar clasificaciones existentes
+            </button>
+        `;
+        newClassGroup.appendChild(manageContainer);
+    }
+});
+</script>
 {% endblock %}

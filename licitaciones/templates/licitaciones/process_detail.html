@@ -247,6 +247,12 @@
                         {% if process.exchange_rate_date %}{{ process.exchange_rate_date|date:"d/m/Y" }}{% else %}-{% endif %}
                     </div>
                 </div>
+                <div class="detail-row">
+                    <div class="detail-label">IPP</div>
+                    <div class="detail-value">
+                        {% if process.ipp %}{{ process.ipp }}{% else %}-{% endif %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>

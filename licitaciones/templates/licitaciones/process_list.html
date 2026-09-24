@@ -19,14 +19,15 @@
         overflow-wrap: anywhere;
         vertical-align: middle;
     }
-    .process-table th:nth-child(1) { width: 14%; }
-    .process-table th:nth-child(2) { width: 9%; }
-    .process-table th:nth-child(3) { width: 25%; }
-    .process-table th:nth-child(4) { width: 13%; }
+    .process-table th:nth-child(1) { width: 13%; }
+    .process-table th:nth-child(2) { width: 8%; }
+    .process-table th:nth-child(3) { width: 22%; }
+    .process-table th:nth-child(4) { width: 12%; }
     .process-table th:nth-child(5) { width: 7%; }
-    .process-table th:nth-child(6) { width: 12%; }
-    .process-table th:nth-child(7) { width: 12%; }
-    .process-table th:nth-child(8) { width: 8%; }
+    .process-table th:nth-child(6) { width: 11%; }
+    .process-table th:nth-child(7) { width: 8%; }
+    .process-table th:nth-child(8) { width: 12%; }
+    .process-table th:nth-child(9) { width: 7%; }
     .process-table .actions-cell {
         white-space: nowrap;
         overflow-wrap: normal;
@@ -118,6 +119,11 @@
         {% endif %}
     </div>
     <div class="d-flex gap-2">
+        {% if request.user|has_any_group:"Supervisor,Capturista" and custom_classifications %}
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteClassificationModal">
+            <i class="fa-solid fa-tags me-1"></i> Borrar clasificaciones
+        </button>
+        {% endif %}
         <a href="{% url 'licitaciones:process_export_csv' %}" class="btn btn-outline-secondary">
             <i class="fa-solid fa-file-csv me-1"></i> Exportar CSV
         </a>
@@ -135,7 +141,7 @@
             {% if selected_group %}
                 <input type="hidden" name="group" value="{{ selected_group }}">
             {% endif %}
-            <div class="col-md-2">
+            <div class="col-md-2 col-lg-1">
                 <label class="form-label small text-muted mb-1">Año</label>
                 <select name="year" class="form-select">
                     <option value="">Todos</option>
@@ -144,7 +150,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 col-lg-2">
                 <label class="form-label small text-muted mb-1">Destino</label>
                 <select name="unit" class="form-select">
                     <option value="">Todos</option>
@@ -153,7 +159,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 col-lg-2">
                 <label class="form-label small text-muted mb-1">Estado</label>
                 <select name="status" class="form-select">
                     <option value="">Todos</option>
@@ -162,7 +168,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 col-lg-2">
                 <label class="form-label small text-muted mb-1">Clasificacion</label>
                 <select name="classification" class="form-select">
                     <option value="">Todas</option>
@@ -171,11 +177,20 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 col-lg-1">
+                <label class="form-label small text-muted mb-1">IPP</label>
+                <input type="text" name="ipp" value="{{ selected_ipp }}" class="form-control" placeholder="IPP" list="ipp-options" autocomplete="off">
+                <datalist id="ipp-options">
+                    {% for ipp_val in ipp_choices %}
+                        <option value="{{ ipp_val }}"></option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div class="col-md-2 col-lg-3">
                 <label class="form-label small text-muted mb-1">Buscar</label>
                 <input type="search" name="q" value="{{ search_query }}" class="form-control" placeholder="Proceso, expediente o nombre">
             </div>
-            <div class="col-md-1 d-grid">
+            <div class="col-md-12 col-lg-1 d-grid">
                 <button type="submit" class="btn btn-outline-success">
                     <i class="fa-solid fa-filter"></i>
                 </button>
@@ -196,6 +211,7 @@
                         <th>Clasificacion</th>
                         <th>Apertura</th>
                         <th>Estado</th>
+                        <th>IPP</th>
                         <th class="text-end">Monto</th>
                         <th>Acciones</th>
                     </tr>
@@ -252,6 +268,13 @@
                                 <span class="badge bg-warning text-dark">{{ process.get_status_display }}</span>
                             {% endif %}
                         </td>
+                        <td>
+                            {% if process.ipp %}
+                                <span class="badge text-bg-light border text-dark">{{ process.ipp }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td class="text-end">
                             {% if process.amount_ars is not None %}
                                 <strong>{{ process.amount_ars|floatformat:2|intcomma }}</strong>
@@ -280,7 +303,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             Todavia no hay procesos licitatorios cargados.
                         </td>
                     </tr>
@@ -353,6 +376,10 @@
                                 </div>
                             </div>
                             <div>
+                                <div class="process-meta-label">IPP</div>
+                                <div class="process-meta-value">{{ process.ipp|default:"-" }}</div>
+                            </div>
+                            <div>
                                 <div class="process-meta-label">OCA</div>
                                 <div class="process-meta-value">{% if process.has_oca is True %}Si{% elif process.has_oca is False %}No{% else %}-{% endif %}</div>
                             </div>
@@ -379,4 +406,6 @@
     </ul>
 </nav>
 {% endif %}
+
+{% include "licitaciones/includes/classification_delete_modal.html" %}
 {% endblock %}

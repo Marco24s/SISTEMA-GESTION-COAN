@@ -47,7 +47,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 col-lg-2">
                 <label class="form-label small text-muted mb-1">Clasificacion</label>
                 <select name="classification" class="form-select">
                     <option value="">Todas</option>
@@ -56,11 +56,20 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 col-lg-1">
+                <label class="form-label small text-muted mb-1">IPP</label>
+                <input type="text" name="ipp" value="{{ selected_ipp }}" class="form-control" placeholder="IPP" list="ipp-history-options" autocomplete="off">
+                <datalist id="ipp-history-options">
+                    {% for ipp_val in ipp_choices %}
+                        <option value="{{ ipp_val }}"></option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div class="col-md-2 col-lg-3">
                 <label class="form-label small text-muted mb-1">Buscar</label>
                 <input type="search" name="q" value="{{ search_query }}" class="form-control" placeholder="Proceso, expediente o nombre">
             </div>
-            <div class="col-md-1 d-grid">
+            <div class="col-md-12 col-lg-1 d-grid">
                 <button type="submit" class="btn btn-outline-secondary">
                     <i class="fa-solid fa-filter"></i>
                 </button>
@@ -82,6 +91,7 @@
                         <th>Clasificacion</th>
                         <th>Apertura</th>
                         <th>Estado</th>
+                        <th>IPP</th>
                         <th class="text-end">Monto $</th>
                         <th>Moneda</th>
                         <th>Acciones</th>
@@ -126,6 +136,13 @@
                         <td>
                             <span class="badge bg-secondary">{{ process.get_status_display }}</span>
                         </td>
+                        <td>
+                            {% if process.ipp %}
+                                <span class="badge text-bg-light border text-dark">{{ process.ipp }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td class="text-end">
                             {% if process.amount_ars is not None %}
                                 {{ process.amount_ars|floatformat:2|intcomma }}
@@ -152,7 +169,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
+                        <td colspan="11" class="text-center text-muted py-4">
                             No hay procesos en el historial para los filtros seleccionados.
                         </td>
                     </tr>

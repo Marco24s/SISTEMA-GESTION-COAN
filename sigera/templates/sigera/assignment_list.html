@@ -202,38 +202,50 @@
                                                                 </td>
                                                                 <td class="py-2 align-middle text-center">
                                                                     {% if not item.returned %}
-                                                                        {% if user.is_superuser or user.unit and item.personnel.assigned_unit_id == user.unit.id %}
-                                                                        <a href="{% url 'sigera:assignment_reception_pdf' item.pk %}" class="btn btn-sm btn-outline-primary shadow-sm py-0 mb-1" title="Descargar formulario de recepción" target="_blank">
-                                                                            <i class="fa-solid fa-file-pdf"></i> PDF
-                                                                        </a>
-                                                                        {% endif %}
-                                                                        {% if item.reception_status == 'PENDING' %}
-                                                                            {% if user.unit and item.personnel.assigned_unit_id == user.unit.id %}
-                                                                            <form method="post" action="{% url 'sigera:assignment_confirm_reception' item.pk %}" onsubmit="return confirm('¿Confirma la recepción de esta prenda en destino?');">
+                                                                        <div class="d-flex justify-content-center align-items-center gap-1 flex-wrap">
+                                                                            {% if user.is_superuser or user.unit and item.personnel.assigned_unit_id == user.unit.id %}
+                                                                            <a href="{% url 'sigera:assignment_reception_pdf' item.pk %}" class="btn btn-sm btn-outline-primary shadow-sm py-0 mb-1" title="Descargar formulario de recepción" target="_blank">
+                                                                                <i class="fa-solid fa-file-pdf"></i> PDF
+                                                                            </a>
+                                                                            {% endif %}
+                                                                            {% if item.reception_status == 'PENDING' %}
+                                                                                {% if user.unit and item.personnel.assigned_unit_id == user.unit.id %}
+                                                                                <form method="post" action="{% url 'sigera:assignment_confirm_reception' item.pk %}" onsubmit="return confirm('¿Confirma la recepción de esta prenda en destino?');" class="d-inline">
+                                                                                    {% csrf_token %}
+                                                                                    <button type="submit" class="btn btn-sm btn-outline-success shadow-sm py-0 mb-1" title="Confirmar recepción">
+                                                                                        <i class="fa-solid fa-check"></i> Confirmar
+                                                                                    </button>
+                                                                                </form>
+                                                                                {% elif user.is_superuser %}
+                                                                                <span class="badge bg-light text-muted border mb-1"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span>
+                                                                                {% else %}
+                                                                                    <span class="badge bg-light text-muted border mb-1"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span>
+                                                                                {% endif %}
+                                                                            {% elif item.batch.clothing_size.clothing_type.must_be_returned %}
+                                                                                {% if is_admin %}
+                                                                                <form method="post" action="{% url 'sigera:assignment_return' item.pk %}" onsubmit="return confirm('¿Confirma que el material fue devuelto? Esto restablecerá {{ item.quantity }} unidades al pañol.');" class="d-inline">
+                                                                                    {% csrf_token %}
+                                                                                    <button type="submit" class="btn btn-sm btn-outline-secondary shadow-sm py-0 mb-1" title="Devolver unitario">
+                                                                                        <i class="fa-solid fa-rotate-left"></i> Devolver
+                                                                                    </button>
+                                                                                </form>
+                                                                                {% else %}
+                                                                                    <span class="badge bg-light text-muted border mb-1"><i class="fa-solid fa-clock me-1"></i>Pendiente</span>
+                                                                                {% endif %}
+                                                                            {% else %}
+                                                                                <span class="badge bg-light text-muted border mb-1"><i class="fa-solid fa-ban me-1"></i>No retorna</span>
+                                                                            {% endif %}
+
+                                                                            {% if user.is_superuser %}
+                                                                            <form method="post" action="{% url 'sigera:assignment_unassign' item.pk %}" class="d-inline" onsubmit="return confirm('¿Está seguro de desasignar esta prenda de {{ person_group.grouper.last_name }}? Se restituirán {{ item.quantity }} unidad(es) al stock del pañol.');">
                                                                                 {% csrf_token %}
-                                                                                <button type="submit" class="btn btn-sm btn-outline-success shadow-sm py-0" title="Confirmar recepción">
-                                                                                    <i class="fa-solid fa-check"></i> Confirmar recepción
+                                                                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                                                <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm py-0 mb-1" title="Desasignar prenda y reponer stock">
+                                                                                    <i class="fa-solid fa-user-minus"></i> Desasignar
                                                                                 </button>
                                                                             </form>
-                                                                            {% elif user.is_superuser %}
-                                                                            <div><span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span></div>
-                                                                            {% else %}
-                                                                                <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Esperando destino</span>
                                                                             {% endif %}
-                                                                        {% elif item.batch.clothing_size.clothing_type.must_be_returned %}
-                                                                            {% if is_admin %}
-                                                                            <form method="post" action="{% url 'sigera:assignment_return' item.pk %}" onsubmit="return confirm('¿Confirma que el material fue devuelto? Esto restablecerá {{ item.quantity }} unidades al pañol.');">
-                                                                                {% csrf_token %}
-                                                                                <button type="submit" class="btn btn-sm btn-outline-danger shadow-sm py-0" title="Devolver unitario">
-                                                                                    <i class="fa-solid fa-rotate-left"></i> Devolver
-                                                                                </button>
-                                                                            </form>
-                                                                            {% else %}
-                                                                                <span class="badge bg-light text-muted border"><i class="fa-solid fa-clock me-1"></i>Pendiente</span>
-                                                                            {% endif %}
-                                                                        {% else %}
-                                                                            <div><span class="badge bg-light text-muted border"><i class="fa-solid fa-ban me-1"></i>No retorna</span></div>
-                                                                        {% endif %}
+                                                                        </div>
                                                                     {% else %}
                                                                         <span class="text-muted small"><i class="fa-solid fa-lock"></i> Cerrado</span>
                                                                     {% endif %}

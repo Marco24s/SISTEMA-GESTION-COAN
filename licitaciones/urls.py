@@ -11,6 +11,7 @@ urlpatterns = [
     path("historial/", views.TenderProcessHistoryView.as_view(), name="process_history"),
     path("procesos/nuevo/", views.TenderProcessCreateView.as_view(), name="process_create"),
     path("procesos/exportar/csv/", views.export_national_tenders_csv, name="process_export_csv"),
+    path("clasificaciones/eliminar/", views.TenderClassificationDeleteView.as_view(), name="classification_delete"),
     path("procesos/<int:pk>/", views.TenderProcessDetailView.as_view(), name="process_detail"),
     path("procesos/<int:pk>/editar/", views.TenderProcessUpdateView.as_view(), name="process_update"),
     path("procesos/<int:pk>/etapas/", views.TenderStageManageView.as_view(), name="tender_stages"),

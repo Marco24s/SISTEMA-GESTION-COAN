@@ -45,8 +45,7 @@ class TenderProcess(models.Model):
         ("PUBLICADO", "Publicado"),
         ("EN_APERTURA", "En apertura"),
         ("EN_EVALUACION", "En evaluacion"),
-        ("PREADJUDICADO", "Preadjudicado"),
-        ("DISPONIBLE_ADJUDICAR", "Disponible para adjudicar"),
+        ("PREADJUDICADO_DISPONIBLE", "Preadjudicado / Disponible para adjudicar"),
         ("ADJUDICADO", "Adjudicado"),
         ("FRACASADO", "Fracasado"),
         ("DESIERTO", "Desierto"),
@@ -64,7 +63,6 @@ class TenderProcess(models.Model):
         ("", "Sin clasificar"),
         ("REPUESTO", "Repuesto"),
         ("SUPERVIVENCIA", "Supervivencia"),
-        ("SIN_EFECTO", "Desiertos / Sin efecto / Fracasados"),
         ("GRASAS_LUBRICANTES", "Grasas y Lubricantes"),
         ("REPUESTOS_FONDEF", "Repuestos / FONDEF"),
     ]
@@ -109,8 +107,7 @@ class TenderProcess(models.Model):
         verbose_name="Tipo de proceso",
     )
     classification = models.CharField(
-        max_length=30,
-        choices=CLASSIFICATION_CHOICES,
+        max_length=100,
         blank=True,
         default="",
         verbose_name="Clasificacion",
@@ -150,6 +147,7 @@ class TenderProcess(models.Model):
         verbose_name="Tipo de cambio usado",
     )
     exchange_rate_date = models.DateField(blank=True, null=True, verbose_name="Fecha del tipo de cambio")
+    ipp = models.CharField(max_length=50, blank=True, null=True, verbose_name="IPP")
     has_oca = models.BooleanField(blank=True, null=True, verbose_name="OCA")
     source = models.CharField(max_length=150, default="COMPRAR.GOB.AR", verbose_name="Fuente")
     notes = models.TextField(blank=True, null=True, verbose_name="Observaciones")
@@ -180,6 +178,8 @@ class TenderProcess(models.Model):
             self.process_number = self.process_number.upper().strip()
         if self.expediente:
             self.expediente = self.expediente.upper().strip()
+        if self.ipp:
+            self.ipp = self.ipp.strip()
         if self.name:
             self.name = self.name.strip()
         super().save(*args, **kwargs)
@@ -187,11 +187,15 @@ class TenderProcess(models.Model):
     def get_absolute_url(self):
         return reverse("licitaciones:process_list")
 
+    def get_classification_display(self):
+        choices_dict = dict(self.CLASSIFICATION_CHOICES)
+        return choices_dict.get(self.classification, self.classification or "-")
+
     @property
     def operational_group(self):
         if self.status == "ADJUDICADO":
             return "ADJUDICADO"
-        if self.status in ["PREADJUDICADO", "DISPONIBLE_ADJUDICAR"]:
+        if self.status in ["PREADJUDICADO", "DISPONIBLE_ADJUDICAR", "PREADJUDICADO_DISPONIBLE"]:
             return "DISPONIBLE"
         if self.status in ["FRACASADO", "DESIERTO", "DEJADO_SIN_EFECTO"]:
             return "SIN_EFECTO"

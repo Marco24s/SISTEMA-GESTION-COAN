@@ -1,0 +1,45 @@
+<!-- Modal Administrar / Eliminar Clasificaciones -->
+<div class="modal fade" id="deleteClassificationModal" tabindex="-1" aria-labelledby="deleteClassificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="deleteClassificationModalLabel">
+                    <i class="fa-solid fa-tags me-2 text-danger"></i> Administrar / Borrar Clasificaciones
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Seleccione una clasificación para eliminarla de las opciones. Los procesos que la tengan asignada pasarán a quedar como <strong>Sin clasificar</strong>.
+                </p>
+                {% if custom_classifications %}
+                    <ul class="list-group list-group-flush border rounded">
+                        {% for item in custom_classifications %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                <div>
+                                    <strong class="text-dark">{{ item.name }}</strong>
+                                    <span class="badge text-bg-secondary ms-2">{{ item.count }} proceso{{ item.count|pluralize:"s" }}</span>
+                                </div>
+                                <form method="post" action="{% url 'licitaciones:classification_delete' %}" onsubmit="return confirm('¿Está seguro de borrar la clasificación \'{{ item.name|escapejs }}\'? Los {{ item.count }} proceso(s) asociados quedarán como Sin clasificar.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="classification_name" value="{{ item.name }}">
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fa-solid fa-trash-can me-1"></i> Borrar
+                                    </button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="alert alert-light border text-center text-muted mb-0 py-3">
+                        <i class="fa-solid fa-circle-info me-1"></i> No hay clasificaciones personalizadas registradas para borrar.
+                    </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>

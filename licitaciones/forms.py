@@ -14,6 +14,16 @@ from .models import (
 
 
 class TenderProcessForm(forms.ModelForm):
+    classification = forms.CharField(
+        label="Clasificacion",
+        required=False,
+        widget=forms.Select(),
+    )
+    new_classification = forms.CharField(
+        label="➕ O crear nueva Clasificación",
+        required=False,
+        help_text="Escriba aquí solo si no encuentra la clasificación en la lista superior.",
+    )
     is_active = forms.BooleanField(
         label="Mostrar en procesos activos",
         required=False,
@@ -48,6 +58,7 @@ class TenderProcessForm(forms.ModelForm):
             "name",
             "process_type",
             "classification",
+            "new_classification",
             "opening_date",
             "status",
             "amount_ars",
@@ -55,6 +66,7 @@ class TenderProcessForm(forms.ModelForm):
             "foreign_amount",
             "exchange_rate",
             "exchange_rate_date",
+            "ipp",
             "has_oca",
             "source",
             "notes",
@@ -63,6 +75,34 @@ class TenderProcessForm(forms.ModelForm):
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        default_keys = [c[0] for c in TenderProcess.CLASSIFICATION_CHOICES]
+        existing_custom = (
+            TenderProcess.objects.exclude(classification__in=default_keys)
+            .exclude(classification__isnull=True)
+            .exclude(classification="")
+            .values_list("classification", flat=True)
+            .distinct()
+            .order_by("classification")
+        )
+        choices = list(TenderProcess.CLASSIFICATION_CHOICES)
+        for c in existing_custom:
+            if (c, c) not in choices:
+                choices.append((c, c))
+        if self.instance and self.instance.classification:
+            choices_keys = [c[0] for c in choices]
+            if self.instance.classification not in choices_keys:
+                choices.append((self.instance.classification, self.instance.classification))
+        self.fields["classification"].widget.choices = choices
+
+    def clean(self):
+        cleaned_data = super().clean()
+        new_classification = cleaned_data.get("new_classification")
+        if new_classification and new_classification.strip():
+            cleaned_data["classification"] = new_classification.strip()
+        return cleaned_data
 
 
 class ForeignTenderProcessForm(forms.ModelForm):

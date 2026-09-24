@@ -1359,6 +1359,48 @@ def assignment_return_view(request, pk):
     return redirect('sigera:assignment_list')
 
 @login_required
+def assignment_unassign(request, pk):
+    """
+    Vista para desasignar / anular una entrega de prenda al personal.
+    Aplica para cualquier prenda, tanto si está pendiente de recepción como si ya fue recepcionada.
+    Restituye las unidades al stock disponible del lote y elimina la asignación.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Acceso denegado: Solo el superusuario puede desasignar prendas.")
+        return redirect('sigera:assignment_list')
+
+    if request.method == 'POST':
+        assignment = get_object_or_404(
+            ClothingAssignment.objects.select_related('batch', 'personnel', 'batch__clothing_size__clothing_type'),
+            pk=pk
+        )
+        
+        person_name = f"{assignment.personnel.last_name}, {assignment.personnel.first_name}"
+        item_name = f"{assignment.batch.clothing_size.clothing_type.name} - Talle {assignment.batch.clothing_size.size}"
+        qty = assignment.quantity
+        batch = assignment.batch
+        person_id = assignment.personnel_id
+
+        with transaction.atomic():
+            # Si no estaba devuelta previamente, reponer el stock al lote
+            if not assignment.returned:
+                batch.available_quantity += qty
+                batch.save(update_fields=['available_quantity'])
+            
+            # Eliminar el registro de asignación
+            assignment.delete()
+
+        messages.success(
+            request,
+            f"Prenda '{item_name}' desasignada correctamente de {person_name}. Se reincorporaron {qty} unidad(es) al stock del pañol."
+        )
+
+        next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or reverse('sigera:personnel_clothing_detail', kwargs={'pk': person_id})
+        return redirect(next_url)
+
+    return redirect('sigera:assignment_list')
+
+@login_required
 def batch_movements(request, pk):
     """
     Vista para ver el historial de movimientos (entregas y devoluciones) de un lote específico.

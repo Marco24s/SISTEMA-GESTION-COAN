@@ -20,6 +20,7 @@ urlpatterns = [
     path('assignments/<int:pk>/reception-pdf/', views.assignment_reception_pdf, name='assignment_reception_pdf'),
     path('assignments/<int:pk>/confirm-reception/', views.assignment_confirm_reception, name='assignment_confirm_reception'),
     path('assignments/<int:pk>/return/', views.assignment_return_view, name='assignment_return'),
+    path('assignments/<int:pk>/unassign/', views.assignment_unassign, name='assignment_unassign'),
     path('catalog/', views.catalog_list, name='catalog_list'),
     path('catalog/new/', views.catalog_create, name='catalog_create'),
     path('catalog/<int:pk>/edit/', views.catalog_edit, name='catalog_edit'),
