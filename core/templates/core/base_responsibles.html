@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Directorio de Responsables por Destino | Aviación Naval{% endblock %}</title>
+    
+    <!-- Bootstrap CSS (LOCAL) -->
+    <link href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" rel="stylesheet">
+    
+    <!-- FontAwesome (LOCAL) -->
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    
+    <!-- Google Fonts (LOCAL) -->
+    <link rel="stylesheet" href="{% static 'vendor/inter/inter.css' %}">
+    
+    <!-- Custom CSS -->
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-light">
+    <!-- Navbar Independiente para el Directorio de Responsables -->
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-sm mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-bottom: 3px solid rgba(255,255,255,0.1);">
+        <div class="container-fluid px-4">
+            <!-- Botón Volver al Portal General -->
+            <a href="/" class="btn btn-sm text-white border-0 shadow-sm me-3" style="border-radius: 50%; width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.15); backdrop-filter: blur(5px); transition: all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='scale(1.08)';" onmouseout="this.style.background='rgba(255,255,255,0.15)'; this.style.transform='scale(1)';" title="Volver al Portal General">
+                <i class="fa-solid fa-house"></i>
+            </a>
+
+            <!-- Logo y Título -->
+            <a class="navbar-brand d-flex align-items-center me-auto" href="{% url 'responsible_directory' %}">
+                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm me-2" style="width: 38px; height: 38px;">
+                    <i class="fa-solid fa-id-card-clip fs-5"></i>
+                </div>
+                <div>
+                    <strong class="text-white fs-5" style="letter-spacing: 0.5px;">RESPONSABLES POR DESTINO</strong>
+                    <span class="d-none d-md-inline-block text-white-50 ms-2 small">| Aviación Naval</span>
+                </div>
+            </a>
+
+            <!-- Usuario y Logout -->
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-white-50 small me-2 d-none d-sm-inline">
+                    <i class="fa-solid fa-user-circle me-1 text-light"></i> {{ user.username }}
+                </span>
+                {% if user.is_superuser %}
+                <a href="/admin/core/systemunitresponsible/" class="btn btn-sm btn-outline-light rounded-pill px-3 me-2" title="Panel de Administración">
+                    <i class="fa-solid fa-gear"></i> Admin
+                </a>
+                {% endif %}
+                <a href="/" class="btn btn-sm btn-outline-light rounded-pill px-3">
+                    <i class="fa-solid fa-arrow-left me-1"></i> Salir al Portal
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="container-fluid px-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-4 text-center text-muted small mt-5 border-top bg-white">
+        <div class="container">
+            Comando de la Aviación Naval (COAN) - Armada Argentina &copy; {% now "Y" %}
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle (LOCAL) -->
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

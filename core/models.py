@@ -332,3 +332,41 @@ class ProcurementRequirement(models.Model):
 
     def __str__(self):
         return f"Req {self.id} - {self.grease_type.nomenclatura} ({self.get_status_display()})"
+
+
+class SystemUnitResponsible(models.Model):
+    SYSTEM_CHOICES = [
+        ('sigera', 'Ropa de Trabajo (SIGERA)'),
+        ('sgmg', 'Materias Grasas (SGMG)'),
+        ('supervivencia', 'Supervivencia / Pirotecnia'),
+        ('sgp', 'Presupuesto (SGP)'),
+        ('licitaciones', 'Licitaciones'),
+    ]
+
+    ROLE_CHOICES = [
+        ('titular', 'Responsable Titular'),
+        ('suplente', 'Responsable Suplente'),
+        ('operador', 'Encargado de Carga / Operador'),
+        ('control', 'Control / Supervisión'),
+    ]
+
+    unit = models.ForeignKey(Unit, on_delete=models.CASCADE, related_name='system_responsibles', verbose_name="Unidad / Destino")
+    system_code = models.CharField(max_length=30, choices=SYSTEM_CHOICES, verbose_name="Sistema")
+    rank_and_name = models.CharField(max_length=150, verbose_name="Grado, Nombre y Apellido", help_text="Ej: Cap. Fragata López Juan")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='titular', verbose_name="Rol / Función")
+    phone = models.CharField(max_length=50, blank=True, null=True, verbose_name="Teléfono / Interno", help_text="Ej: Int. 4201 / Cel. 291-...")
+    email = models.EmailField(blank=True, null=True, verbose_name="Correo Electrónico")
+    notes = models.TextField(blank=True, null=True, verbose_name="Observaciones / Novedades")
+    user = models.ForeignKey(CustomUser, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_system_responsibilities', verbose_name="Usuario del Sistema (Opcional)")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Responsable por Sistema y Destino"
+        verbose_name_plural = "Responsables por Sistema y Destino"
+        ordering = ['unit__name', 'system_code', 'role', 'rank_and_name']
+
+    def __str__(self):
+        return f"{self.unit.name} - {self.get_system_code_display()}: {self.rank_and_name} ({self.get_role_display()})"
+

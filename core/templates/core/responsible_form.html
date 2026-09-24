@@ -1,0 +1,117 @@
+{% extends 'core/base_responsibles.html' %}
+{% load static %}
+
+{% block title %}{{ title }} | Aviación Naval{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-7">
+            <div class="card shadow border-0" style="border-radius: 16px; overflow: hidden;">
+                <div class="card-header bg-gradient bg-primary text-white py-3 px-4">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-id-card fa-lg"></i>
+                        <h4 class="mb-0 fw-bold">{{ title }}</h4>
+                    </div>
+                </div>
+                <div class="card-body p-4 bg-white">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <!-- Sección 1: Asignación de Ubicación y Módulo -->
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-building me-1"></i> Destino y Sistema
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-semibold" for="{{ form.unit.id_for_label }}">Unidad / Destino <span class="text-danger">*</span></label>
+                                {{ form.unit }}
+                                {% if form.unit.errors %}<div class="text-danger small mt-1">{{ form.unit.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-semibold" for="{{ form.system_code.id_for_label }}">Sistema / Módulo <span class="text-danger">*</span></label>
+                                {{ form.system_code }}
+                                {% if form.system_code.errors %}<div class="text-danger small mt-1">{{ form.system_code.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Sección 2: Datos de la Persona -->
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-user me-1"></i> Datos del Responsable
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-md-8">
+                                <label class="form-label fw-semibold" for="{{ form.rank_and_name.id_for_label }}">Grado, Nombre y Apellido <span class="text-danger">*</span></label>
+                                {{ form.rank_and_name }}
+                                <div class="form-text small">Ej: Cap. de Fragata López Juan Manuel / Subof. Mayor Gómez Carlos</div>
+                                {% if form.rank_and_name.errors %}<div class="text-danger small mt-1">{{ form.rank_and_name.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label fw-semibold" for="{{ form.role.id_for_label }}">Rol / Función <span class="text-danger">*</span></label>
+                                {{ form.role }}
+                                {% if form.role.errors %}<div class="text-danger small mt-1">{{ form.role.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-semibold" for="{{ form.phone.id_for_label }}">Teléfono / Interno</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa-solid fa-phone text-muted"></i></span>
+                                    {{ form.phone }}
+                                </div>
+                                <div class="form-text small">Ej: Int. 4201 / Cel. 291-4567890</div>
+                                {% if form.phone.errors %}<div class="text-danger small mt-1">{{ form.phone.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label fw-semibold" for="{{ form.email.id_for_label }}">Correo Electrónico</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa-solid fa-envelope text-muted"></i></span>
+                                    {{ form.email }}
+                                </div>
+                                {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Sección 3: Opciones y Observaciones -->
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-gear me-1"></i> Información Adicional
+                        </h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-12 col-md-8">
+                                <label class="form-label fw-semibold" for="{{ form.user.id_for_label }}">Usuario del Sistema (Opcional)</label>
+                                {{ form.user }}
+                                <div class="form-text small">Vincular a una cuenta de usuario existente solo si corresponde.</div>
+                                {% if form.user.errors %}<div class="text-danger small mt-1">{{ form.user.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-md-4 d-flex align-items-center">
+                                <div class="form-check form-switch mt-3">
+                                    {{ form.is_active }}
+                                    <label class="form-check-label fw-bold" for="{{ form.is_active.id_for_label }}">Responsable Activo</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold" for="{{ form.notes.id_for_label }}">Observaciones</label>
+                                {{ form.notes }}
+                                {% if form.notes.errors %}<div class="text-danger small mt-1">{{ form.notes.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <a href="{% url 'responsible_directory' %}" class="btn btn-outline-secondary px-4 rounded-pill">
+                                <i class="fa-solid fa-xmark me-1"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary px-4 rounded-pill shadow-sm">
+                                <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Responsable
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

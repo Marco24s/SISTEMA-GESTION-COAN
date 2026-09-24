@@ -84,4 +84,11 @@ urlpatterns = [
     path('security/pin/create/', views.CreatePinView.as_view(), name='create_pin'),
     path('security/pin/change/', views.ChangePinView.as_view(), name='change_pin'),
     path('security/pin/lock/', views.LockSystemsView.as_view(), name='lock_systems'),
+
+    # System Unit Responsibles (Directorio de Responsables por Destino)
+    path('responsibles/', views.ResponsibleDirectoryView.as_view(), name='responsible_directory'),
+    path('responsibles/add/', views.ResponsibleCreateView.as_view(), name='responsible_create'),
+    path('responsibles/<int:pk>/edit/', views.ResponsibleUpdateView.as_view(), name='responsible_update'),
+    path('responsibles/<int:pk>/delete/', views.ResponsibleDeleteView.as_view(), name='responsible_delete'),
 ]
+

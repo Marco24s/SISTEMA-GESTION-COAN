@@ -10,7 +10,8 @@ from .models import (
     FlightPlan, 
     GreaseBatch, 
     StockMovement,
-    UserSystemPIN
+    UserSystemPIN,
+    SystemUnitResponsible
 )
 from django.contrib.auth.hashers import make_password
 
@@ -103,3 +104,11 @@ class StockMovementAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SystemUnitResponsible)
+class SystemUnitResponsibleAdmin(admin.ModelAdmin):
+    list_display = ('rank_and_name', 'unit', 'system_code', 'role', 'phone', 'email', 'is_active')
+    list_filter = ('system_code', 'unit', 'role', 'is_active')
+    search_fields = ('rank_and_name', 'phone', 'email', 'notes', 'unit__name')
+

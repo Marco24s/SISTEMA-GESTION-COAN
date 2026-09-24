@@ -1,5 +1,9 @@
 from django import forms
-from .models import Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGrease, FlightPlan, GreaseBatch, GreaseReferencePrice, ProcurementRequirement
+from .models import (
+    Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGrease,
+    FlightPlan, GreaseBatch, GreaseReferencePrice, ProcurementRequirement,
+    SystemUnitResponsible
+)
 
 class UnitForm(forms.ModelForm):
     class Meta:
@@ -323,4 +327,23 @@ class ProcurementRequirementCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['grease_type'].queryset = GreaseType.objects.order_by('nomenclatura', 'unidad')
+
+
+class SystemUnitResponsibleForm(forms.ModelForm):
+    class Meta:
+        model = SystemUnitResponsible
+        fields = ['unit', 'system_code', 'rank_and_name', 'role', 'phone', 'email', 'notes', 'user', 'is_active']
+        widgets = {
+            'unit': forms.Select(attrs={'class': 'form-select'}),
+            'system_code': forms.Select(attrs={'class': 'form-select'}),
+            'rank_and_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Cap. Fragata López Juan'}),
+            'role': forms.Select(attrs={'class': 'form-select'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Int. 4201 / Cel. 291-4567890'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Ej: usuario@armada.mil.ar'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Observaciones, horarios, guardia o detalles adicionales...'}),
+            'user': forms.Select(attrs={'class': 'form-select'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
 

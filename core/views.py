@@ -12,8 +12,8 @@ from django.core.exceptions import ValidationError
 import csv
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from .models import Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGrease, FlightPlan, GreaseBatch, StockMovement, GreaseReferencePrice, ProcurementRequirement, UserSystemPIN
-from .forms import UnitForm, MeasurementUnitForm, AircraftModelForm, GreaseTypeForm, AircraftGreaseForm, FlightPlanForm, GreaseBatchForm, IncorporateBatchStockForm, ConsumeGreaseForm, GreaseReferencePriceForm, RetestBatchForm, ProcurementRequirementForm, ProcurementRequirementCreateForm
+from .models import Unit, MeasurementUnit, AircraftModel, GreaseType, AircraftGrease, FlightPlan, GreaseBatch, StockMovement, GreaseReferencePrice, ProcurementRequirement, UserSystemPIN, SystemUnitResponsible
+from .forms import UnitForm, MeasurementUnitForm, AircraftModelForm, GreaseTypeForm, AircraftGreaseForm, FlightPlanForm, GreaseBatchForm, IncorporateBatchStockForm, ConsumeGreaseForm, GreaseReferencePriceForm, RetestBatchForm, ProcurementRequirementForm, ProcurementRequirementCreateForm, SystemUnitResponsibleForm
 from .services import update_batch_statuses, consume_grease, incorporate_batch_stock
 from django.db.models import ProtectedError
 from .decorators import pin_required
@@ -1508,3 +1508,121 @@ class LockSystemsView(LoginRequiredMixin, View):
         request.session['verified_pins'] = {}
         messages.info(request, "Sistemas bloqueados. Se requerirá PIN para ingresar nuevamente.")
         return redirect('portal')
+
+
+# --- System Unit Responsible Views (Directorio de Responsables por Destino) ---
+class ResponsibleDirectoryView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/responsible_directory.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from django.db.models import Q
+
+        q = self.request.GET.get('q', '').strip()
+        selected_system = self.request.GET.get('system', '').strip()
+        selected_unit = self.request.GET.get('unit', '').strip()
+        
+        responsibles = SystemUnitResponsible.objects.select_related('unit', 'user').all()
+        
+        if q:
+            responsibles = responsibles.filter(
+                Q(rank_and_name__icontains=q) |
+                Q(phone__icontains=q) |
+                Q(email__icontains=q) |
+                Q(notes__icontains=q) |
+                Q(unit__name__icontains=q)
+            )
+            
+        if selected_system:
+            responsibles = responsibles.filter(system_code=selected_system)
+            
+        if selected_unit:
+            responsibles = responsibles.filter(unit_id=selected_unit)
+            
+        units = Unit.objects.all().order_by('name')
+        system_choices = SystemUnitResponsible.SYSTEM_CHOICES
+        
+        # Matriz de datos: Unidad -> Sistema -> Lista de Responsables
+        matrix = []
+        for unit in units:
+            unit_data = {
+                'unit': unit,
+                'systems': {}
+            }
+            has_any = False
+            for sys_code, sys_label in system_choices:
+                resps = [r for r in responsibles if r.unit_id == unit.id and r.system_code == sys_code]
+                unit_data['systems'][sys_code] = {
+                    'label': sys_label,
+                    'responsibles': resps,
+                }
+                if resps:
+                    has_any = True
+            
+            # Si no hay filtros aplicados, mostramos todas las unidades
+            # Si hay filtros, solo mostramos las unidades que tienen coincidencias o la unidad seleccionada
+            if not (q or selected_system or selected_unit) or has_any or (selected_unit and str(unit.id) == selected_unit):
+                matrix.append(unit_data)
+
+        user = self.request.user
+        can_manage = user.is_superuser or user.groups.filter(name__in=['Administrador', 'Logistica', 'Editor']).exists()
+
+        context.update({
+            'responsibles': responsibles,
+            'matrix': matrix,
+            'units': units,
+            'system_choices': system_choices,
+            'selected_system': selected_system,
+            'selected_unit': selected_unit,
+            'search_query': q,
+            'can_manage': can_manage,
+            'total_count': SystemUnitResponsible.objects.count(),
+            'active_count': SystemUnitResponsible.objects.filter(is_active=True).count(),
+        })
+        return context
+
+
+class ResponsibleCreateView(LogisticsRequiredMixin, SuccessMessageMixin, CreateView):
+    model = SystemUnitResponsible
+    form_class = SystemUnitResponsibleForm
+    template_name = 'core/responsible_form.html'
+    success_url = reverse_lazy('responsible_directory')
+    success_message = "Responsable registrado exitosamente."
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if 'unit' in self.request.GET:
+            initial['unit'] = self.request.GET.get('unit')
+        if 'system' in self.request.GET:
+            initial['system_code'] = self.request.GET.get('system')
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Registrar Responsable de Destino'
+        return context
+
+
+class ResponsibleUpdateView(LogisticsRequiredMixin, SuccessMessageMixin, UpdateView):
+    model = SystemUnitResponsible
+    form_class = SystemUnitResponsibleForm
+    template_name = 'core/responsible_form.html'
+    success_url = reverse_lazy('responsible_directory')
+    success_message = "Datos del responsable actualizados exitosamente."
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Editar Responsable de Destino'
+        return context
+
+
+class ResponsibleDeleteView(LogisticsRequiredMixin, SuccessMessageMixin, DeleteView):
+    model = SystemUnitResponsible
+    template_name = 'core/responsible_confirm_delete.html'
+    success_url = reverse_lazy('responsible_directory')
+    success_message = "Responsable eliminado del registro exitosamente."
+
+    def form_valid(self, form):
+        messages.success(self.request, self.success_message)
+        return super().form_valid(form)
+

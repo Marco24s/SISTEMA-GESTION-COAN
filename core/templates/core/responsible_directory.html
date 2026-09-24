@@ -1,0 +1,272 @@
+{% extends 'core/base_responsibles.html' %}
+{% load static %}
+
+{% block title %}Directorio de Responsables por Destino | Aviación Naval{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <!-- Header Section -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-2 border-bottom">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary bg-gradient p-2 rounded-3 shadow-sm">
+                    <i class="fa-solid fa-id-card-clip fa-lg text-white"></i>
+                </span>
+                <h3 class="fw-bold mb-0 text-dark">Directorio de Responsables por Destino</h3>
+            </div>
+            <p class="text-muted mb-0 small mt-1">
+                Registro y control de personal a cargo del llenado y supervisión por cada Unidad / Sistema.
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-light text-dark border px-3 py-2">
+                <i class="fa-solid fa-users text-primary me-1"></i> Total Registrados: <strong>{{ total_count }}</strong>
+            </span>
+            <span class="badge bg-light text-dark border px-3 py-2">
+                <i class="fa-solid fa-circle-check text-success me-1"></i> Activos: <strong>{{ active_count }}</strong>
+            </span>
+            {% if can_manage %}
+            <a href="{% url 'responsible_create' %}" class="btn btn-primary shadow-sm rounded-pill px-3">
+                <i class="fa-solid fa-user-plus me-1"></i> Registrar Responsable
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+        <div class="card-body p-3 bg-light rounded-3">
+            <form method="get" class="row g-2 align-items-center">
+                <div class="col-12 col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input type="text" name="q" value="{{ search_query }}" class="form-control border-start-0" placeholder="Buscar por nombre, interno, email, notas...">
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-md-3">
+                    <select name="system" class="form-select">
+                        <option value="">-- Todos los Sistemas --</option>
+                        {% for sys_code, sys_name in system_choices %}
+                        <option value="{{ sys_code }}" {% if selected_system == sys_code %}selected{% endif %}>
+                            {{ sys_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-md-3">
+                    <select name="unit" class="form-select">
+                        <option value="">-- Todas las Unidades --</option>
+                        {% for u in units %}
+                        <option value="{{ u.id }}" {% if selected_unit == u.id|stringformat:"s" %}selected{% endif %}>
+                            {{ u.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-dark w-100">
+                        <i class="fa-solid fa-filter me-1"></i> Filtrar
+                    </button>
+                    {% if search_query or selected_system or selected_unit %}
+                    <a href="{% url 'responsible_directory' %}" class="btn btn-outline-secondary" title="Limpiar filtros">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main View: Grouped by Unit -->
+    {% if matrix %}
+    <div class="row g-4">
+        {% for item in matrix %}
+        <div class="col-12">
+            <div class="card shadow-sm border-0" style="border-radius: 14px; overflow: hidden;">
+                <!-- Unit Card Header -->
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;">
+                            <i class="fa-solid fa-building-shield"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">{{ item.unit.name }}</h5>
+                            {% if item.unit.component_code %}
+                            <small class="text-muted">Cód: {{ item.unit.component_code }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if can_manage %}
+                    <a href="{% url 'responsible_create' %}?unit={{ item.unit.id }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                        <i class="fa-solid fa-plus me-1"></i> Agregar a esta unidad
+                    </a>
+                    {% endif %}
+                </div>
+
+                <!-- Systems Table / Grid -->
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 0.92rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 22%;">Sistema / Módulo</th>
+                                    <th style="width: 20%;">Rol / Función</th>
+                                    <th style="width: 28%;">Grado, Nombre y Contacto</th>
+                                    <th style="width: 18%;">Observaciones</th>
+                                    <th style="width: 12%;" class="text-end px-3">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sys_code, sys_info in item.systems.items %}
+                                    {% if not selected_system or selected_system == sys_code %}
+                                        {% if sys_info.responsibles %}
+                                            {% for resp in sys_info.responsibles %}
+                                            <tr class="{% if not resp.is_active %}opacity-50 bg-light{% endif %}">
+                                                <!-- Sistema -->
+                                                <td class="align-middle">
+                                                    {% if sys_code == 'sigera' %}
+                                                        <span class="badge px-2 py-1" style="background-color: #462880; color: white;">
+                                                            <i class="fa-solid fa-shirt me-1"></i> {{ sys_info.label }}
+                                                        </span>
+                                                    {% elif sys_code == 'sgmg' %}
+                                                        <span class="badge bg-primary px-2 py-1">
+                                                            <i class="fa-solid fa-oil-can me-1"></i> {{ sys_info.label }}
+                                                        </span>
+                                                    {% elif sys_code == 'supervivencia' %}
+                                                        <span class="badge bg-success px-2 py-1">
+                                                            <i class="fa-solid fa-person-swimming me-1"></i> {{ sys_info.label }}
+                                                        </span>
+                                                    {% elif sys_code == 'sgp' %}
+                                                        <span class="badge bg-secondary px-2 py-1">
+                                                            <i class="fa-solid fa-chart-pie me-1"></i> {{ sys_info.label }}
+                                                        </span>
+                                                    {% elif sys_code == 'licitaciones' %}
+                                                        <span class="badge bg-info text-dark px-2 py-1">
+                                                            <i class="fa-solid fa-file-contract me-1"></i> {{ sys_info.label }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge bg-dark px-2 py-1">{{ sys_info.label }}</span>
+                                                    {% endif %}
+                                                </td>
+
+                                                <!-- Rol -->
+                                                <td class="align-middle">
+                                                    {% if resp.role == 'titular' %}
+                                                        <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                                                            <i class="fa-solid fa-star me-1"></i>{{ resp.get_role_display }}
+                                                        </span>
+                                                    {% elif resp.role == 'suplente' %}
+                                                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                                                            <i class="fa-solid fa-user-clock me-1"></i>{{ resp.get_role_display }}
+                                                        </span>
+                                                    {% elif resp.role == 'operador' %}
+                                                        <span class="badge rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle px-2 py-1">
+                                                            <i class="fa-solid fa-keyboard me-1"></i>{{ resp.get_role_display }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge rounded-pill bg-light text-dark border px-2 py-1">
+                                                            {{ resp.get_role_display }}
+                                                        </span>
+                                                    {% endif %}
+
+                                                    {% if not resp.is_active %}
+                                                        <span class="badge bg-danger ms-1">Inactivo</span>
+                                                    {% endif %}
+                                                </td>
+
+                                                <!-- Nombre y Contacto -->
+                                                <td class="align-middle">
+                                                    <div class="fw-bold text-dark">{{ resp.rank_and_name }}</div>
+                                                    <div class="d-flex flex-wrap gap-2 mt-1 small text-muted">
+                                                        {% if resp.phone %}
+                                                        <div>
+                                                            <i class="fa-solid fa-phone text-success me-1"></i>
+                                                            <a href="tel:{{ resp.phone }}" class="text-decoration-none text-muted">{{ resp.phone }}</a>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if resp.email %}
+                                                        <div>
+                                                            <i class="fa-solid fa-envelope text-primary me-1"></i>
+                                                            <a href="mailto:{{ resp.email }}" class="text-decoration-none text-muted">{{ resp.email }}</a>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if resp.user %}
+                                                        <div>
+                                                            <i class="fa-solid fa-user-check text-info me-1"></i>
+                                                            <span class="text-muted">Usuario: <strong>{{ resp.user.username }}</strong></span>
+                                                        </div>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+
+                                                <!-- Observaciones -->
+                                                <td class="align-middle small text-muted">
+                                                    {{ resp.notes|default:"-"|linebreaksbr }}
+                                                </td>
+
+                                                <!-- Acciones -->
+                                                <td class="align-middle text-end px-3">
+                                                    {% if can_manage %}
+                                                    <div class="d-flex justify-content-end gap-1">
+                                                        <a href="{% url 'responsible_update' resp.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar datos">
+                                                            <i class="fa-solid fa-pen-to-square"></i>
+                                                        </a>
+                                                        <a href="{% url 'responsible_delete' resp.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar registro">
+                                                            <i class="fa-solid fa-trash-can"></i>
+                                                        </a>
+                                                    </div>
+                                                    {% else %}
+                                                    <span class="text-muted small">-</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            {% if not search_query %}
+                                            <tr class="table-light opacity-75">
+                                                <td class="align-middle">
+                                                    <span class="text-muted small fw-semibold">
+                                                        <i class="fa-regular fa-circle me-1 opacity-50"></i> {{ sys_info.label }}
+                                                    </span>
+                                                </td>
+                                                <td colspan="3" class="align-middle text-muted small fst-italic">
+                                                    Sin responsable asignado
+                                                </td>
+                                                <td class="align-middle text-end px-3">
+                                                    {% if can_manage %}
+                                                    <a href="{% url 'responsible_create' %}?unit={{ item.unit.id }}&system={{ sys_code }}" class="btn btn-sm btn-light border text-primary py-0" title="Asignar responsable">
+                                                        <i class="fa-solid fa-plus"></i> Asignar
+                                                    </a>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card shadow-sm border-0 p-5 text-center text-muted" style="border-radius: 14px;">
+        <i class="fa-solid fa-id-card fa-3x mb-3 opacity-25"></i>
+        <h5>No se encontraron registros de responsables</h5>
+        <p class="mb-3">No hay responsables que coincidan con los filtros aplicados.</p>
+        {% if can_manage %}
+        <div>
+            <a href="{% url 'responsible_create' %}" class="btn btn-primary rounded-pill px-4">
+                <i class="fa-solid fa-user-plus me-1"></i> Registrar Primer Responsable
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
