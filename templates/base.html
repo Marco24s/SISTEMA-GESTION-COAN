@@ -199,8 +199,11 @@
         {% endblock %}
     </div>
 
-    <footer class="text-center mt-5 mb-3 text-muted">
-        <small>Sistema de Gestión Integral - Comando de la Aviación Naval</small>
+    <footer class="mt-5 mb-3 text-muted">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <small class="text-muted">Sistema de Gestión Integral - Comando de la Aviación Naval</small>
+            <small class="text-secondary font-monospace"><span class="badge text-bg-light border">{{ APP_VERSION }}</span></small>
+        </div>
     </footer>
 
     <!-- Bootstrap Bundle with Popper (LOCAL) -->

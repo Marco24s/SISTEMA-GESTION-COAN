@@ -427,6 +427,13 @@
         </div>
     </div>
 
+    <!-- Version Display (Inferior Derecha) -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050; pointer-events: none;">
+        <span class="badge bg-white text-secondary border shadow-sm px-2 py-1 font-monospace" style="pointer-events: auto; font-size: 0.78rem; opacity: 0.9;">
+            {{ APP_VERSION }}
+        </span>
+    </div>
+
     <!-- Bootstrap Bundle (LOCAL) -->
     <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 </body>

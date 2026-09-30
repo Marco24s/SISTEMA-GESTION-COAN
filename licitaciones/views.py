@@ -325,7 +325,6 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
     model = TenderProcess
     template_name = "licitaciones/process_history.html"
     context_object_name = "processes"
-    paginate_by = 25
 
     def get_queryset(self):
         queryset = (
@@ -361,11 +360,32 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        selected_year = _clean_int(self.request.GET.get("year")) or ""
+        current_year = timezone.now().year
+
+        process_list = list(context["processes"])
+        grouped = {}
+        for p in process_list:
+            grouped.setdefault(p.year, []).append(p)
+
+        year_groups = []
+        for yr, items in grouped.items():
+            is_open = (yr == selected_year) if selected_year else (yr == current_year)
+            year_groups.append({
+                "year": yr,
+                "is_current": (yr == current_year),
+                "is_open": is_open,
+                "processes": items,
+                "count": len(items),
+            })
+
+        context["year_groups"] = year_groups
+        context["current_year"] = current_year
         context["units"] = Unit.objects.filter().order_by("name")
         context["status_choices"] = TenderProcess.STATUS_CHOICES
         context["classification_choices"] = _get_classification_choices()
         context["custom_classifications"] = _get_custom_classifications_with_count()
-        context["selected_year"] = _clean_int(self.request.GET.get("year")) or ""
+        context["selected_year"] = selected_year
         context["selected_unit"] = _clean_int(self.request.GET.get("unit")) or ""
         context["selected_status"] = self.request.GET.get("status", "")
         context["selected_classification"] = self.request.GET.get("classification", "")

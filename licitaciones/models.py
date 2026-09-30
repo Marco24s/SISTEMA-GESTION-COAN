@@ -130,7 +130,7 @@ class TenderProcess(models.Model):
         max_length=10,
         choices=CURRENCY_CHOICES,
         default="ARS",
-        verbose_name="Moneda original",
+        verbose_name="Divisa",
     )
     foreign_amount = models.DecimalField(
         max_digits=18,
@@ -208,6 +208,16 @@ class TenderProcess(models.Model):
     @property
     def classification_text_color(self):
         return self.CLASSIFICATION_TEXT_COLORS.get(self.classification, "#111827")
+
+    @property
+    def display_amount(self):
+        if self.currency != "ARS" and self.foreign_amount is not None:
+            return self.foreign_amount
+        if self.amount_ars is not None:
+            return self.amount_ars
+        if self.foreign_amount is not None:
+            return self.foreign_amount
+        return None
 
 
 class ForeignTenderProcess(models.Model):

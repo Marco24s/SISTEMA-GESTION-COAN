@@ -105,15 +105,17 @@
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-body">
-                    <div class="detail-label">Monto en pesos</div>
+                    <div class="detail-label">
+                        {% if process.currency == "USD" %}Monto en dólares{% elif process.currency != "ARS" %}Monto ({{ process.currency }}){% else %}Monto en pesos{% endif %}
+                    </div>
                     <div class="display-6 fw-bold">
-                        {% if process.amount_ars is not None %}
-                            $ {{ process.amount_ars|floatformat:2|intcomma }}
+                        {% if process.display_amount is not None %}
+                            {% if process.currency == "USD" %}USD {% elif process.currency == "ARS" %}$ {% else %}{{ process.currency }} {% endif %}{{ process.display_amount|floatformat:2|intcomma }}
                         {% else %}
                             <span class="text-muted">Sin monto</span>
                         {% endif %}
                     </div>
-                    <div class="text-muted small mt-1">Moneda original: {{ process.currency }}</div>
+                    <div class="text-muted small mt-1">Divisa: {{ process.currency }}</div>
                 </div>
             </div>
         </div>
@@ -226,7 +228,7 @@
                     </div>
                 </div>
                 <div class="detail-row">
-                    <div class="detail-label">Moneda original</div>
+                    <div class="detail-label">Divisa</div>
                     <div class="detail-value">{{ process.currency }}</div>
                 </div>
                 <div class="detail-row">
@@ -238,7 +240,7 @@
                 <div class="detail-row">
                     <div class="detail-label">Tipo de cambio usado</div>
                     <div class="detail-value">
-                        {% if process.exchange_rate is not None %}{{ process.exchange_rate|floatformat:4|intcomma }}{% else %}-{% endif %}
+                        {% if process.exchange_rate is not None %}{{ process.exchange_rate|floatformat:2|intcomma }}{% else %}-{% endif %}
                     </div>
                 </div>
                 <div class="detail-row">

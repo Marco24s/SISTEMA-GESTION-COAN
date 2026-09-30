@@ -86,6 +86,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'licitaciones.context_processors.unread_notifications',
+                'core.context_processors.app_version',
             ],
         },
     },
@@ -185,3 +186,6 @@ PIN_ALLOWED_SYSTEMS = ['sgmg', 'sigera', 'sgp', 'licitaciones', 'supervivencia',
 
 # --- Skills operativas internas ---
 SKILLS_DIR = BASE_DIR / "system" / "skills"
+
+# --- Versión de la Aplicación (Formato: YY13.MM.BUILD) ---
+APP_VERSION_BUILD = 1
