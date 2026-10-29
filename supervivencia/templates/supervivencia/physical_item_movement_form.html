@@ -26,6 +26,7 @@
                 <div class="small text-muted text-uppercase">Identificacion</div>
                 {% if item.serial_number %}<div>Serie: <strong>{{ item.serial_number }}</strong></div>{% endif %}
                 {% if item.lot_number %}<div>Lote: <strong>{{ item.lot_number }}</strong></div>{% endif %}
+                <div>Cantidad en lote: <strong>{{ item.lot_quantity }}</strong></div>
             </div>
             <div class="col-lg-3">
                 <div class="small text-muted text-uppercase">Vencimiento</div>
@@ -45,6 +46,13 @@
         <div class="alert alert-danger border-0 shadow-sm">{{ form.non_field_errors }}</div>
     {% endif %}
 
+    {% if item.lot_quantity > 1 and not item.serial_number %}
+    <div class="alert alert-info border-0 shadow-sm mb-3">
+        <i class="fa-solid fa-layer-group me-2"></i>
+        Este material es un lote con <strong>{{ item.lot_quantity }} unidades</strong>. Puede mover o consumir solo una fracción indicando la cantidad deseada. El lote original mantendrá el remanente en su estado/ubicación actual.
+    </div>
+    {% endif %}
+
     <div class="card border-0 shadow-sm mb-3">
         <div class="card-header bg-white border-bottom py-3">
             <h5 class="mb-0 fw-bold" style="color:#b91c1c;">
@@ -60,6 +68,15 @@
                     {{ form.operational_status|as_crispy_field }}
                 </div>
             </div>
+            {% if not item.serial_number %}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.movement_quantity|as_crispy_field }}
+                </div>
+            </div>
+            {% else %}
+                {{ form.movement_quantity }}
+            {% endif %}
         </div>
     </div>
 

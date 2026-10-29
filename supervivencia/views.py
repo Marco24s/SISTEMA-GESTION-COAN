@@ -791,6 +791,84 @@ class PyrotechnicPhysicalItemMovementView(LoginRequiredMixin, SuccessMessageMixi
         previous_condition = previous.get_condition_display()
         previous_status = previous.get_operational_status_display()
 
+        movement_qty = form.cleaned_data.get("movement_quantity")
+        movement_notes = form.cleaned_data.get("movement_notes")
+
+        if movement_qty and movement_qty < previous.lot_quantity:
+            with transaction.atomic():
+                original_qty = previous.lot_quantity
+                previous.lot_quantity = original_qty - movement_qty
+                previous.save(update_fields=["lot_quantity", "updated_at"])
+
+                target_condition = form.cleaned_data["condition"]
+                target_status = form.cleaned_data["operational_status"]
+                target_storage = form.cleaned_data.get("current_storage_location")
+                target_loc = form.cleaned_data.get("current_location") or ""
+                if target_storage:
+                    target_loc = str(target_storage).upper().strip()
+                elif not target_loc:
+                    target_loc = previous.current_location
+
+                new_item = PyrotechnicPhysicalItem.objects.create(
+                    catalog_item=previous.catalog_item,
+                    serial_number=None,
+                    lot_number=previous.lot_number,
+                    lot_quantity=movement_qty,
+                    manufacturer=previous.manufacturer,
+                    manufacture_date=previous.manufacture_date,
+                    expiration_date=previous.expiration_date,
+                    condition=target_condition,
+                    operational_status=target_status,
+                    current_storage_location=target_storage,
+                    current_location=target_loc,
+                    certificate_reference=previous.certificate_reference,
+                    notes=previous.notes,
+                    is_active=True,
+                    created_by=self.request.user,
+                )
+
+                active_assignment = (
+                    PyrotechnicAssignment.objects.filter(physical_item=previous, is_active=True)
+                    .select_related("medium")
+                    .first()
+                )
+                from_desc = previous_location
+                if active_assignment:
+                    from_desc = f"Montado en {_assignment_destination(active_assignment)}"
+
+                new_location_ref = _item_location_reference(new_item)
+                movement_type = "STATUS_CHANGE" if previous.operational_status != target_status else "LOCATION_CHANGE"
+                if previous.operational_status == target_status and previous_location == new_location_ref:
+                    movement_type = "NOTE"
+
+                PyrotechnicMovement.objects.create(
+                    physical_item=new_item,
+                    movement_type=movement_type,
+                    movement_date=timezone.localdate(),
+                    from_reference=f"{previous_condition} / {previous_status} ({from_desc}) - Lote original de {original_qty} un.",
+                    to_reference=f"{new_item.get_condition_display()} / {new_item.get_operational_status_display()} ({new_location_ref})",
+                    notes=(f"[Movimiento parcial: {movement_qty} un.] " + (movement_notes or "")).strip(),
+                    created_by=self.request.user,
+                )
+
+                PyrotechnicMovement.objects.create(
+                    physical_item=previous,
+                    medium=active_assignment.medium if active_assignment else None,
+                    assignment=active_assignment,
+                    movement_type="NOTE",
+                    movement_date=timezone.localdate(),
+                    from_reference=f"Lote: {original_qty} un.",
+                    to_reference=f"Lote: {previous.lot_quantity} un.",
+                    notes=(f"Se descontaron {movement_qty} un. por paso a {new_item.get_operational_status_display().lower()} ({new_item.get_condition_display().lower()}). " + (movement_notes or "")).strip(),
+                    created_by=self.request.user,
+                )
+
+            messages.success(
+                self.request,
+                f"Movimiento parcial registrado: se descontaron {movement_qty} unidad(es) del lote (quedan {previous.lot_quantity} en {previous.get_operational_status_display().lower()}) y se generó el nuevo registro con {movement_qty} unidad(es) en estado '{new_item.get_operational_status_display()}'."
+            )
+            return redirect(self.get_success_url())
+
         response = super().form_valid(form)
         item = form.instance
         new_location = _item_location_reference(item)
@@ -803,7 +881,20 @@ class PyrotechnicPhysicalItemMovementView(LoginRequiredMixin, SuccessMessageMixi
             .select_related("medium")
             .first()
         )
-        movement_notes = form.cleaned_data.get("movement_notes")
+
+        if active_assignment and item.operational_status in {"CONSUMED", "DISCARDED"}:
+            active_assignment.is_active = False
+            active_assignment.removed_at = timezone.localdate()
+            active_assignment.save(update_fields=["is_active", "removed_at", "updated_at"])
+            _create_pyrotechnic_movement(
+                assignment=active_assignment,
+                movement_type="REMOVED",
+                movement_date=active_assignment.removed_at,
+                user=self.request.user,
+                from_reference=_assignment_destination(active_assignment),
+                to_reference=_item_location_reference(item),
+                notes=f"Asignacion retirada automaticamente por pase a {item.get_operational_status_display().lower()}.",
+            )
 
         if location_changed:
             PyrotechnicMovement.objects.create(

@@ -353,6 +353,12 @@ class PyrotechnicStorageLocationForm(forms.ModelForm):
 
 
 class PyrotechnicPhysicalItemMovementForm(forms.ModelForm):
+    movement_quantity = forms.IntegerField(
+        label="Cantidad a mover / consumir",
+        min_value=1,
+        required=False,
+        widget=forms.NumberInput(attrs={"placeholder": "Cantidad", "class": "form-control"}),
+    )
     movement_notes = forms.CharField(
         label="Observaciones del movimiento",
         required=False,
@@ -361,12 +367,13 @@ class PyrotechnicPhysicalItemMovementForm(forms.ModelForm):
 
     class Meta:
         model = PyrotechnicPhysicalItem
-        fields = ["condition", "operational_status", "current_storage_location", "current_location", "movement_notes"]
+        fields = ["condition", "operational_status", "current_storage_location", "current_location", "movement_quantity", "movement_notes"]
         labels = {
             "condition": "Condicion",
             "operational_status": "Estado operativo",
             "current_storage_location": "Ubicacion controlada",
             "current_location": "Ubicacion manual",
+            "movement_quantity": "Cantidad a mover / consumir",
         }
         widgets = {
             "current_location": forms.TextInput(
@@ -384,26 +391,61 @@ class PyrotechnicPhysicalItemMovementForm(forms.ModelForm):
         self.fields["current_storage_location"].required = False
         self.fields["current_location"].required = False
 
+        if self.instance and self.instance.pk:
+            if self.instance.serial_number:
+                self.fields["movement_quantity"].widget = forms.HiddenInput()
+                self.fields["movement_quantity"].initial = 1
+            else:
+                self.fields["movement_quantity"].help_text = (
+                    f"Cantidad disponible en este lote: {self.instance.lot_quantity} unidades. "
+                    "Deje vacío para aplicar el cambio a la totalidad del lote, o ingrese una cantidad menor para fraccionarlo (ej: consumir 1 de 54)."
+                )
+                self.fields["movement_quantity"].widget.attrs.update({
+                    "max": self.instance.lot_quantity,
+                    "min": 1,
+                    "placeholder": f"Máx: {self.instance.lot_quantity}",
+                })
+
     def clean(self):
         cleaned_data = super().clean()
         condition = cleaned_data.get("condition")
         operational_status = cleaned_data.get("operational_status")
         current_storage_location = cleaned_data.get("current_storage_location")
         current_location = cleaned_data.get("current_location")
+        movement_quantity = cleaned_data.get("movement_quantity")
+
         if not current_storage_location and not current_location:
             raise forms.ValidationError("Debe indicar una ubicacion controlada o una ubicacion manual.")
+
         if self.instance and self.instance.pk:
+            if self.instance.serial_number and movement_quantity and movement_quantity > 1:
+                self.add_error("movement_quantity", "Los materiales con número de serie no pueden fraccionarse.")
+            if movement_quantity:
+                if movement_quantity > self.instance.lot_quantity:
+                    self.add_error(
+                        "movement_quantity",
+                        f"La cantidad indicada ({movement_quantity}) supera la disponible en el lote ({self.instance.lot_quantity})."
+                    )
+                elif movement_quantity < 1:
+                    self.add_error("movement_quantity", "La cantidad debe ser de al menos 1 unidad.")
+
             has_active_assignment = PyrotechnicAssignment.objects.filter(
                 physical_item=self.instance, is_active=True
             ).exists()
-            if has_active_assignment and operational_status in {"STOCK", "REMOVED", "DISCARDED", "CONSUMED"}:
-                raise forms.ValidationError(
-                    "Este material esta montado en un medio. Primero retire la asignacion antes de pasarlo a deposito, removido, consumido o baja."
-                )
-            if has_active_assignment and condition in {"UNSERVICEABLE", "QUARANTINE", "BLOCKED"}:
-                raise forms.ValidationError(
-                    "Este material esta montado en un medio. Primero retire la asignacion antes de marcarlo no operativo, en cuarentena o bloqueado."
-                )
+            is_partial = bool(movement_quantity and movement_quantity < self.instance.lot_quantity)
+
+            # Si es un fraccionamiento parcial de lote, el lote original PERMANECE montado con las unidades restantes.
+            # Si no es fraccionamiento parcial y se intenta pasar a depósito o removido, se exige retirar antes la asignación.
+            # Para Consumido o Baja, se permite directamente y la asignación se cerrará de forma automática.
+            if has_active_assignment and not is_partial:
+                if operational_status in {"STOCK", "REMOVED"}:
+                    raise forms.ValidationError(
+                        "Este material esta montado en un medio. Primero retire la asignacion antes de pasarlo a deposito o removido."
+                    )
+                if condition in {"UNSERVICEABLE", "QUARANTINE", "BLOCKED"} and operational_status == "INSTALLED":
+                    raise forms.ValidationError(
+                        "Este material esta montado en un medio. Primero retire la asignacion antes de marcarlo no operativo, en cuarentena o bloqueado."
+                    )
         return cleaned_data
 
 
