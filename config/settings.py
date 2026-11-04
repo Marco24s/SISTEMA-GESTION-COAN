@@ -188,5 +188,5 @@ PIN_ALLOWED_SYSTEMS = ['sgmg', 'sigera', 'sgp', 'licitaciones', 'supervivencia',
 SKILLS_DIR = BASE_DIR / "system" / "skills"
 
 # --- Versión de la Aplicación ---
-APP_VERSION = "v2613.09.1"
+APP_VERSION = "v2613.11.2"
 
