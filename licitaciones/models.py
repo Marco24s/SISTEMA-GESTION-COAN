@@ -273,7 +273,7 @@ class ForeignTenderProcess(models.Model):
         decimal_places=2,
         blank=True,
         null=True,
-        verbose_name="Monto del dictamen de evaluacion",
+        verbose_name="Monto del dictamen de evaluacion / adjudicacion",
     )
     awarded_amount = models.DecimalField(
         max_digits=18,
@@ -364,11 +364,35 @@ class ForeignTenderProcess(models.Model):
         return self.evaluation_amount - self.awarded_amount
 
     @property
-    def committed_po_amount(self):
+    def total_sp_amount(self):
+        return sum(
+            (
+                sp.amount
+                for po in self.purchase_orders.all()
+                for sp in po.provision_requests.all()
+                if sp.amount is not None
+            ),
+            start=Decimal("0.00"),
+        )
+
+    @property
+    def total_sp_count(self):
+        return sum(
+            len(po.provision_requests.all()) for po in self.purchase_orders.all()
+        )
+
+    @property
+    def total_po_ceiling_amount(self):
         return sum(
             (po.amount for po in self.purchase_orders.all() if po.amount is not None),
             start=Decimal("0.00"),
         )
+
+    @property
+    def committed_po_amount(self):
+        if self.has_oca:
+            return self.total_sp_amount
+        return self.total_po_ceiling_amount
 
     @property
     def remaining_awarded_amount(self):
@@ -434,6 +458,16 @@ class ForeignTenderRequirement(models.Model):
             errors["requested_amount"] = "El monto no puede ser negativo."
         if not self.unit and not self.workshop.strip():
             errors["workshop"] = "Seleccione una unidad o indique el taller."
+        if self.process_id and self.requirement_number:
+            req_num = self.requirement_number.upper().strip()
+            qs = ForeignTenderRequirement.objects.filter(
+                process_id=self.process_id,
+                requirement_number__iexact=req_num,
+            )
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                errors["requirement_number"] = f"Ya existe un requerimiento con el número '{req_num}' en esta licitación."
         if errors:
             raise ValidationError(errors)
 
@@ -516,6 +550,19 @@ class ForeignTenderPurchaseOrder(models.Model):
         if self.amount is not None and self.amount < 0:
             raise ValidationError({"amount": "El monto no puede ser negativo."})
 
+        if self.process_id and self.order_number:
+            order_num = self.order_number.upper().strip()
+            qs = ForeignTenderPurchaseOrder.objects.filter(
+                process_id=self.process_id,
+                order_number__iexact=order_num,
+            )
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError({
+                    "order_number": f"Ya existe una Orden de Compra con el número '{order_num}' en esta licitación."
+                })
+
         if self.process_id and self.amount is not None:
             awarded = self.process.awarded_amount
             if awarded is not None:
@@ -532,7 +579,22 @@ class ForeignTenderPurchaseOrder(models.Model):
                         "amount": f"La suma del monto de las Órdenes de Compra ({new_total}) supera el monto asignado en adjudicación ({awarded}). El disponible máximo para esta orden es {available}."
                     })
 
+    @property
+    def total_sp_amount(self):
+        return sum(
+            (sp.amount for sp in self.provision_requests.all() if sp.amount is not None),
+            start=Decimal("0.00"),
+        )
+
+    @property
+    def remaining_sp_amount(self):
+        if self.amount is None:
+            return None
+        return self.amount - self.total_sp_amount
+
     def save(self, *args, **kwargs):
+        if self.process_id and hasattr(self, "process") and self.process:
+            self.order_type = "OCA" if self.process.has_oca else "OC"
         if self.order_number:
             self.order_number = self.order_number.upper().strip()
         if self.supplier:
@@ -585,6 +647,19 @@ class ForeignProvisionRequest(models.Model):
         super().clean()
         if self.amount is not None and self.amount < 0:
             raise ValidationError({"amount": "El monto no puede ser negativo."})
+
+        if self.purchase_order_id and self.sp_number:
+            sp_num = self.sp_number.upper().strip()
+            qs = ForeignProvisionRequest.objects.filter(
+                purchase_order_id=self.purchase_order_id,
+                sp_number__iexact=sp_num,
+            )
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError({
+                    "sp_number": f"Ya existe una Solicitud de Provisión con el número '{sp_num}' en esta orden de compra."
+                })
 
         if self.purchase_order_id and self.amount is not None:
             po_amount = self.purchase_order.amount

@@ -173,6 +173,25 @@ class ForeignTenderRequirementForm(forms.ModelForm):
             "notes": forms.Textarea(attrs={"rows": 2}),
         }
 
+    def clean_requirement_number(self):
+        req_number = self.cleaned_data.get("requirement_number")
+        if req_number:
+            req_number = req_number.upper().strip()
+            process = getattr(self.instance, "process", None)
+            process_id = getattr(self.instance, "process_id", None)
+            if process or process_id:
+                qs = ForeignTenderRequirement.objects.filter(
+                    process_id=process_id or (process.pk if process else None),
+                    requirement_number__iexact=req_number,
+                )
+                if self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise forms.ValidationError(
+                        f"Ya existe un requerimiento con el número '{req_number}' en esta licitación."
+                    )
+        return req_number
+
 
 class ForeignTenderUpdateForm(forms.ModelForm):
     event_date = forms.DateField(
@@ -220,6 +239,25 @@ class ForeignTenderPurchaseOrderForm(forms.ModelForm):
             "saimb_number",
         ]
 
+    def clean_order_number(self):
+        order_number = self.cleaned_data.get("order_number")
+        if order_number:
+            order_number = order_number.upper().strip()
+            process = getattr(self.instance, "process", None)
+            process_id = getattr(self.instance, "process_id", None)
+            if process or process_id:
+                qs = ForeignTenderPurchaseOrder.objects.filter(
+                    process_id=process_id or (process.pk if process else None),
+                    order_number__iexact=order_number,
+                )
+                if self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise forms.ValidationError(
+                        f"Ya existe una Orden de Compra con el número '{order_number}' en esta licitación."
+                    )
+        return order_number
+
 
 class TenderStageUpdateForm(forms.ModelForm):
     class Meta:
@@ -242,3 +280,22 @@ class ForeignProvisionRequestForm(forms.ModelForm):
             "expiration_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
             "received": forms.Select(choices=[(None, "-"), (True, "SI"), (False, "NO")], attrs={"class": "form-select"}),
         }
+
+    def clean_sp_number(self):
+        sp_number = self.cleaned_data.get("sp_number")
+        if sp_number:
+            sp_number = sp_number.upper().strip()
+            po = getattr(self.instance, "purchase_order", None)
+            po_id = getattr(self.instance, "purchase_order_id", None)
+            if po or po_id:
+                qs = ForeignProvisionRequest.objects.filter(
+                    purchase_order_id=po_id or (po.pk if po else None),
+                    sp_number__iexact=sp_number,
+                )
+                if self.instance.pk:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise forms.ValidationError(
+                        f"Ya existe una Solicitud de Provisión con el número '{sp_number}' en esta orden de compra."
+                    )
+        return sp_number

@@ -20,6 +20,8 @@ class GroupRequiredMixin(UserPassesTestMixin):
             return True
         groups = self.group_required if isinstance(self.group_required, list) else [self.group_required]
         return self.request.user.groups.filter(name__in=groups).exists()
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
@@ -514,7 +516,9 @@ class ForeignTenderProcessListView(LoginRequiredMixin, ListView):
     context_object_name = "processes"
 
     def get_queryset(self):
-        queryset = ForeignTenderProcess.objects.filter(is_active=True).prefetch_related("requirements", "purchase_orders", "updates")
+        queryset = ForeignTenderProcess.objects.filter(is_active=True).prefetch_related(
+            "requirements", "purchase_orders__provision_requests", "updates"
+        )
         year = _clean_int(self.request.GET.get("year"))
         status = self.request.GET.get("status", "")
         currency = self.request.GET.get("currency", "")
@@ -561,7 +565,7 @@ class ForeignTenderProcessHistoryView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         queryset = ForeignTenderProcess.objects.filter(is_active=False).prefetch_related(
-            "requirements", "purchase_orders", "updates"
+            "requirements", "purchase_orders__provision_requests", "updates"
         )
         year = _clean_int(self.request.GET.get("year"))
         status = self.request.GET.get("status", "")
@@ -631,7 +635,7 @@ class ForeignTenderProcessDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         return ForeignTenderProcess.objects.select_related("created_by").prefetch_related(
             "requirements__unit",
-            "purchase_orders",
+            "purchase_orders__provision_requests",
             "updates__created_by",
         )
 
@@ -660,9 +664,26 @@ class ForeignTenderRequirementCreateView(LoginRequiredMixin, SuccessMessageMixin
         self.process = get_object_or_404(ForeignTenderProcess, pk=kwargs["process_pk"])
         return super().dispatch(request, *args, **kwargs)
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.instance.process = self.process
+        return form
+
     def form_valid(self, form):
         form.instance.process = self.process
-        return super().form_valid(form)
+        try:
+            return super().form_valid(form)
+        except ValidationError as e:
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(None if field == "__all__" else field, error)
+            else:
+                form.add_error(None, e.message)
+            return self.form_invalid(form)
+        except IntegrityError:
+            form.add_error("requirement_number", "Ya existe un requerimiento con este número en esta licitación.")
+            return self.form_invalid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -678,6 +699,21 @@ class ForeignTenderRequirementUpdateView(LoginRequiredMixin, SuccessMessageMixin
     form_class = ForeignTenderRequirementForm
     template_name = "licitaciones/foreign_child_form.html"
     success_message = "Requerimiento actualizado correctamente."
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except ValidationError as e:
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(None if field == "__all__" else field, error)
+            else:
+                form.add_error(None, e.message)
+            return self.form_invalid(form)
+        except IntegrityError:
+            form.add_error("requirement_number", "Ya existe un requerimiento con este número en esta licitación.")
+            return self.form_invalid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -737,15 +773,28 @@ class ForeignTenderPurchaseOrderCreateView(LoginRequiredMixin, SuccessMessageMix
         self.process = get_object_or_404(ForeignTenderProcess, pk=kwargs["process_pk"])
         return super().dispatch(request, *args, **kwargs)
 
-    def form_valid(self, form):
-        form.instance.process = self.process
-        return super().form_valid(form)
-
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
+        form.instance.process = self.process
         if self.process.has_oca:
             form.fields.pop("saimb_number", None)
         return form
+
+    def form_valid(self, form):
+        form.instance.process = self.process
+        try:
+            return super().form_valid(form)
+        except ValidationError as e:
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(None if field == "__all__" else field, error)
+            else:
+                form.add_error(None, e.message)
+            return self.form_invalid(form)
+        except IntegrityError:
+            form.add_error("order_number", "Ya existe una orden de compra con este número en la licitación.")
+            return self.form_invalid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -767,6 +816,21 @@ class ForeignTenderPurchaseOrderUpdateView(LoginRequiredMixin, SuccessMessageMix
         if self.object.process.has_oca:
             form.fields.pop("saimb_number", None)
         return form
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except ValidationError as e:
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(None if field == "__all__" else field, error)
+            else:
+                form.add_error(None, e.message)
+            return self.form_invalid(form)
+        except IntegrityError:
+            form.add_error("order_number", "Ya existe una orden de compra con este número en la licitación.")
+            return self.form_invalid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1117,15 +1181,28 @@ class ForeignProvisionRequestCreateView(LoginRequiredMixin, SuccessMessageMixin,
             return redirect(self.purchase_order.process.get_absolute_url())
         return super().dispatch(request, *args, **kwargs)
 
-    def form_valid(self, form):
-        form.instance.purchase_order = self.purchase_order
-        return super().form_valid(form)
-
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
+        form.instance.purchase_order = self.purchase_order
         if not self.purchase_order.process.has_oca:
             form.fields.pop("saimb_number", None)
         return form
+
+    def form_valid(self, form):
+        form.instance.purchase_order = self.purchase_order
+        try:
+            return super().form_valid(form)
+        except ValidationError as e:
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(None if field == "__all__" else field, error)
+            else:
+                form.add_error(None, e.message)
+            return self.form_invalid(form)
+        except IntegrityError:
+            form.add_error("sp_number", "Ya existe una solicitud de provisión con este número en esta orden de compra.")
+            return self.form_invalid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1147,6 +1224,21 @@ class ForeignProvisionRequestUpdateView(LoginRequiredMixin, SuccessMessageMixin,
         if not self.object.purchase_order.process.has_oca:
             form.fields.pop("saimb_number", None)
         return form
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except ValidationError as e:
+            if hasattr(e, "message_dict"):
+                for field, errors in e.message_dict.items():
+                    for error in errors:
+                        form.add_error(None if field == "__all__" else field, error)
+            else:
+                form.add_error(None, e.message)
+            return self.form_invalid(form)
+        except IntegrityError:
+            form.add_error("sp_number", "Ya existe una solicitud de provisión con este número en esta orden de compra.")
+            return self.form_invalid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
