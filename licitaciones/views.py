@@ -49,6 +49,7 @@ from .models import (
     ProcurementDestination,
     TenderProcess,
     TenderStage,
+    sync_tender_opening_statuses,
 )
 
 
@@ -75,7 +76,7 @@ def _status_filter_for_group(group):
     if group == "DISPONIBLE":
         return ["PREADJUDICADO", "DISPONIBLE_ADJUDICAR", "PREADJUDICADO_DISPONIBLE"]
     if group == "EN_PROCESO":
-        return ["PUBLICADO", "EN_APERTURA", "EN_EVALUACION"]
+        return ["PUBLICADO", "EN_VISTA", "EN_APERTURA", "EN_EVALUACION"]
     if group == "SIN_EFECTO":
         return ["FRACASADO", "DESIERTO", "DEJADO_SIN_EFECTO"]
     return []
@@ -115,6 +116,7 @@ class TenderDashboardView(LoginRequiredMixin, TemplateView):
     template_name = "licitaciones/dashboard.html"
 
     def get_context_data(self, **kwargs):
+        sync_tender_opening_statuses()
         context = super().get_context_data(**kwargs)
         years = list(
             TenderProcess.objects.filter(is_active=True)
@@ -163,7 +165,10 @@ class TenderDashboardView(LoginRequiredMixin, TemplateView):
 
         status_rows = []
         for value, label in TenderProcess.STATUS_CHOICES:
-            items = [p for p in process_list if p.status == value]
+            if value == "EN_VISTA":
+                items = [p for p in process_list if p.status in ("EN_VISTA", "EN_APERTURA")]
+            else:
+                items = [p for p in process_list if p.status == value]
             count = len(items)
             if count:
                 status_rows.append(
@@ -176,45 +181,46 @@ class TenderDashboardView(LoginRequiredMixin, TemplateView):
                     }
                 )
 
-        today = timezone.localdate()
+        now = timezone.now()
+        in_vista_alerts = []
+        in_eval_alerts = []
         upcoming_opening_alerts = []
         overdue_opening_alerts = []
+
         opening_processes = [
             p
             for p in process_list
             if p.opening_date and p.operational_group in ["EN_PROCESO", "DISPONIBLE"]
         ]
-        for process in sorted(opening_processes, key=lambda p: p.opening_date):
-            opening_date = timezone.localtime(process.opening_date).date()
-            days_until = (opening_date - today).days
-            if days_until > 7:
-                break
-            if days_until < 0:
-                days_late = abs(days_until)
-                alert_label = f"Vencida hace {days_late} dia" if days_late == 1 else f"Vencida hace {days_late} dias"
-                alert_class = "text-bg-danger"
-            elif days_until == 0:
-                alert_label = "Abre hoy"
-                alert_class = "text-bg-warning"
-            elif days_until <= 7:
-                alert_label = f"En {days_until} dia" if days_until == 1 else f"En {days_until} dias"
-                alert_class = "text-bg-info"
-            else:
-                alert_label = f"En {days_until} dia(s)"
-                alert_class = "text-bg-light border"
+
+        for process in opening_processes:
+            info = process.get_opening_stage_info(now=now)
+            if not info:
+                continue
+
             alert = {
                 "process": process,
-                "alert_label": alert_label,
-                "alert_class": alert_class,
-                "days_until": days_until,
+                "alert_label": info["label"],
+                "alert_class": info["badge_class"],
+                "days_until": info.get("days", 0),
+                "stage": info["stage"],
             }
-            if days_until < 0:
+            if info["stage"] == "EN_VISTA":
+                in_vista_alerts.append(alert)
+            elif info["stage"] == "EN_EVALUACION":
+                in_eval_alerts.append(alert)
+            elif info["stage"] == "UPCOMING":
+                if info.get("days", 0) <= 7:
+                    upcoming_opening_alerts.append(alert)
+            elif info["stage"] == "OVERDUE":
                 overdue_opening_alerts.append(alert)
-            else:
-                upcoming_opening_alerts.append(alert)
 
-        overdue_opening_alerts = sorted(overdue_opening_alerts, key=lambda item: item["days_until"], reverse=True)
-        opening_alerts = upcoming_opening_alerts + overdue_opening_alerts[:5]
+        in_vista_alerts.sort(key=lambda item: item["process"].vista_end_date or item["process"].opening_date)
+        in_eval_alerts.sort(key=lambda item: item["process"].evaluacion_end_date or item["process"].opening_date)
+        upcoming_opening_alerts.sort(key=lambda item: item["process"].opening_date)
+        overdue_opening_alerts.sort(key=lambda item: item["days_until"], reverse=True)
+
+        opening_alerts = in_vista_alerts + in_eval_alerts + upcoming_opening_alerts + overdue_opening_alerts[:5]
 
         context.update(
             {
@@ -250,6 +256,7 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
+        sync_tender_opening_statuses()
         queryset = (
             TenderProcess.objects.select_related("unit", "destination", "created_by")
             .filter(is_active=True)
@@ -269,7 +276,10 @@ class TenderProcessListView(LoginRequiredMixin, ListView):
         if unit:
             queryset = queryset.filter(unit_id=unit)
         if status:
-            queryset = queryset.filter(status=status)
+            if status == "EN_VISTA":
+                queryset = queryset.filter(status__in=["EN_VISTA", "EN_APERTURA"])
+            else:
+                queryset = queryset.filter(status=status)
         elif group:
             group_statuses = _status_filter_for_group(group)
             if group_statuses:
@@ -329,6 +339,7 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
     context_object_name = "processes"
 
     def get_queryset(self):
+        sync_tender_opening_statuses()
         queryset = (
             TenderProcess.objects.select_related("unit", "destination", "created_by")
             .filter(is_active=False)
@@ -346,7 +357,10 @@ class TenderProcessHistoryView(LoginRequiredMixin, ListView):
         if unit:
             queryset = queryset.filter(unit_id=unit)
         if status:
-            queryset = queryset.filter(status=status)
+            if status == "EN_VISTA":
+                queryset = queryset.filter(status__in=["EN_VISTA", "EN_APERTURA"])
+            else:
+                queryset = queryset.filter(status=status)
         if classification:
             queryset = queryset.filter(classification=classification)
         if ipp:
@@ -432,6 +446,10 @@ class TenderProcessDetailView(LoginRequiredMixin, DetailView):
     template_name = "licitaciones/process_detail.html"
     context_object_name = "process"
 
+    def dispatch(self, request, *args, **kwargs):
+        sync_tender_opening_statuses()
+        return super().dispatch(request, *args, **kwargs)
+
     def get_queryset(self):
         return TenderProcess.objects.select_related("unit", "destination", "created_by")
 
@@ -442,6 +460,10 @@ class TenderProcessUpdateView(LoginRequiredMixin, GroupRequiredMixin, SuccessMes
     form_class = TenderProcessForm
     template_name = "licitaciones/process_form.html"
     success_message = "Proceso licitatorio actualizado correctamente."
+
+    def dispatch(self, request, *args, **kwargs):
+        sync_tender_opening_statuses()
+        return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         if self.object.is_active:

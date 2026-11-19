@@ -78,6 +78,8 @@ class TenderProcessForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance and self.instance.status == "EN_APERTURA":
+            self.initial["status"] = "EN_VISTA"
         default_keys = [c[0] for c in TenderProcess.CLASSIFICATION_CHOICES]
         existing_custom = (
             TenderProcess.objects.exclude(classification__in=default_keys)

@@ -7,8 +7,27 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils import timezone
 
 from core.models import Unit
+
+
+def add_business_days(start_dt, n_days):
+    """
+    Suma n_days días hábiles (lunes a viernes) a start_dt manteniendo la hora.
+    Si start_dt cae en fin de semana, se normaliza al lunes siguiente antes de sumar.
+    """
+    if not start_dt:
+        return None
+    cur = start_dt
+    while cur.weekday() >= 5:
+        cur += timedelta(days=1)
+    added = 0
+    while added < n_days:
+        cur += timedelta(days=1)
+        if cur.weekday() < 5:
+            added += 1
+    return cur
 
 
 class ProcurementDestination(models.Model):
@@ -43,8 +62,8 @@ class TenderProcess(models.Model):
 
     STATUS_CHOICES = [
         ("PUBLICADO", "Publicado"),
-        ("EN_APERTURA", "En apertura"),
-        ("EN_EVALUACION", "En evaluacion"),
+        ("EN_VISTA", "En vista"),
+        ("EN_EVALUACION", "Evaluacion / apertura"),
         ("PREADJUDICADO_DISPONIBLE", "Preadjudicado / Disponible para adjudicar"),
         ("ADJUDICADO", "Adjudicado"),
         ("FRACASADO", "Fracasado"),
@@ -173,7 +192,16 @@ class TenderProcess(models.Model):
         destination_name = self.unit.name if self.unit else (self.destination.code if self.destination else "SIN_UNIDAD")
         return f"{self.process_number} - {destination_name}"
 
+    def get_status_display(self):
+        if self.status == "EN_APERTURA":
+            return "En vista"
+        return dict(self.STATUS_CHOICES).get(self.status, self.status)
+
     def save(self, *args, **kwargs):
+        if self.status == "EN_APERTURA":
+            self.status = "EN_VISTA"
+        if self.opening_date and self.opening_date > timezone.now() and self.status in ["EN_VISTA", "EN_APERTURA"]:
+            self.status = "PUBLICADO"
         if self.process_number:
             self.process_number = self.process_number.upper().strip()
         if self.expediente:
@@ -183,6 +211,82 @@ class TenderProcess(models.Model):
         if self.name:
             self.name = self.name.strip()
         super().save(*args, **kwargs)
+
+    @property
+    def vista_end_date(self):
+        if not self.opening_date:
+            return None
+        return add_business_days(self.opening_date, 2)
+
+    @property
+    def evaluacion_end_date(self):
+        if not self.opening_date:
+            return None
+        return add_business_days(self.opening_date, 7)
+
+    def get_opening_stage_info(self, now=None):
+        if not self.opening_date:
+            return None
+        if now is None:
+            now = timezone.now()
+
+        t0 = self.opening_date
+        t_vista = self.vista_end_date
+        t_eval = self.evaluacion_end_date
+
+        if now < t0:
+            today = timezone.localdate()
+            opening_day = timezone.localtime(t0).date()
+            days_until = (opening_day - today).days
+            if days_until == 0:
+                return {
+                    "stage": "UPCOMING",
+                    "label": "Abre hoy",
+                    "badge_class": "text-bg-warning",
+                    "days": 0,
+                }
+            return {
+                "stage": "UPCOMING",
+                "label": f"En {days_until} dia" if days_until == 1 else f"En {days_until} dias",
+                "badge_class": "text-bg-info" if days_until <= 7 else "text-bg-light border",
+                "days": days_until,
+            }
+
+        if now < t_vista:
+            return {
+                "stage": "EN_VISTA",
+                "label": "En vista",
+                "badge_class": "text-bg-primary",
+                "days": 0,
+                "end_date": t_vista,
+            }
+
+        if now < t_eval:
+            return {
+                "stage": "EN_EVALUACION",
+                "label": "Evaluacion / apertura",
+                "badge_class": "text-bg-warning text-dark",
+                "days": 0,
+                "end_date": t_eval,
+            }
+
+        today = timezone.localdate()
+        eval_day = timezone.localtime(t_eval).date()
+        days_late = (today - eval_day).days
+        if days_late <= 0:
+            label = "Vencida hoy"
+        elif days_late == 1:
+            label = "Vencida hace 1 dia"
+        else:
+            label = f"Vencida hace {days_late} dias"
+
+        return {
+            "stage": "OVERDUE",
+            "label": label,
+            "badge_class": "text-bg-danger",
+            "days": -max(1, days_late),
+            "end_date": t_eval,
+        }
 
     def get_absolute_url(self):
         return reverse("licitaciones:process_list")
@@ -218,6 +322,42 @@ class TenderProcess(models.Model):
         if self.foreign_amount is not None:
             return self.foreign_amount
         return None
+
+
+def sync_tender_opening_statuses():
+    """
+    Sincroniza automáticamente en la base de datos el estado de licitaciones nacionales activas:
+      - Al llegar la fecha de apertura: pasa de PUBLICADO a EN_VISTA (por 48 hs hábiles).
+      - Pasadas las 48 hs hábiles: pasa a EN_EVALUACION (por 120 hs / 5 días hábiles).
+    No altera procesos preadjudicados, adjudicados o dados de baja.
+    """
+    now = timezone.now()
+    # 1. De PUBLICADO a EN_VISTA o EN_EVALUACION si ya abrió
+    publicados = TenderProcess.objects.filter(
+        is_active=True,
+        status="PUBLICADO",
+        opening_date__isnull=False,
+        opening_date__lte=now,
+    )
+    for p in publicados:
+        vista_end = p.vista_end_date
+        if vista_end and now < vista_end:
+            p.status = "EN_VISTA"
+        else:
+            p.status = "EN_EVALUACION"
+        p.save(update_fields=["status"])
+
+    # 2. De EN_VISTA a EN_EVALUACION si expiraron las 48 hs hábiles
+    en_vista = TenderProcess.objects.filter(
+        is_active=True,
+        status__in=["EN_VISTA", "EN_APERTURA"],
+        opening_date__isnull=False,
+    )
+    for p in en_vista:
+        vista_end = p.vista_end_date
+        if vista_end and now >= vista_end:
+            p.status = "EN_EVALUACION"
+            p.save(update_fields=["status"])
 
 
 class ForeignTenderProcess(models.Model):
