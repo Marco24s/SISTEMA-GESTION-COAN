@@ -704,19 +704,19 @@ class ForeignTenderPurchaseOrder(models.Model):
                 })
 
         if self.process_id and self.amount is not None:
-            awarded = self.process.awarded_amount
-            if awarded is not None:
+            evaluation = self.process.evaluation_amount
+            if evaluation is not None:
                 qs = self.process.purchase_orders.all()
                 if self.pk:
                     qs = qs.exclude(pk=self.pk)
                 total_other = sum(po.amount for po in qs if po.amount)
                 new_total = total_other + self.amount
-                if new_total > awarded:
-                    available = awarded - total_other
+                if new_total > evaluation:
+                    available = evaluation - total_other
                     if available < 0:
                         available = 0
                     raise ValidationError({
-                        "amount": f"La suma del monto de las Órdenes de Compra ({new_total}) supera el monto asignado en adjudicación ({awarded}). El disponible máximo para esta orden es {available}."
+                        "amount": f"La suma del monto de las Órdenes de Compra ({new_total}) supera el monto del dictamen de evaluación / adjudicación ({evaluation}). El disponible máximo para esta orden es {available}."
                     })
 
     @property
@@ -815,6 +815,24 @@ class ForeignProvisionRequest(models.Model):
                         available = 0
                     raise ValidationError({
                         "amount": f"La suma de las Solicitudes de Provisión ({new_total}) supera el monto de la Orden de Compra ({po_amount}). El saldo disponible para esta SP es {available}."
+                    })
+
+            process = getattr(self.purchase_order, "process", None)
+            if process and process.awarded_amount is not None:
+                awarded = process.awarded_amount
+                qs_process = ForeignProvisionRequest.objects.filter(
+                    purchase_order__process=process
+                )
+                if self.pk:
+                    qs_process = qs_process.exclude(pk=self.pk)
+                total_other_process = sum(sp.amount for sp in qs_process if sp.amount)
+                new_total_process = total_other_process + self.amount
+                if new_total_process > awarded:
+                    available = awarded - total_other_process
+                    if available < 0:
+                        available = 0
+                    raise ValidationError({
+                        "amount": f"La suma de las Solicitudes de Provisión ({new_total_process}) supera el monto asignado en adjudicación ({awarded}). El saldo disponible para esta SP es {available}."
                     })
 
     def save(self, *args, **kwargs):

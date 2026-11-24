@@ -1,7 +1,7 @@
 {% extends "licitaciones/base_foreign.html" %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% if child_type == "requirement" %}Requerimiento{% elif child_type == "purchase_order" %}Orden de compra{% else %}Novedad documental{% endif %}{% endblock %}
+{% block title %}{% if child_type == "requirement" %}Requerimiento{% elif child_type == "purchase_order" %}Orden de compra{% elif child_type == "provision_request" %}Solicitud de provisión{% else %}Novedad documental{% endif %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center mt-4">
@@ -13,6 +13,8 @@
                         <i class="fa-solid fa-list-check me-2"></i>{% if object %}Editar requerimiento{% else %}Nuevo requerimiento{% endif %}
                     {% elif child_type == "purchase_order" %}
                         <i class="fa-solid fa-file-invoice-dollar me-2"></i>{% if object %}Editar orden de compra{% else %}Nueva orden de compra{% endif %}
+                    {% elif child_type == "provision_request" %}
+                        <i class="fa-solid fa-file-lines me-2"></i>{% if object %}Editar solicitud de provisión{% else %}Nueva solicitud de provisión{% endif %}
                     {% else %}
                         <i class="fa-solid fa-clock-rotate-left me-2"></i>Nueva novedad documental
                     {% endif %}
@@ -24,6 +26,8 @@
                 <div class="alert alert-light border">El monto del requerimiento se registra en {{ process.currency_label }}.</div>
                 {% elif child_type == "purchase_order" %}
                 <div class="alert alert-light border">El monto de la orden se registra en {{ process.currency_label }}.</div>
+                {% elif child_type == "provision_request" %}
+                <div class="alert alert-light border">El monto de la solicitud de provisión se registra en {{ process.currency_label }}.</div>
                 {% endif %}
                 <form method="post">
                     {% csrf_token %}

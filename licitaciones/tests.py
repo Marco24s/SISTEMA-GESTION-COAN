@@ -13,6 +13,7 @@ from django.utils import timezone
 from core.models import Unit, UserSystemPIN
 from licitaciones.forms import ForeignTenderProcessForm
 from licitaciones.models import (
+    ForeignProvisionRequest,
     ForeignTenderProcess,
     ForeignTenderPurchaseOrder,
     ForeignTenderRequirement,
@@ -311,3 +312,60 @@ class ForeignTenderTests(TestCase):
         self.assertTrue(
             process.requirements.filter(requirement_number="500010").exists()
         )
+
+
+    def test_purchase_order_maximum_is_evaluation_amount(self):
+        process = self.create_process()
+        process.evaluation_amount = Decimal("200000.00")
+        process.awarded_amount = Decimal("50000.00")
+        process.has_oca = True
+        process.save()
+
+        # Should succeed even though it exceeds awarded_amount (50,000)
+        # because the maximum for purchase orders is evaluation_amount (200,000)
+        order = ForeignTenderPurchaseOrder.objects.create(
+            process=process,
+            order_number="OCA 01/26",
+            supplier="Supplier Test",
+            amount=Decimal("180000.00"),
+        )
+        self.assertEqual(order.amount, Decimal("180000.00"))
+
+        # Should fail if it exceeds evaluation_amount
+        with self.assertRaises(ValidationError) as cm:
+            ForeignTenderPurchaseOrder.objects.create(
+                process=process,
+                order_number="OCA 02/26",
+                amount=Decimal("30000.00"),
+            )
+        self.assertIn("amount", cm.exception.message_dict)
+
+    def test_provision_request_maximum_is_awarded_amount(self):
+        process = self.create_process()
+        process.evaluation_amount = Decimal("200000.00")
+        process.awarded_amount = Decimal("50000.00")
+        process.has_oca = True
+        process.save()
+
+        order = ForeignTenderPurchaseOrder.objects.create(
+            process=process,
+            order_number="OCA 01/26",
+            amount=Decimal("150000.00"),
+        )
+
+        # SP within awarded_amount succeeds
+        sp1 = ForeignProvisionRequest.objects.create(
+            purchase_order=order,
+            sp_number="SP 01/26",
+            amount=Decimal("30000.00"),
+        )
+        self.assertEqual(sp1.amount, Decimal("30000.00"))
+
+        # Second SP exceeds awarded_amount (30000 + 25000 = 55000 > 50000), even though within PO amount (150000)
+        with self.assertRaises(ValidationError) as cm:
+            ForeignProvisionRequest.objects.create(
+                purchase_order=order,
+                sp_number="SP 02/26",
+                amount=Decimal("25000.00"),
+            )
+        self.assertIn("amount", cm.exception.message_dict)
